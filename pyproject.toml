@@ -1,0 +1,30 @@
+[build-system]
+requires = ["meson-python>=0.15", "pybind11"]
+build-backend = "mesonpy"
+
+[project]
+name = "layrics"
+version = "0.1.0"
+description = "ASS subtitle overlay on wlr-layer-shell"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+dependencies = [
+    "httpx[brotli,http2]",
+    "dbus-python",
+    "PyGObject",
+    "click>=8.4.1",
+    "PySide6-Essentials>=6.8.0",
+    "mutagen",
+    "diskcache",
+    "charset-normalizer",
+    "pyaes",
+    "appdirs",
+    "tomli; python_version < '3.11'",
+]
+
+[project.scripts]
+layrics = "layrics.main:main"
+layctl = "layrics.layctl:cli"
+
+[tool.meson-python.args]
+setup = ["-Dbuildtype=release"]

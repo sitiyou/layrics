@@ -1,0 +1,7 @@
+/refs
+__pycache__/
+dist/
+*.egg-info/
+.venv/
+/*_PLAN.md
+/AGENTS.md
