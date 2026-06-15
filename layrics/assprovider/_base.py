@@ -46,17 +46,15 @@ class DefaultProvider(AssProvider):
     def generate(
         self, lyrics: Lyrics, duration_ms: int | None = None
     ) -> str:
-        orig_type = lyrics.types.get(lyrics.primary_lang)
+        orig_type = lyrics.types.get(lyrics.primary_track)
 
         if orig_type == LyricsType.PlainText:
-            return self._generate_plaintext(lyrics)
+            return self._generate_plaintext(lyrics, duration_ms)
 
         fslyrics = lyrics.get_fslyrics(duration_ms)
-        active_langs = self._get_active_langs(fslyrics, lyrics)
-        alignment = self._build_alignment(fslyrics, active_langs, lyrics.primary_lang)
         use_karaoke = orig_type == LyricsType.VERBATIM and self.karaoke
 
-        orig_data = fslyrics[lyrics.primary_lang]
+        orig_data = fslyrics[lyrics.primary_track]
         header = AssHeader(title=lyrics.title or "lyrics")
 
         # Step 1: advance start by up to advance_ms into the gap of the same-side line
@@ -83,7 +81,9 @@ class DefaultProvider(AssProvider):
         events: list[AssDialogueLine] = []
         secondary: AssStyle | None = None
 
-        for i, oline in enumerate(orig_data):
+        for i, (oline, aligned) in enumerate(
+            lyrics.iter_aligned(fslyrics, secondary_enabled=self.secondary_enabled)
+        ):
             start, end, shift = advanced[i]
             text = self._karaoke_text(oline) if use_karaoke else self._plain_text(oline)
             if shift > 0 and use_karaoke:
@@ -93,11 +93,7 @@ class DefaultProvider(AssProvider):
                 style=primary.name, text=text,
             ))
 
-            for lang in active_langs[1:]:
-                li = alignment.get(lang, {}).get(i)
-                if li is None or li < 0:
-                    continue
-                lline = fslyrics[lang][li]
+            for lang, lline in aligned.items():
                 stext = self._plain_text(lline)
                 if stext == text:
                     continue
@@ -194,21 +190,22 @@ class DefaultProvider(AssProvider):
         )
         return left, right
 
-    def _generate_plaintext(self, lyrics: Lyrics) -> str:
-        orig = lyrics.get(lyrics.primary_lang)
+    def _generate_plaintext(self, lyrics: Lyrics, duration_ms: int | None = None) -> str:
+        orig = lyrics.get(lyrics.primary_track)
         if not orig:
             return ""
         ptext = ass_escape("".join(w.text for line in orig for w in line.words).strip())
+        end_ms = duration_ms or 5000
 
         primary = self._adjust(lyrics.primary_style, is_primary=True, secondary_style=lyrics.secondary_style)
         styles = [primary]
         events = [AssDialogueLine(
-            start_ms=0, end_ms=5000,
+            start_ms=0, end_ms=end_ms,
             style=primary.name, text=ptext,
         )]
 
         if self.secondary_enabled:
-            sec = lyrics.secondary_lang
+            sec = lyrics.secondary_track
             if sec:
                 sdata = lyrics.get(sec)
                 if sdata:
@@ -217,7 +214,7 @@ class DefaultProvider(AssProvider):
                         secondary = self._adjust(lyrics.secondary_style, is_primary=False, secondary_style=lyrics.secondary_style)
                         styles.append(secondary)
                         events.append(AssDialogueLine(
-                            start_ms=0, end_ms=5000,
+                            start_ms=0, end_ms=end_ms,
                             style=secondary.name, text=stext,
                         ))
 
@@ -237,35 +234,6 @@ class DefaultProvider(AssProvider):
         if mv == style.margin_v:
             return style
         return replace(style, margin_v=mv)
-
-    def _get_active_langs(self, fslyrics: FSLyrics, lyrics: Lyrics) -> list[str]:
-        langs = [lyrics.primary_lang]
-        sec = lyrics.secondary_lang
-        if self.secondary_enabled and sec and sec in fslyrics and len(fslyrics[sec]) > 0:
-            langs.append(sec)
-        return langs
-
-    def _build_alignment(
-        self, fslyrics: FSLyrics, active_langs: list[str], primary_lang: str
-    ) -> dict[str, dict[int, int]]:
-        alignment: dict[str, dict[int, int]] = {}
-        orig_data = fslyrics[primary_lang]
-        for lang in active_langs[1:]:
-            if lang not in fslyrics:
-                continue
-            lang_data = fslyrics[lang]
-            mapping: dict[int, int] = {}
-            for oi, oline in enumerate(orig_data):
-                best = -1
-                best_dist = 2**31 - 1
-                for li, lline in enumerate(lang_data):
-                    dist = abs(lline.start - oline.start)
-                    if dist < best_dist:
-                        best_dist = dist
-                        best = li
-                mapping[oi] = best
-            alignment[lang] = mapping
-        return alignment
 
     def _karaoke_text(self, line: FSLyricsLine) -> str:
         if len(line.words) <= 1:
