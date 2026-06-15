@@ -19,7 +19,7 @@ void AssRenderer::messageCallback(int level, const char *fmt, va_list va,
     if (level > 6) {
         return;
     }
-    if (::layrics::debugEnabled()) {
+    if (::layrics::g_debugEnabled) {
         fprintf(stderr, "[DEBUG] libass/%d: ", level);
         vfprintf(stderr, fmt, va);
     }

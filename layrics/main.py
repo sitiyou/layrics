@@ -51,6 +51,12 @@ logging.basicConfig(
 )
 logger = logging.getLogger("layrics")
 
+# LAYRICS_DEBUG=ruby,match  → 模块级 DEBUG
+for name in os.environ.get("LAYRICS_DEBUG", "").split(","):
+    name = name.strip()
+    if name and name != "core":
+        logging.getLogger(f"layrics.{name}").setLevel(logging.DEBUG)
+
 
 class LayricsApp:
     """Orchestrates overlay, MPRIS monitoring, NetEase API, and IPC."""

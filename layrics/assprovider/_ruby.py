@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import logging
 import re
+
+
+logger = logging.getLogger("layrics.ruby")
 
 
 # 行级 detect：kanji + 可选空格 + 括号 ruby（跨 word 边界也能匹配）
@@ -49,31 +53,37 @@ def _is_ruby_content(word_start: int, word_end: int, ranges: list[tuple[int, int
     return False
 
 
-def detect_ruby(lyrics) -> bool:
+def detect_ruby(lyrics, track: str | None = None) -> bool:
     total = 0
     ruby_lines = 0
-    for data in lyrics.values():
-        for line in data:
+    for lang in lyrics:
+        if track is not None and lang != track:
+            continue
+        for line in lyrics[lang]:
             total += 1
             text = ' '.join(w.text for w in line.words)
             if _RUBY_RE.search(text):
                 ruby_lines += 1
-    return total > 0 and ruby_lines / total >= _RUBY_LINE_RATIO
+    ratio = ruby_lines / total if total > 0 else 0
+    result = total > 0 and ratio >= _RUBY_LINE_RATIO
+    logger.debug("detect: total_lines=%d ruby_lines=%d ratio=%.2f threshold=%.2f strip=%s",
+               total, ruby_lines, ratio, _RUBY_LINE_RATIO, result)
+    return result
 
 
-def strip_ruby(lyrics) -> None:
-    if not detect_ruby(lyrics):
+def strip_ruby(lyrics, track: str | None = None) -> None:
+    if not detect_ruby(lyrics, track=track):
         return
     for lang in list(lyrics.keys()):
         data = lyrics[lang]
         new_lines: list = []
-        for line in data:
+        for li, line in enumerate(data):
             text = ''.join(w.text for w in line.words)
             ruby_ranges = _find_bracket_ranges(text)
 
             new_words: list = []
             pos = 0
-            for w in line.words:
+            for wi, w in enumerate(line.words):
                 word_start = pos
                 word_end = pos + len(w.text)
                 pos = word_end

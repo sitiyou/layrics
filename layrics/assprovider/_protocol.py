@@ -67,10 +67,10 @@ class Lyrics(_LDCLyrics):
         self._strip_ruby()
 
     def _strip_ruby(self) -> None:
-        _ruby.strip_ruby(self)
+        _ruby.strip_ruby(self, track=self._primary_track)
 
     def _detect_ruby(self) -> bool:
-        return _ruby.detect_ruby(self)
+        return _ruby.detect_ruby(self, track=self._primary_track)
 
     @property
     def primary_track(self) -> str:
