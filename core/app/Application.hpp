@@ -42,6 +42,7 @@ class Application {
     void unlock();
     void clear();
     int getStartTime() { return m_startTimeMs; };
+    AppStatus getStatus();
 
     static void frameDone(void *data, wl_callback *cb, uint32_t time);
 

@@ -24,6 +24,7 @@ class ApplicationController {
     void setPaused(bool paused);
     void setStartTime(int64_t ms);
     int getStartTime();
+    AppStatus getStatus();
     void setHidden(bool hidden);
     void setLocked(bool locked);
 

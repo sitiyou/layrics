@@ -311,3 +311,15 @@ void Application::clear() {
 void Application::setStartTime(int64_t ms) {
     m_startTimeMs = ms;
 }
+
+AppStatus Application::getStatus() {
+    auto dragState = m_dragMgr.state();
+    AppStatus s;
+    s.paused = m_paused;
+    s.hidden = m_hidden;
+    s.locked = m_locked;
+    s.startTimeMs = m_startTimeMs;
+    s.dragOffsetX = dragState.offsetX;
+    s.dragOffsetY = dragState.offsetY;
+    return s;
+}

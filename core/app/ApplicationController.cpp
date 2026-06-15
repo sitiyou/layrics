@@ -53,6 +53,10 @@ int ApplicationController::getStartTime() {
     return m_app.getStartTime();
 }
 
+AppStatus ApplicationController::getStatus() {
+    return m_app.getStatus();
+}
+
 void ApplicationController::setHidden(bool hidden) {
     std::lock_guard<std::mutex> lock(m_mutex);
     m_pendingHide.push(hidden);

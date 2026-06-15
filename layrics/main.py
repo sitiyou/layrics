@@ -459,12 +459,14 @@ class LayricsApp:
                             player_info["track"] = asdict(self._last_track)
                     except Exception:
                         player_info = {"error": "disconnected"}
+                overlay = self.ctrl.get_status()
+                overlay["position_ms"] = int(time.monotonic() * 1000) - overlay["start_time_ms"]
                 return {
                     "id": req_id,
                     "type": "result",
                     "data": {
                         "mpris_player": player_info,
-                        "overlay": {"paused": self._paused, "position_ms": int(time.monotonic() * 1000) - self.ctrl.get_start_time()},
+                        "overlay": overlay,
                     },
                 }
 
