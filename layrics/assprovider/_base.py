@@ -77,7 +77,7 @@ class DefaultProvider(AssProvider):
                 pairs[i] = (pairs[i][0], pairs[i + 1][0])
 
         # Step 2: advance start by up to advance_ms into the gap of the same-side line
-        is_double = self.line_mode == "double"
+        is_double = self.line_mode == "double" and len(orig_data) > 3
         advanced = []
         for i, (start, end) in enumerate(pairs):
             if is_double:
