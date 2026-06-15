@@ -6,7 +6,7 @@ from LDDC.common.models import Lyrics as _LDCLyrics, SearchType, SongInfo, Sourc
 from LDDC.core.api.lyrics import get_lyrics as _lddc_get_lyrics
 from LDDC.core.api.lyrics import search as _lddc_search
 
-from .assprovider import DefaultProvider, Lyrics, match_provider
+from .assprovider import AssProvider, DefaultProvider, Lyrics, match_provider
 from .config import get_config
 
 
@@ -98,21 +98,21 @@ def fetch_lyrics(
     player_name: str = "",
 ) -> str:
     song_info = _resolve_song_info(song_info)
-    lyrics: Lyrics = _lddc_get_lyrics(song_info)
-    if not lyrics:
+    lddc_lyrics = _lddc_get_lyrics(song_info)
+    if not lddc_lyrics:
         msg = f"no lyrics returned for {song_info.title}"
         raise RuntimeError(msg)
 
-    provider_cls = match_provider(player_name, lyrics) or DefaultProvider
+    provider_cls = match_provider(player_name, lddc_lyrics) or DefaultProvider
     cfg = get_config()
     lyrics = Lyrics(
-        lyrics,
+        lddc_lyrics,
         fonts=cfg.fonts,
         primary_override=cfg.get_style_config("primary"),
         secondary_override=cfg.get_style_config("secondary"),
     )
-    provider = provider_cls(
-        config=cfg.get_provider_config(getattr(provider_cls, "PROVIDER", "")),
+    provider: AssProvider = provider_cls(
+        config=cfg.get_provider_config(getattr(provider_cls, "PROVIDER", "")),  # type: ignore[call-arg]
     )
     dur_ms = song_info.duration
     ass = provider.generate(lyrics, duration_ms=dur_ms)

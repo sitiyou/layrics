@@ -224,7 +224,9 @@ class DefaultProvider(AssProvider):
         header = AssHeader(title=lyrics.title or "lyrics")
         return build_ass(header, styles, events)
 
-    def _adjust(self, style: AssStyle, is_primary: bool, secondary_style: AssStyle | None) -> AssStyle:
+    def _adjust(self, style: AssStyle | None, is_primary: bool, secondary_style: AssStyle | None) -> AssStyle:
+        if style is None:
+            style = DEFAULT_PRIMARY if is_primary else DEFAULT_SECONDARY
         if secondary_style is None:
             secondary_style = DEFAULT_SECONDARY
         spacing = int(secondary_style.font_size) + self.margin_v_spacing

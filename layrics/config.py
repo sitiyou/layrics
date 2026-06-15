@@ -26,7 +26,7 @@ class Config:
         try:
             import tomllib
         except ImportError:
-            import tomli as tomllib
+            import tomli as tomllib  # type: ignore[import-unresolved]
         with open(_CONFIG_PATH, "rb") as f:
             data = tomllib.load(f)
         raw = data.get("include_players", [])

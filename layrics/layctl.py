@@ -96,7 +96,7 @@ def search(ctx, keyword: str, limit: int):
 @click.option("--sync", is_flag=True, help="Also update overlay with fetched lyrics")
 @click.pass_context
 def fetch(ctx, song_id: str, sync: bool):
-    params = {"sync": sync}
+    params: dict[str, Any] = {"sync": sync}
     if song_id:
         params["song_id"] = song_id
     resp = _call(ctx.obj["socket"], "fetch_lyrics", params)

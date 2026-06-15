@@ -221,6 +221,7 @@ class LayricsApp:
         loop.add_reader(self._signal_monitor.fileno(), self._on_mpris_signal)
 
     def _on_mpris_signal(self):
+        assert self._signal_monitor is not None
         for event in self._signal_monitor.read_events():
             typ = event.get("type")
             val = event.get("value")
@@ -252,6 +253,7 @@ class LayricsApp:
 
     def _stop_signal_monitor(self):
         if self._signal_reader:
+            assert self._signal_monitor is not None
             loop = asyncio.get_event_loop()
             loop.remove_reader(self._signal_monitor.fileno())
             self._signal_reader = None
