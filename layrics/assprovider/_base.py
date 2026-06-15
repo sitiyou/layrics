@@ -6,7 +6,6 @@ from typing import Any
 from LDDC.common.models import (
     FSLyrics,
     FSLyricsLine,
-    Lyrics,
     LyricsType,
 )
 
@@ -18,7 +17,7 @@ from ._ass import (
     DEFAULT_PRIMARY,
     DEFAULT_SECONDARY,
 )
-from ._protocol import AssContext, AssProvider, AssTrigger
+from ._protocol import AssProvider, AssTrigger, Lyrics
 from ._util import ass_escape
 
 
@@ -29,16 +28,9 @@ class DefaultProvider(AssProvider):
 
     def __init__(
         self,
-        ctx: AssContext | None = None,
-        extra_config: dict[str, Any] | None = None,
+        config: dict[str, Any] | None = None,
     ) -> None:
-        ctx = ctx or AssContext()
-        self.primary_style = ctx.primary_style
-        self.secondary_style = ctx.secondary_style or DEFAULT_SECONDARY
-        self.primary_lang = ctx.primary_lang
-        self.secondary_lang = ctx.secondary_lang
-
-        cfg = extra_config or {}
+        cfg = config or {}
         self.primary_position = str(cfg.get("primary_position", "top"))
         self.margin_v_spacing = int(cfg.get("margin_v_spacing", 2))
         self.karaoke = bool(cfg.get("karaoke", True))
@@ -51,33 +43,25 @@ class DefaultProvider(AssProvider):
         self.double_margin_r = cfg.get("double_margin_r", None)
         self.double_margin_max_length = cfg.get("double_margin_max_length", None)
 
-        if self.line_mode == "double" and self.secondary_enabled:
-            self.secondary_enabled = False
-
     def generate(
         self, lyrics: Lyrics, duration_ms: int | None = None
     ) -> str:
-        orig_type = lyrics.types.get(self.primary_lang)
+        orig_type = lyrics.types.get(lyrics.primary_lang)
 
         if orig_type == LyricsType.PlainText:
             return self._generate_plaintext(lyrics)
 
         fslyrics = lyrics.get_fslyrics(duration_ms)
-        active_langs = self._get_active_langs(fslyrics)
-        alignment = self._build_alignment(fslyrics, active_langs)
+        active_langs = self._get_active_langs(fslyrics, lyrics)
+        alignment = self._build_alignment(fslyrics, active_langs, lyrics.primary_lang)
         use_karaoke = orig_type == LyricsType.VERBATIM and self.karaoke
 
-        orig_data = fslyrics[self.primary_lang]
+        orig_data = fslyrics[lyrics.primary_lang]
         header = AssHeader(title=lyrics.title or "lyrics")
 
-        # Step 1: normalize — clip end to next.start so input overlap is removed
-        pairs = [(line.start, line.end) for line in orig_data]
-        for i in range(len(pairs) - 1):
-            if pairs[i][1] > pairs[i + 1][0]:
-                pairs[i] = (pairs[i][0], pairs[i + 1][0])
-
-        # Step 2: advance start by up to advance_ms into the gap of the same-side line
+        # Step 1: advance start by up to advance_ms into the gap of the same-side line
         is_double = self.line_mode == "double" and len(orig_data) > 3
+        pairs = [(line.start, line.end) for line in orig_data]
         advanced = []
         for i, (start, end) in enumerate(pairs):
             if is_double:
@@ -91,10 +75,10 @@ class DefaultProvider(AssProvider):
 
         if is_double:
             return self._generate_double(
-                header, orig_data, use_karaoke, advanced,
+                header, orig_data, use_karaoke, advanced, lyrics,
             )
 
-        primary = self._adjust(self.primary_style, is_primary=True)
+        primary = self._adjust(lyrics.primary_style, is_primary=True, secondary_style=lyrics.secondary_style)
         styles = [primary]
         events: list[AssDialogueLine] = []
         secondary: AssStyle | None = None
@@ -118,7 +102,7 @@ class DefaultProvider(AssProvider):
                 if stext == text:
                     continue
                 if secondary is None:
-                    secondary = self._adjust(self.secondary_style, is_primary=False)
+                    secondary = self._adjust(lyrics.secondary_style, is_primary=False, secondary_style=lyrics.secondary_style)
                     styles.append(secondary)
                 events.append(AssDialogueLine(
                     start_ms=start, end_ms=end,
@@ -133,13 +117,14 @@ class DefaultProvider(AssProvider):
         orig_data: list[FSLyricsLine],
         use_karaoke: bool,
         advanced: list[tuple[int, int, int]],
+        lyrics: Lyrics,
     ) -> str:
         left_style, right_style = self._build_double_styles(
-            self._adjust(self.primary_style, is_primary=True),
+            self._adjust(lyrics.primary_style, is_primary=True, secondary_style=lyrics.secondary_style),
             header,
         )
         if not use_karaoke:
-            dim_colour = self.primary_style.secondary_colour
+            dim_colour = lyrics.primary_style.secondary_colour
             left_dim = replace(left_style, name=left_style.name + "Dim", primary_colour=dim_colour)
             right_dim = replace(right_style, name=right_style.name + "Dim", primary_colour=dim_colour)
             styles = [left_style, left_dim, right_style, right_dim]
@@ -210,12 +195,12 @@ class DefaultProvider(AssProvider):
         return left, right
 
     def _generate_plaintext(self, lyrics: Lyrics) -> str:
-        orig = lyrics.get(self.primary_lang)
+        orig = lyrics.get(lyrics.primary_lang)
         if not orig:
             return ""
         ptext = ass_escape("".join(w.text for line in orig for w in line.words).strip())
 
-        primary = self._adjust(self.primary_style, is_primary=True)
+        primary = self._adjust(lyrics.primary_style, is_primary=True, secondary_style=lyrics.secondary_style)
         styles = [primary]
         events = [AssDialogueLine(
             start_ms=0, end_ms=5000,
@@ -223,13 +208,13 @@ class DefaultProvider(AssProvider):
         )]
 
         if self.secondary_enabled:
-            sec = self.secondary_lang
+            sec = lyrics.secondary_lang
             if sec:
                 sdata = lyrics.get(sec)
                 if sdata:
                     stext = ass_escape("".join(w.text for line in sdata for w in line.words).strip())
                     if stext and stext != ptext:
-                        secondary = self._adjust(self.secondary_style, is_primary=False)
+                        secondary = self._adjust(lyrics.secondary_style, is_primary=False, secondary_style=lyrics.secondary_style)
                         styles.append(secondary)
                         events.append(AssDialogueLine(
                             start_ms=0, end_ms=5000,
@@ -239,8 +224,10 @@ class DefaultProvider(AssProvider):
         header = AssHeader(title=lyrics.title or "lyrics")
         return build_ass(header, styles, events)
 
-    def _adjust(self, style: AssStyle, is_primary: bool) -> AssStyle:
-        spacing = int(self.secondary_style.font_size) + self.margin_v_spacing
+    def _adjust(self, style: AssStyle, is_primary: bool, secondary_style: AssStyle | None) -> AssStyle:
+        if secondary_style is None:
+            secondary_style = DEFAULT_SECONDARY
+        spacing = int(secondary_style.font_size) + self.margin_v_spacing
         if self.primary_position == "bottom":
             mv = style.margin_v if is_primary else style.margin_v + spacing
         else:
@@ -249,18 +236,18 @@ class DefaultProvider(AssProvider):
             return style
         return replace(style, margin_v=mv)
 
-    def _get_active_langs(self, fslyrics: FSLyrics) -> list[str]:
-        langs = [self.primary_lang]
-        sec = self.secondary_lang
+    def _get_active_langs(self, fslyrics: FSLyrics, lyrics: Lyrics) -> list[str]:
+        langs = [lyrics.primary_lang]
+        sec = lyrics.secondary_lang
         if self.secondary_enabled and sec and sec in fslyrics and len(fslyrics[sec]) > 0:
             langs.append(sec)
         return langs
 
     def _build_alignment(
-        self, fslyrics: FSLyrics, active_langs: list[str]
+        self, fslyrics: FSLyrics, active_langs: list[str], primary_lang: str
     ) -> dict[str, dict[int, int]]:
         alignment: dict[str, dict[int, int]] = {}
-        orig_data = fslyrics[self.primary_lang]
+        orig_data = fslyrics[primary_lang]
         for lang in active_langs[1:]:
             if lang not in fslyrics:
                 continue

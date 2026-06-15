@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from LDDC.common.models import Lyrics, SearchType, SongInfo, Source
+from LDDC.common.models import Lyrics as _LDCLyrics, SearchType, SongInfo, Source
 from LDDC.core.api.lyrics import get_lyrics as _lddc_get_lyrics
 from LDDC.core.api.lyrics import search as _lddc_search
 
-from .assprovider import DefaultProvider, make_context, match_provider
+from .assprovider import DefaultProvider, Lyrics, match_provider
 from .config import get_config
 
 
@@ -105,15 +105,14 @@ def fetch_lyrics(
 
     provider_cls = match_provider(player_name, lyrics) or DefaultProvider
     cfg = get_config()
-    ctx = make_context(
+    lyrics = Lyrics(
         lyrics,
         fonts=cfg.fonts,
         primary_override=cfg.get_style_config("primary"),
         secondary_override=cfg.get_style_config("secondary"),
     )
     provider = provider_cls(
-        ctx=ctx,
-        extra_config=cfg.get_provider_config(getattr(provider_cls, "PROVIDER", "")),
+        config=cfg.get_provider_config(getattr(provider_cls, "PROVIDER", "")),
     )
     dur_ms = song_info.duration
     ass = provider.generate(lyrics, duration_ms=dur_ms)

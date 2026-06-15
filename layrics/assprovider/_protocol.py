@@ -1,11 +1,12 @@
 from __future__ import annotations
 import re
 from typing import Any, ClassVar, Protocol, runtime_checkable
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, replace
 
-from LDDC.common.models import Lyrics, LyricsType, Source
+from LDDC.common.models import Lyrics as _LDCLyrics, FSLyrics, LyricsType, Source, LyricsLine, LyricsWord
 
 from ._ass import AssStyle, DEFAULT_PRIMARY, DEFAULT_SECONDARY
+from . import _ruby
 
 
 _ass_providers: list[type[AssProvider]] = []
@@ -19,7 +20,7 @@ class AssTrigger:
     has_romaji: bool | None = None
     source: Source | list[Source] | None = None
 
-    def matches(self, player_name: str, lyrics: Lyrics) -> bool:
+    def matches(self, player_name: str, lyrics: _LDCLyrics) -> bool:
         if self.player_regex is not None:
             if not re.search(self.player_regex, player_name):
                 return False
@@ -38,12 +39,95 @@ class AssTrigger:
         return True
 
 
-@dataclass
-class AssContext:
-    primary_style: AssStyle = field(default_factory=lambda: DEFAULT_PRIMARY)
-    secondary_style: AssStyle | None = field(default_factory=lambda: DEFAULT_SECONDARY)
-    primary_lang: str = "orig"
-    secondary_lang: str | None = "ts"
+class Lyrics(_LDCLyrics):
+    """Layrics 增强歌词类，内建样式/语言检测。
+
+    包装 LDDC 的原始 Lyrics 对象，将样式解析和语言检测作为属性/方法直接提供。
+    """
+
+    def __init__(
+        self,
+        lyrics: _LDCLyrics,
+        fonts: dict[str, str] = {},
+        *,
+        primary_lang: str = "orig",
+        secondary_lang: str | None = "ts",
+        primary_override: dict[str, Any] | None = None,
+        secondary_override: dict[str, Any] | None = None,
+    ) -> None:
+        super().__init__(lyrics.info)
+        self.update(lyrics)
+        self.types = dict(lyrics.types)
+        self.tags = dict(lyrics.tags)
+        self._fonts = dict(fonts)
+        self._primary_lang = primary_lang
+        self._secondary_lang = secondary_lang
+        self._primary_override = primary_override or {}
+        self._secondary_override = secondary_override or {}
+        self._strip_ruby()
+
+    def _strip_ruby(self) -> None:
+        _ruby.strip_ruby(self)
+
+    def _detect_ruby(self) -> bool:
+        return _ruby.detect_ruby(self)
+
+    @property
+    def primary_lang(self) -> str:
+        return self._primary_lang
+
+    @property
+    def secondary_lang(self) -> str | None:
+        return self._secondary_lang
+
+    @property
+    def primary_style(self) -> AssStyle:
+        return self._build_style(DEFAULT_PRIMARY, "Primary", self._primary_lang, self._primary_override)
+
+    @property
+    def secondary_style(self) -> AssStyle | None:
+        if not self._secondary_lang:
+            return None
+        return self._build_style(DEFAULT_SECONDARY, "Secondary", self._secondary_lang, self._secondary_override)
+
+    def _build_style(self, base: AssStyle, name: str, lang_key: str, override: dict[str, Any]) -> AssStyle:
+        if override:
+            base = replace(base, name=name, **override)
+        else:
+            base = replace(base, name=name)
+        lang = self.detect_lang(lang_key)
+        f = self._fonts.get(lang)
+        if f:
+            base = replace(base, font_name=f)
+        return base
+
+    def detect_lang(self, key: str = "orig") -> str:
+        """通过字符集检测指定 key 的歌词文本的语言。
+
+        Returns:
+            语言代码: ``"ja"`` ``"zh"`` ``"ko"`` ``"ru"`` 或 ``"default"``。
+        """
+        data = self.get(key)
+        if not data:
+            return "default"
+        text = "".join(w.text for line in data for w in line.words)
+        if re.search(r'[\u3040-\u309f\u30a0-\u30ff]', text):
+            return "ja"
+        if re.search(r'[\uac00-\ud7af]', text):
+            return "ko"
+        if re.search(r'[\u0400-\u04ff]', text):
+            return "ru"
+        if re.search(r'[\u4e00-\u9fff]', text):
+            return "zh"
+        return "default"
+
+    def get_fslyrics(self, duration_ms: int | None = None) -> FSLyrics:
+        fslyrics = super().get_fslyrics(duration_ms)
+        for data in fslyrics.values():
+            for i in range(len(data) - 1):
+                if data[i].end > data[i + 1].start:
+                    data[i] = data[i]._replace(end=data[i + 1].start)
+        return fslyrics
 
 
 @runtime_checkable
@@ -61,78 +145,9 @@ def register_ass_provider(provider: type[AssProvider]) -> None:
 
 
 def match_provider(
-    player_name: str, lyrics: Lyrics
+    player_name: str, lyrics: _LDCLyrics
 ) -> type[AssProvider] | None:
     for p in _ass_providers:
         if p.trigger.matches(player_name, lyrics):
             return p
     return None
-
-
-def _detect_lang(text: str) -> str:
-    if re.search(r'[\u3040-\u309f\u30a0-\u30ff]', text):
-        return "ja"
-    if re.search(r'[\uac00-\ud7af]', text):
-        return "ko"
-    if re.search(r'[\u0400-\u04ff]', text):
-        return "ru"
-    if re.search(r'[\u4e00-\u9fff]', text):
-        return "zh"
-    return "default"
-
-
-def detect_lyrics_lang(lyrics: Lyrics, key: str = "orig") -> str:
-    """通过字符集检测指定 key 的歌词文本的语言。
-
-    Returns:
-        语言代码: ``"ja"`` ``"zh"`` ``"ko"`` ``"ru"`` 或 ``"default"``。
-    """
-    data = lyrics.get(key)
-    if not data:
-        return "default"
-    text = "".join(w.text for line in data for w in line.words)
-    return _detect_lang(text)
-
-
-def make_context(
-    lyrics: Lyrics,
-    fonts: dict[str, str] = {},
-    *,
-    primary_lang: str = "orig",
-    secondary_lang: str | None = "ts",
-    primary_override: dict[str, Any] | None = None,
-    secondary_override: dict[str, Any] | None = None,
-) -> AssContext:
-    """根据歌词语言动态构造 AssContext，自动匹配字体。
-
-    Args:
-        lyrics: 歌词对象
-        fonts: ``{语言代码: 字体名}`` 映射（来自 ``Config.fonts``）
-        primary_lang: 原文在 ``lyrics`` 中的 key
-        secondary_lang: 翻译在 ``lyrics`` 中的 key，设为 ``None`` 禁用
-        primary_override: 覆盖 Primary 样式属性（来自 ``cfg.get_style_config("primary")``）
-        secondary_override: 覆盖 Secondary 样式属性
-    """
-    def _build(name: str, lang_key: str, override: dict[str, Any] | None) -> AssStyle:
-        base = DEFAULT_PRIMARY if name == "Primary" else DEFAULT_SECONDARY
-        if override:
-            base = replace(base, name=name, **override)
-        else:
-            base = replace(base, name=name)
-        lang = detect_lyrics_lang(lyrics, lang_key)
-        f = fonts.get(lang)
-        if f:
-            base = replace(base, font_name=f)
-        return base
-
-    primary = _build("Primary", primary_lang, primary_override)
-    secondary = None
-    if secondary_lang:
-        secondary = _build("Secondary", secondary_lang, secondary_override)
-
-    return AssContext(
-        primary_style=primary,
-        secondary_style=secondary,
-        primary_lang=primary_lang,
-        secondary_lang=secondary_lang,
-    )
