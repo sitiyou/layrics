@@ -28,3 +28,7 @@ layctl = "layrics.layctl:cli"
 
 [tool.meson-python.args]
 setup = ["-Dbuildtype=release"]
+
+[tool.pyright]
+extraPaths = ["./vendor/LDDC"]
+typeCheckingMode = "basic"
