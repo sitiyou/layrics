@@ -38,6 +38,8 @@ class Application {
     void setStartTime(int64_t ms);
     void hide();
     void show();
+    void lock();
+    void unlock();
     void clear();
     int getStartTime() { return m_startTimeMs; };
 
@@ -60,6 +62,7 @@ class Application {
 
     bool m_paused = false;
     bool m_hidden = false;
+    bool m_locked = false;
     int64_t m_freezeTimestampMs = 0;
 
     bool initWayland();

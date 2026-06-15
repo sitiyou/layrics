@@ -58,6 +58,11 @@ void ApplicationController::setHidden(bool hidden) {
     m_pendingHide.push(hidden);
 }
 
+void ApplicationController::setLocked(bool locked) {
+    std::lock_guard<std::mutex> lock(m_mutex);
+    m_pendingLock.push(locked);
+}
+
 void ApplicationController::processPendingCommands() {
     std::lock_guard<std::mutex> lock(m_mutex);
 
@@ -90,6 +95,16 @@ void ApplicationController::processPendingCommands() {
             m_app.hide();
         } else {
             m_app.show();
+        }
+    }
+
+    while (!m_pendingLock.empty()) {
+        bool locked = m_pendingLock.front();
+        m_pendingLock.pop();
+        if (locked) {
+            m_app.lock();
+        } else {
+            m_app.unlock();
         }
     }
 }

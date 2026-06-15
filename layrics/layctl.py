@@ -129,6 +129,18 @@ def unhide(ctx):
 
 @cli.command()
 @click.pass_context
+def lock(ctx):
+    _pp(_call(ctx.obj["socket"], "lock"))
+
+
+@cli.command()
+@click.pass_context
+def unlock(ctx):
+    _pp(_call(ctx.obj["socket"], "unlock"))
+
+
+@cli.command()
+@click.pass_context
 def stop(ctx):
     _pp(_call(ctx.obj["socket"], "stop"))
 

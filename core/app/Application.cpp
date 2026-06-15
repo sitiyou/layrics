@@ -194,8 +194,12 @@ void Application::onFrame() {
     if (m_paused) {
         uint8_t *bufData = static_cast<uint8_t *>(m_buffer.data());
         RenderResult result = m_renderMgr.render(bufData, m_freezeTimestampMs);
-        m_regionMgr.update(m_waylandCtx.compositor, m_surface.surface(),
-                           result.regions, m_surface.width(), m_surface.height());
+        if (m_locked) {
+            m_regionMgr.clear(m_waylandCtx.compositor, m_surface.surface());
+        } else {
+            m_regionMgr.update(m_waylandCtx.compositor, m_surface.surface(),
+                               result.regions, m_surface.width(), m_surface.height());
+        }
         requestFrame();
         m_surface.commitFrame(m_buffer.buffer());
         return;
@@ -212,8 +216,12 @@ void Application::onFrame() {
     uint8_t *bufData = static_cast<uint8_t *>(m_buffer.data());
     RenderResult result = m_renderMgr.render(bufData, timestampMs);
 
-    m_regionMgr.update(m_waylandCtx.compositor, m_surface.surface(),
-                       result.regions, m_surface.width(), m_surface.height());
+    if (m_locked) {
+        m_regionMgr.clear(m_waylandCtx.compositor, m_surface.surface());
+    } else {
+        m_regionMgr.update(m_waylandCtx.compositor, m_surface.surface(),
+                           result.regions, m_surface.width(), m_surface.height());
+    }
 
     requestFrame();
     m_surface.commitFrame(m_buffer.buffer());
@@ -282,6 +290,17 @@ void Application::hide() {
 
 void Application::show() {
     m_hidden = false;
+}
+
+void Application::lock() {
+    m_locked = true;
+    if (m_surface.configured()) {
+        m_regionMgr.clear(m_waylandCtx.compositor, m_surface.surface());
+    }
+}
+
+void Application::unlock() {
+    m_locked = false;
 }
 
 void Application::clear() {

@@ -25,6 +25,7 @@ class ApplicationController {
     void setStartTime(int64_t ms);
     int getStartTime();
     void setHidden(bool hidden);
+    void setLocked(bool locked);
 
   private:
     void processPendingCommands();
@@ -37,4 +38,5 @@ class ApplicationController {
     std::queue<bool> m_pendingPause;
     std::queue<int64_t> m_pendingStartTime;
     std::queue<bool> m_pendingHide;
+    std::queue<bool> m_pendingLock;
 };

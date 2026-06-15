@@ -23,5 +23,7 @@ PYBIND11_MODULE(_layrics, m) {
              py::arg("ms"))
         .def("get_start_time", &ApplicationController::getStartTime)
         .def("set_hidden", &ApplicationController::setHidden,
-             py::arg("hidden"));
+             py::arg("hidden"))
+        .def("set_locked", &ApplicationController::setLocked,
+             py::arg("locked"));
 }

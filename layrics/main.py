@@ -13,12 +13,14 @@ Methods:
   select_player  {name}                -> {selected}
   search_songs   {keyword, limit?}     -> [{id (composite), name, artists, album, source}]
   fetch_lyrics   {song_id?, sync?}     -> {ass}  (song_id e.g. "QM248672467", omit for current track)
-  load_ass       {path}                -> {loaded}
-  hide                                 -> {hidden}
-  unhide                               -> {hidden}
-  stop                                 -> {status}
-  start                                -> {status}
-  get_status                           -> {mpris_player}
+   load_ass       {path}                -> {loaded}
+   hide                                 -> {hidden}
+   unhide                               -> {hidden}
+   lock                                 -> {locked}
+   unlock                               -> {locked}
+   stop                                 -> {status}
+   start                                -> {status}
+   get_status                           -> {mpris_player}
 """
 
 import sys
@@ -416,6 +418,14 @@ class LayricsApp:
                 self.ctrl.set_hidden(False)
                 self.ctrl.set_paused(self._paused)
                 return {"id": req_id, "type": "result", "data": {"hidden": False}}
+
+            elif method == "lock":
+                self.ctrl.set_locked(True)
+                return {"id": req_id, "type": "result", "data": {"locked": True}}
+
+            elif method == "unlock":
+                self.ctrl.set_locked(False)
+                return {"id": req_id, "type": "result", "data": {"locked": False}}
 
             elif method == "stop":
                 self.stop_overlay()
