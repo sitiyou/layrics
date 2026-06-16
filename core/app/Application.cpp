@@ -189,7 +189,7 @@ void Application::onFrame() {
 
     if (m_hidden) {
         requestFrame();
-        m_surface.commitFrame(m_buffer.buffer(), false);
+        m_surface.commitFrame(m_buffer.buffer(), true);
         m_frameRateLimiter.wait();
         return;
     }
