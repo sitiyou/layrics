@@ -11,6 +11,7 @@
 #include "core/input/RegionManager.hpp"
 #include "core/renderer/IRenderer.hpp"
 #include "core/renderer/RenderManager.hpp"
+#include "core/utils/FrameRateLimiter.hpp"
 #include "core/wayland/LayerSurface.hpp"
 #include "core/wayland/ShmBuffer.hpp"
 #include "core/wayland/WaylandContext.hpp"
@@ -36,6 +37,7 @@ class Application {
     void pause();
     void resume();
     void setStartTime(int64_t ms);
+    void setTargetFps(int fps);
     void hide();
     void show();
     void lock();
@@ -51,6 +53,7 @@ class Application {
     LayerSurface m_surface;
     ShmBuffer m_buffer;
     RenderManager m_renderMgr;
+    FrameRateLimiter m_frameRateLimiter;
     InputManager m_inputMgr;
     DragManager m_dragMgr;
     RegionManager m_regionMgr;

@@ -139,6 +139,13 @@ def unlock(ctx):
     _pp(_call(ctx.obj["socket"], "unlock"))
 
 
+@cli.command(name="set-fps")
+@click.argument("fps", type=int)
+@click.pass_context
+def set_fps(ctx, fps: int):
+    _pp(_call(ctx.obj["socket"], "set_fps", {"fps": fps}))
+
+
 @cli.command()
 @click.pass_context
 def stop(ctx):

@@ -49,6 +49,11 @@ void ApplicationController::setStartTime(int64_t ms) {
     m_pendingStartTime.push(ms);
 }
 
+void ApplicationController::setTargetFps(int fps) {
+    std::lock_guard<std::mutex> lock(m_mutex);
+    m_pendingTargetFps.push(fps);
+}
+
 int ApplicationController::getStartTime() {
     return m_app.getStartTime();
 }
@@ -90,6 +95,12 @@ void ApplicationController::processPendingCommands() {
         std::string content = m_pendingAssContents.front();
         m_pendingAssContents.pop();
         m_app.loadAssContent(content);
+    }
+
+    while (!m_pendingTargetFps.empty()) {
+        int fps = m_pendingTargetFps.front();
+        m_pendingTargetFps.pop();
+        m_app.setTargetFps(fps);
     }
 
     while (!m_pendingHide.empty()) {

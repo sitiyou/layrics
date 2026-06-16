@@ -23,6 +23,7 @@ class ApplicationController {
     void setAssInput(const std::string &path);
     void setPaused(bool paused);
     void setStartTime(int64_t ms);
+    void setTargetFps(int fps);
     int getStartTime();
     AppStatus getStatus();
     void setHidden(bool hidden);
@@ -38,6 +39,7 @@ class ApplicationController {
     std::queue<std::string> m_pendingAssContents;
     std::queue<bool> m_pendingPause;
     std::queue<int64_t> m_pendingStartTime;
+    std::queue<int> m_pendingTargetFps;
     std::queue<bool> m_pendingHide;
     std::queue<bool> m_pendingLock;
 };

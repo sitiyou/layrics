@@ -19,4 +19,5 @@ struct AppStatus {
     int64_t startTimeMs = 0;
     double dragOffsetX = 0.0;
     double dragOffsetY = 0.0;
+    int targetFps = -1;
 };

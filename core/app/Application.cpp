@@ -188,6 +188,7 @@ void Application::onFrame() {
     if (m_hidden) {
         requestFrame();
         m_surface.commitFrame(m_buffer.buffer(), false);
+        m_frameRateLimiter.wait();
         return;
     }
 
@@ -216,6 +217,7 @@ void Application::onFrame() {
 
     requestFrame();
     m_surface.commitFrame(m_buffer.buffer(), result.contentChanged);
+    m_frameRateLimiter.wait();
 }
 
 void Application::onPointerMotion(double x, double y) {
@@ -294,6 +296,11 @@ void Application::unlock() {
     m_locked = false;
 }
 
+void Application::setTargetFps(int fps) {
+    m_frameRateLimiter.setTargetFps(fps);
+    LAY_LOG("target FPS set to %d", fps);
+}
+
 void Application::clear() {
     m_buffer.clear();
     m_regionMgr.clear(m_waylandCtx.compositor, m_surface.surface());
@@ -313,5 +320,6 @@ AppStatus Application::getStatus() {
     s.startTimeMs = m_startTimeMs;
     s.dragOffsetX = dragState.offsetX;
     s.dragOffsetY = dragState.offsetY;
+    s.targetFps = m_frameRateLimiter.targetFps();
     return s;
 }

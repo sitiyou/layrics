@@ -86,6 +86,10 @@ renderer_sources = files(
   'core/renderer/RenderManager.cpp',
 )
 
+utils_sources = files(
+  'core/utils/FrameRateLimiter.cpp',
+)
+
 app_sources = files(
   'core/app/Application.cpp',
   'core/app/ApplicationController.cpp',
@@ -108,6 +112,7 @@ if pybind11_dep.found()
     input_sources,
     renderer_sources,
     app_sources,
+    utils_sources,
     protocol_sources,
   ]
 

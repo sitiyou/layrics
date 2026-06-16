@@ -1,6 +1,9 @@
 # layrics 配置文件
 # 路径: $XDG_CONFIG_HOME/layrics/config.toml 或 ~/.config/layrics/config.toml
 
+# 目标帧率（覆盖 vsync），-1 表示跟随显示器刷新率
+# target_fps = 30
+
 # 歌词搜索源（排序决定展示优先级，空列表则用默认 [QM, NE]）
 # 可选: QM, KG, NE, LRCLIB
 sources = ["QM", "NE"]

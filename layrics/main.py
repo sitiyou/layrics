@@ -18,6 +18,7 @@ Methods:
    unhide                               -> {hidden}
    lock                                 -> {locked}
    unlock                               -> {locked}
+   set_fps      {fps}                   -> {target_fps}
    stop                                 -> {status}
    start                                -> {status}
    get_status                           -> {mpris_player}
@@ -435,6 +436,18 @@ class LayricsApp:
                 self.ctrl.set_locked(False)
                 return {"id": req_id, "type": "result", "data": {"locked": False}}
 
+            elif method == "set_fps":
+                fps = params.get("fps", -1)
+                if not isinstance(fps, int) or (fps <= 0 and fps != -1):
+                    return {
+                        "id": req_id,
+                        "type": "error",
+                        "data": {"code": 400, "message": "fps must be > 0 or -1 (vsync)"},
+                    }
+                self.ctrl.set_target_fps(fps)
+                self._config.target_fps = fps
+                return {"id": req_id, "type": "result", "data": {"target_fps": fps}}
+
             elif method == "stop":
                 self.stop_overlay()
                 return {
@@ -555,6 +568,10 @@ class LayricsApp:
 
     async def run(self):
         self.start_overlay()
+
+        if self._config.target_fps > 0:
+            self.ctrl.set_target_fps(self._config.target_fps)
+            logger.info("target FPS set from config: %d", self._config.target_fps)
 
         try:
             os.unlink(self.socket_path)

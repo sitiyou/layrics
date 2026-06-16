@@ -1,6 +1,6 @@
 executable(
   'layrics',
-  ['main.cpp', app_sources, wayland_sources, input_sources, renderer_sources, protocol_sources],
+  ['main.cpp', app_sources, wayland_sources, input_sources, renderer_sources, utils_sources, protocol_sources],
   include_directories : inc,
   dependencies : dependencies,
   install : true,
