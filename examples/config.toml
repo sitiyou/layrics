@@ -1,0 +1,33 @@
+# layrics 配置文件
+# 路径: $XDG_CONFIG_HOME/layrics/config.toml 或 ~/.config/layrics/config.toml
+
+# 歌词搜索源（排序决定展示优先级，空列表则用默认 [QM, NE]）
+# 可选: QM, KG, NE, LRCLIB
+sources = ["QM", "NE"]
+
+# 字体映射: 检测到的语言 → 字体名
+# 语言: ja (日语), zh (中文), ko (韩语), ru (俄语), default
+[fonts]
+ja = "Noto Sans CJK JP"
+zh = "Noto Sans CJK SC"
+
+# ASS 样式覆盖
+[style.primary]
+# font_name = "思源黑体"
+# font_size = 48
+
+[style.secondary]
+# font_size = 36
+
+# MPRIS 播放器过滤（正则）
+# 留空或缺失则不过滤，取第一个正在播放的
+include_players = []
+
+# ASS 生成器配置
+[assprovider.default]
+primary_position = "top"
+karaoke = true
+line_mode = "single"
+secondary = true
+advance_ms = 0
+margin_v_spacing = 2

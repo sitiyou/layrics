@@ -10,24 +10,31 @@ from .assprovider import AssProvider, DefaultProvider, Lyrics, match_provider
 from .config import get_config
 
 
-_SEARCH_SOURCES = [Source.QM, Source.NE, Source.LRCLIB]
+_SOURCE_PREFIXES: list[tuple[str, Source]] | None = None
 
-# Source name → raw id, sorted longest prefix first for correct parsing
-_SOURCE_PREFIXES = sorted(
-    [(s.name, s) for s in _SEARCH_SOURCES],
-    key=lambda x: -len(x[0]),
-)
+
+def _init_prefixes() -> list[tuple[str, Source]]:
+    global _SOURCE_PREFIXES
+    if _SOURCE_PREFIXES is None:
+        cfg = get_config()
+        _SOURCE_PREFIXES = sorted(
+            [(s.name, s) for s in cfg.sources],
+            key=lambda x: -len(x[0]),
+        )
+    return _SOURCE_PREFIXES
 
 
 def parse_composite_id(song_id: str) -> tuple[Source, str]:
     """Parse a composite song id like ``QM248672467`` into ``(Source.QM, "248672467")``."""
-    for prefix, src in _SOURCE_PREFIXES:
+    for prefix, src in _init_prefixes():
         if song_id.startswith(prefix):
             return src, song_id[len(prefix):]
     raise ValueError(f"cannot parse composite song id: {song_id!r}")
 
 
 def search_songs(keyword: str, limit: int = 10) -> list[dict[str, Any]]:
+    search_sources = get_config().sources
+
     def _items(src: Source) -> list[dict[str, Any]]:
         try:
             results = _lddc_search(src, keyword, SearchType.SONG, page=1)
@@ -51,7 +58,7 @@ def search_songs(keyword: str, limit: int = 10) -> list[dict[str, Any]]:
             )
         return items
 
-    all_results = [_items(src) for src in _SEARCH_SOURCES]
+    all_results = [_items(src) for src in search_sources]
     interleaved = []
     max_len = max(len(r) for r in all_results)
     for i in range(max_len):

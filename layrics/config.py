@@ -1,8 +1,11 @@
+from __future__ import annotations
+
 import os
 import re
 from typing import Any, Optional
 
 import appdirs
+from LDDC.common.models import Source
 
 if os.environ.get("LAYRICS_CONFIG_DIR"):
     _CONFIG_DIR = os.environ["LAYRICS_CONFIG_DIR"]
@@ -16,6 +19,7 @@ class Config:
     def __init__(self):
         self.include_players: list[re.Pattern] = []
         self.fonts: dict[str, str] = {}
+        self.sources: list[Source] = [Source.QM, Source.NE]
         self._style_config: dict[str, dict[str, str | int | float | bool]] = {}
         self._provider_config: dict[str, dict[str, Any]] = {}
         self._load()
@@ -32,6 +36,16 @@ class Config:
         raw = data.get("include_players", [])
         for pat_str in raw:
             self.include_players.append(re.compile(pat_str))
+        raw_sources = data.get("sources", [])
+        if isinstance(raw_sources, list) and raw_sources:
+            parsed: list[Source] = []
+            for name in raw_sources:
+                try:
+                    parsed.append(Source[name.upper().strip()])
+                except KeyError:
+                    pass
+            if parsed:
+                self.sources = parsed
         raw_fonts = data.get("fonts", {})
         if isinstance(raw_fonts, dict):
             self.fonts = {str(k): str(v) for k, v in raw_fonts.items()}
