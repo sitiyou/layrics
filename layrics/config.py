@@ -21,6 +21,8 @@ class Config:
         self.fonts: dict[str, str] = {}
         self.sources: list[Source] = [Source.QM, Source.NE]
         self.target_fps: int = -1
+        self._lyrics_primary: list[str] = ["orig"]
+        self._lyrics_secondary: list[str] = ["ts"]
         self._style_config: dict[str, dict[str, str | int | float | bool]] = {}
         self._provider_config: dict[str, dict[str, Any]] = {}
         self._load()
@@ -61,6 +63,15 @@ class Config:
             for k, v in raw_style.items():
                 if isinstance(v, dict):
                     self._style_config[str(k)] = {str(kk): vv for kk, vv in v.items()}
+        raw_lyrics = data.get("lyrics", {})
+        if isinstance(raw_lyrics, dict):
+            raw_pri = raw_lyrics.get("primary")
+            if isinstance(raw_pri, list) and all(isinstance(i, str) for i in raw_pri):
+                self._lyrics_primary = raw_pri
+            raw_sec = raw_lyrics.get("secondary")
+            if isinstance(raw_sec, list) and all(isinstance(i, str) for i in raw_sec):
+                self._lyrics_secondary = raw_sec
+
         raw_assprovider = data.get("assprovider", {})
         if isinstance(raw_assprovider, dict):
             for k, v in raw_assprovider.items():
@@ -69,6 +80,14 @@ class Config:
 
     def get_style_config(self, key: str) -> dict[str, str | int | float | bool]:
         return dict(self._style_config.get(key, {}))
+
+    @property
+    def lyrics_primary(self) -> list[str]:
+        return list(self._lyrics_primary)
+
+    @property
+    def lyrics_secondary(self) -> list[str]:
+        return list(self._lyrics_secondary)
 
     def get_provider_config(self, name: str) -> dict[str, Any]:
         return dict(self._provider_config.get(name, {}))

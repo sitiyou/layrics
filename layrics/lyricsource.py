@@ -115,6 +115,8 @@ def fetch_lyrics(
     lyrics = Lyrics(
         lddc_lyrics,
         fonts=cfg.fonts,
+        primary_priority=cfg.lyrics_primary,
+        secondary_priority=cfg.lyrics_secondary,
         primary_override=cfg.get_style_config("primary"),
         secondary_override=cfg.get_style_config("secondary"),
     )

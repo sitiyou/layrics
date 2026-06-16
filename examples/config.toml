@@ -22,6 +22,13 @@ zh = "Noto Sans CJK SC"
 [style.secondary]
 # font_size = 36
 
+# 主/副歌词选择优先级
+# 每项可以是 track 类型 (orig, ts, roma) 或语言代码 (zh, ja, ko, ru)
+# 从左到右优先级依次降低
+[lyrics]
+primary = ["orig", "ja", "zh"]
+# secondary = ["ts", "roma", "en"]   # 注释掉则使用默认 ["ts"]
+
 # MPRIS 播放器过滤（正则）
 # 留空或缺失则不过滤，取第一个正在播放的
 include_players = []
