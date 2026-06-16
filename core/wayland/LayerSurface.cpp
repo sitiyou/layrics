@@ -116,8 +116,10 @@ void LayerSurface::commit() {
     wl_surface_commit(m_surface);
 }
 
-void LayerSurface::commitFrame(wl_buffer *buffer) {
+void LayerSurface::commitFrame(wl_buffer *buffer, bool fullDamage) {
     wl_surface_attach(m_surface, buffer, 0, 0);
-    wl_surface_damage_buffer(m_surface, 0, 0, INT32_MAX, INT32_MAX);
+    if (fullDamage) {
+        wl_surface_damage_buffer(m_surface, 0, 0, INT32_MAX, INT32_MAX);
+    }
     wl_surface_commit(m_surface);
 }

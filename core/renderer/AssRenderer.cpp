@@ -138,6 +138,8 @@ cairo_surface_t *AssRenderer::render(int64_t timestampMs) {
         changed = 1;
     }
 
+    contentChanged = changed;
+
     if (!changed) {
         return cairo_surface_reference(m_surface);
     }

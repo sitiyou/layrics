@@ -28,6 +28,12 @@ void RenderManager::setOffset(double offsetX, double offsetY) {
     m_offsetY = offsetY;
 }
 
+void RenderManager::reset() {
+    m_everRendered = false;
+    m_lastOffsetX = 0.0;
+    m_lastOffsetY = 0.0;
+}
+
 RenderResult RenderManager::render(uint8_t *buffer, int64_t timestampMs) {
     RenderResult result;
 
@@ -37,11 +43,50 @@ RenderResult RenderManager::render(uint8_t *buffer, int64_t timestampMs) {
 
     int stride = cairo_format_stride_for_width(CAIRO_FORMAT_ARGB32, m_width);
 
+    bool anyContentChanged = false;
+    bool offsetChanged = (m_offsetX != m_lastOffsetX ||
+                          m_offsetY != m_lastOffsetY);
+    struct RenderItem {
+        cairo_surface_t *surf;
+    };
+    RenderItem items[16];
+    int numItems = 0;
+
+    for (auto &r : m_renderers) {
+        cairo_surface_t *surf = r->render(timestampMs);
+        if (!surf) {
+            continue;
+        }
+
+        anyContentChanged = anyContentChanged || r->contentChanged;
+
+        for (const auto &rect : r->lastRegions) {
+            result.regions.push_back(
+                {static_cast<int>(rect.x + m_offsetX),
+                 static_cast<int>(rect.y + m_offsetY), rect.w, rect.h});
+        }
+
+        items[numItems++].surf = surf;
+    }
+
+    bool visualChanged = anyContentChanged || offsetChanged || !m_everRendered;
+
+    if (!visualChanged) {
+        for (int i = 0; i < numItems; i++) {
+            cairo_surface_destroy(items[i].surf);
+        }
+        result.contentChanged = false;
+        return result;
+    }
+
     cairo_surface_t *target = cairo_image_surface_create_for_data(
         buffer, CAIRO_FORMAT_ARGB32, m_width, m_height, stride);
     if (cairo_surface_status(target) != CAIRO_STATUS_SUCCESS) {
         LAY_ERR("RenderManager: failed to create target surface");
         cairo_surface_destroy(target);
+        for (int i = 0; i < numItems; i++) {
+            cairo_surface_destroy(items[i].surf);
+        }
         return result;
     }
 
@@ -53,26 +98,19 @@ RenderResult RenderManager::render(uint8_t *buffer, int64_t timestampMs) {
 
     cairo_translate(cr, m_offsetX, m_offsetY);
 
-    for (auto &r : m_renderers) {
-        cairo_surface_t *surf = r->render(timestampMs);
-        if (!surf) {
-            continue;
-        }
-
-        cairo_set_source_surface(cr, surf, 0, 0);
+    for (int i = 0; i < numItems; i++) {
+        cairo_set_source_surface(cr, items[i].surf, 0, 0);
         cairo_paint(cr);
-        cairo_surface_destroy(surf);
-
-        for (const auto &rect : r->lastRegions) {
-            result.regions.push_back(
-                {static_cast<int>(rect.x + m_offsetX),
-                 static_cast<int>(rect.y + m_offsetY), rect.w, rect.h});
-        }
+        cairo_surface_destroy(items[i].surf);
     }
 
     cairo_destroy(cr);
     cairo_surface_destroy(target);
 
-    // LAY_DEBUG("RenderManager composed %zu region(s)", result.regions.size());
+    m_everRendered = true;
+    m_lastOffsetX = m_offsetX;
+    m_lastOffsetY = m_offsetY;
+    result.contentChanged = true;
+
     return result;
 }

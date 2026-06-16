@@ -9,6 +9,7 @@ struct RenderRect {
 
 struct RenderResult {
     std::vector<RenderRect> regions;
+    bool contentChanged = true;
 };
 
 struct AppStatus {

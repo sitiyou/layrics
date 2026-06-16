@@ -17,4 +17,5 @@ class IRenderer {
     virtual void setSize(int width, int height) = 0;
 
     std::vector<RenderRect> lastRegions;
+    bool contentChanged = true;
 };

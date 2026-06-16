@@ -187,28 +187,19 @@ void Application::onFrame() {
 
     if (m_hidden) {
         requestFrame();
-        m_surface.commitFrame(m_buffer.buffer());
+        m_surface.commitFrame(m_buffer.buffer(), false);
         return;
     }
 
+    int64_t timestampMs;
     if (m_paused) {
-        uint8_t *bufData = static_cast<uint8_t *>(m_buffer.data());
-        RenderResult result = m_renderMgr.render(bufData, m_freezeTimestampMs);
-        if (m_locked) {
-            m_regionMgr.clear(m_waylandCtx.compositor, m_surface.surface());
-        } else {
-            m_regionMgr.update(m_waylandCtx.compositor, m_surface.surface(),
-                               result.regions, m_surface.width(), m_surface.height());
-        }
-        requestFrame();
-        m_surface.commitFrame(m_buffer.buffer());
-        return;
+        timestampMs = m_freezeTimestampMs;
+    } else {
+        struct timespec ts;
+        clock_gettime(CLOCK_MONOTONIC, &ts);
+        int64_t now = ts.tv_sec * 1000LL + ts.tv_nsec / 1000000LL;
+        timestampMs = now - m_startTimeMs;
     }
-
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    int64_t now = ts.tv_sec * 1000LL + ts.tv_nsec / 1000000LL;
-    int64_t timestampMs = now - m_startTimeMs;
 
     LAY_DEBUG("onFrame: ts=%lld offset=(%.1f, %.1f)",
               (long long)timestampMs, dragState.offsetX, dragState.offsetY);
@@ -224,7 +215,7 @@ void Application::onFrame() {
     }
 
     requestFrame();
-    m_surface.commitFrame(m_buffer.buffer());
+    m_surface.commitFrame(m_buffer.buffer(), result.contentChanged);
 }
 
 void Application::onPointerMotion(double x, double y) {
@@ -306,6 +297,7 @@ void Application::unlock() {
 void Application::clear() {
     m_buffer.clear();
     m_regionMgr.clear(m_waylandCtx.compositor, m_surface.surface());
+    m_renderMgr.reset();
 }
 
 void Application::setStartTime(int64_t ms) {

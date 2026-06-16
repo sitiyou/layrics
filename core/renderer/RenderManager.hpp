@@ -16,10 +16,16 @@ class RenderManager {
 
     RenderResult render(uint8_t *buffer, int64_t timestampMs);
 
+    void reset();
+
   private:
     std::vector<std::unique_ptr<IRenderer>> m_renderers;
     double m_offsetX = 0.0;
     double m_offsetY = 0.0;
     int m_width = 0;
     int m_height = 0;
+
+    bool m_everRendered = false;
+    double m_lastOffsetX = 0.0;
+    double m_lastOffsetY = 0.0;
 };

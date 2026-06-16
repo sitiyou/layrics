@@ -36,7 +36,7 @@ class LayerSurface {
     void damage(int x, int y, int width, int height);
     void damageFull();
     void commit();
-    void commitFrame(wl_buffer *buffer);
+    void commitFrame(wl_buffer *buffer, bool fullDamage = true);
 
     wl_surface *surface() const { return m_surface; }
     int width() const { return m_width; }
