@@ -123,3 +123,12 @@ void LayerSurface::commitFrame(wl_buffer *buffer, bool fullDamage) {
     }
     wl_surface_commit(m_surface);
 }
+
+void LayerSurface::commitFrame(wl_buffer *buffer,
+                               const std::vector<RenderRect> &damageRects) {
+    wl_surface_attach(m_surface, buffer, 0, 0);
+    for (const auto &r : damageRects) {
+        wl_surface_damage_buffer(m_surface, r.x, r.y, r.w, r.h);
+    }
+    wl_surface_commit(m_surface);
+}

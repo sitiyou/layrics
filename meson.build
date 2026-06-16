@@ -79,6 +79,7 @@ input_sources = files(
   'core/input/DragManager.cpp',
   'core/input/CursorTracker.cpp',
   'core/input/RegionManager.cpp',
+  'core/input/DamageGrid.cpp',
 )
 
 renderer_sources = files(

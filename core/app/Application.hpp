@@ -6,6 +6,7 @@
 #include <memory>
 #include <string>
 
+#include "core/input/DamageGrid.hpp"
 #include "core/input/DragManager.hpp"
 #include "core/input/InputManager.hpp"
 #include "core/input/RegionManager.hpp"
@@ -54,6 +55,7 @@ class Application {
     ShmBuffer m_buffer;
     RenderManager m_renderMgr;
     FrameRateLimiter m_frameRateLimiter;
+    DamageGrid m_damageGrid;
     InputManager m_inputMgr;
     DragManager m_dragMgr;
     RegionManager m_regionMgr;

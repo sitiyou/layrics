@@ -65,6 +65,8 @@ bool Application::initWayland() {
 
     initBuffers();
 
+    m_damageGrid.setSurfaceSize(m_surface.width(), m_surface.height());
+
     return m_buffer.operator bool();
 }
 
@@ -208,15 +210,35 @@ void Application::onFrame() {
     uint8_t *bufData = static_cast<uint8_t *>(m_buffer.data());
     RenderResult result = m_renderMgr.render(bufData, timestampMs);
 
-    if (m_locked) {
-        m_regionMgr.clear(m_waylandCtx.compositor, m_surface.surface());
+    if (result.contentChanged) {
+        m_damageGrid.beginFrame();
+        for (const auto &rect : result.regions) {
+            m_damageGrid.addRegion(rect.x, rect.y, rect.w, rect.h);
+        }
+
+        if (m_locked) {
+            m_regionMgr.clear(m_waylandCtx.compositor, m_surface.surface());
+        } else {
+            m_regionMgr.update(m_waylandCtx.compositor, m_surface.surface(),
+                               m_damageGrid.buildRegions(),
+                               m_surface.width(), m_surface.height());
+        }
+
+        requestFrame();
+        m_surface.commitFrame(m_buffer.buffer(), m_damageGrid.buildDamage());
     } else {
-        m_regionMgr.update(m_waylandCtx.compositor, m_surface.surface(),
-                           result.regions, m_surface.width(), m_surface.height());
+        if (m_locked) {
+            m_regionMgr.clear(m_waylandCtx.compositor, m_surface.surface());
+        } else {
+            m_regionMgr.update(m_waylandCtx.compositor, m_surface.surface(),
+                               result.regions,
+                               m_surface.width(), m_surface.height());
+        }
+
+        requestFrame();
+        m_surface.commitFrame(m_buffer.buffer(), false);
     }
 
-    requestFrame();
-    m_surface.commitFrame(m_buffer.buffer(), result.contentChanged);
     m_frameRateLimiter.wait();
 }
 

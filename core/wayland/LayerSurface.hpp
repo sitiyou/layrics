@@ -1,6 +1,9 @@
 #pragma once
 
 #include <cstdint>
+#include <vector>
+
+#include "core/types/Common.hpp"
 
 struct wl_surface;
 struct wl_buffer;
@@ -37,6 +40,8 @@ class LayerSurface {
     void damageFull();
     void commit();
     void commitFrame(wl_buffer *buffer, bool fullDamage = true);
+    void commitFrame(wl_buffer *buffer,
+                     const std::vector<RenderRect> &damageRects);
 
     wl_surface *surface() const { return m_surface; }
     int width() const { return m_width; }
