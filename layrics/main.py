@@ -165,8 +165,7 @@ class LayricsApp:
         matched = match_song(meta, results)
         if not matched:
             logger.info("fetch: no match for %s in %d candidates", keyword, len(results))
-            logger.info("fetch: fallback to first result")
-            matched = results[0]
+            raise RuntimeError(f"no match found for {keyword!r}")
 
         src, raw_id = parse_composite_id(matched["id"])
         song_info = SongInfo(
