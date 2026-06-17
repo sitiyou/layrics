@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from LDDC.common.models import Lyrics as _LDCLyrics, SearchType, SongInfo, Source
@@ -8,6 +9,9 @@ from LDDC.core.api.lyrics import search as _lddc_search
 
 from .assprovider import AssProvider, DefaultProvider, Lyrics, match_provider
 from .config import get_config
+
+
+logger = logging.getLogger("layrics.lyrics")
 
 
 _SOURCE_PREFIXES: list[tuple[str, Source]] | None = None
@@ -36,12 +40,14 @@ def search_songs(keyword: str, limit: int = 10) -> list[dict[str, Any]]:
     cfg = get_config()
     search_sources = cfg.search.sources
     per_source = cfg.search.result_count
+    logger.debug("search: %s  sources=%s  per_source=%d", keyword, [s.name for s in search_sources], per_source)
 
     def _items(src: Source) -> list[dict[str, Any]]:
         try:
             results = _lddc_search(src, keyword, SearchType.SONG, page=1)
         except Exception:
             return []
+        logger.debug("search: %s  from %s -> %d raw results", keyword, src.name, len(results))
         items = []
         for s in results[:per_source]:
             sid = s.id or ""
@@ -61,6 +67,7 @@ def search_songs(keyword: str, limit: int = 10) -> list[dict[str, Any]]:
         return items
 
     all_results = [_items(src) for src in search_sources]
+    logger.debug("search: total %d interleaved candidates", sum(len(r) for r in all_results))
     interleaved = []
     max_len = max(len(r) for r in all_results)
     for i in range(max_len):
@@ -68,7 +75,9 @@ def search_songs(keyword: str, limit: int = 10) -> list[dict[str, Any]]:
             if i < len(src_results):
                 interleaved.append(src_results[i])
                 if len(interleaved) >= limit:
+                    logger.debug("search: returning %d results (limit=%d)", len(interleaved), limit)
                     return interleaved
+    logger.debug("search: returning %d results", len(interleaved))
     return interleaved
 
 
@@ -77,11 +86,14 @@ def _resolve_song_info(song_info: SongInfo) -> SongInfo:
     if song_info.title and song_info.duration is not None and song_info.album:
         return song_info
 
+    logger.debug("resolve: %s/%s  searching by ID", song_info.source.name, song_info.id)
     results = _lddc_search(  # noqa: SLF001
         song_info.source, song_info.id or "", SearchType.SONG, page=1
     )
     for s in results:
         if s.id == song_info.id:
+            logger.debug("resolve: %s/%s -> title=%s  artist=%s  dur=%s",
+                         song_info.source.name, song_info.id, s.title, s.artist, s.duration)
             return SongInfo(
                 source=song_info.source,
                 id=s.id,
@@ -91,7 +103,8 @@ def _resolve_song_info(song_info: SongInfo) -> SongInfo:
                 duration=s.duration,
             )
 
-    # QM 需要 title/album/duration，搜索没有返回的场合用空值兜底
+    logger.debug("resolve: %s/%s  no match in %d results, using fallback",
+                 song_info.source.name, song_info.id, len(results))
     return SongInfo(
         source=song_info.source,
         id=song_info.id,
@@ -107,10 +120,17 @@ def fetch_lyrics(
     player_name: str = "",
 ) -> str:
     song_info = _resolve_song_info(song_info)
+    logger.debug("fetch: %s/%s  title=%s  artist=%s  dur=%s",
+                 song_info.source.name, song_info.id,
+                 song_info.title, song_info.artist, song_info.duration)
     lddc_lyrics = _lddc_get_lyrics(song_info)
     if not lddc_lyrics:
         msg = f"no lyrics returned for {song_info.title}"
+        logger.debug("fetch: %s/%s  %s", song_info.source.name, song_info.id, msg)
         raise RuntimeError(msg)
+
+    logger.debug("fetch: %s/%s  got %d lyric lines",
+                 song_info.source.name, song_info.id, len(lddc_lyrics))
 
     provider_cls = match_provider(player_name, lddc_lyrics) or DefaultProvider
     cfg = get_config()

@@ -57,7 +57,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger("layrics")
 
-# LAYRICS_DEBUG=ruby,match  → 模块级 DEBUG
+# LAYRICS_DEBUG=lyrics,match  → 模块级 DEBUG；=core  → C++ DEBUG
 for name in os.environ.get("LAYRICS_DEBUG", "").split(","):
     name = name.strip()
     if name and name != "core":
