@@ -36,12 +36,3 @@ class BottomStyle:
     gradient: str | None = None
     gradient_color: str = "&H00000000"
     gradient_angle: float = 0.0
-
-
-STYLE_PRESETS: dict[str, BottomStyle] = {
-    "white": BottomStyle(),
-    "yellow": BottomStyle(
-        primary_color="&H00B3FFFF",
-        outline_color="&H00000000",
-    ),
-}

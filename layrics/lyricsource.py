@@ -52,7 +52,7 @@ def search_songs(keyword: str, limit: int = 10) -> list[dict[str, Any]]:
             return []
         logger.debug("search: %s  from %s -> %d raw results", keyword, src.name, len(results))
         items = []
-        for s in results[:per_source]:
+        for s in list(results)[:per_source]:
             sid = s.id or ""
             if not sid:
                 continue

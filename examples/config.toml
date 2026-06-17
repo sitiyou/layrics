@@ -32,10 +32,10 @@ zh = "Noto Sans CJK SC"
 [style.primary]
 font_name = "sans-serif"
 font_size = 48
-primary_colour = "&H00E6D8AD"
-secondary_colour = "&H00AAAAAA"
-outline_colour = "&H88000000"
-back_colour = "&H40000000"
+primary_colour = "&H00FCDD1C"
+secondary_colour = "&H00FFFFFF"
+outline_colour = "&H005C3317"
+back_colour = "&H4C000000"
 bold = false
 italic = false
 underline = false
@@ -45,8 +45,8 @@ scale_y = 100
 spacing = 0
 angle = 0
 border_style = 1
-outline = 2
-shadow = 2
+outline = 3
+shadow = 1
 alignment = 2
 margin_l = 480
 margin_r = 480
@@ -57,10 +57,10 @@ encoding = 1
 [style.secondary]
 font_name = "sans-serif"
 font_size = 32
-primary_colour = "&H00CCCCCC"
-secondary_colour = "&H00555555"
-outline_colour = "&H00000000"
-back_colour = "&H30000000"
+primary_colour = "&H00D5D1CF"
+secondary_colour = "&H00C0C0C0"
+outline_colour = "&H005C3317"
+back_colour = "&H4C000000"
 bold = false
 italic = false
 underline = false
@@ -70,7 +70,7 @@ scale_y = 100
 spacing = 0
 angle = 0
 border_style = 1
-outline = 1
+outline = 1.5
 shadow = 1
 alignment = 2
 margin_l = 480
@@ -99,12 +99,12 @@ secondary = true
 # 单行模式设置
 # margin_v_bottom: 副歌词不存在时主歌词的底部边距
 [assprovider.default.single]
-margin_v_bottom = 0
+margin_v_bottom = 32
 
 # 双行模式设置
-# advance_ms: 同侧递进偏移 (ms)
+# advance_ms: 歌词最大提前显示时间
 # margin_v_right: 右列底部边距
-# v_spacing: 两列垂直间距
+# v_spacing: 两列垂直间距（字体高度+实际间距）
 # margin_l: 左列左边距
 # margin_r: 右列右边距
 # max_length: 每列最大宽度
@@ -112,6 +112,6 @@ margin_v_bottom = 0
 advance_ms = 5000
 margin_v_right = 24
 v_spacing = 64
-margin_l = 20
-margin_r = 20
-max_length = 960
+margin_l = 480
+margin_r = 480
+max_length = 1280

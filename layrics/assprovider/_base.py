@@ -37,15 +37,15 @@ class DefaultProvider(AssProvider):
         self.advance_ms = 0
 
         single = cfg.get("single", {})
-        self.single_margin_v_bottom = int(single.get("margin_v_bottom", 0))
+        self.single_margin_v_bottom = int(single.get("margin_v_bottom", 32))
 
         double = cfg.get("double", {})
         self.advance_ms = int(double.get("advance_ms", 5000))
-        self.double_margin_v_right = double.get("margin_v_right")
-        self.double_v_spacing = double.get("v_spacing")
-        self.double_margin_l = double.get("margin_l")
-        self.double_margin_r = double.get("margin_r")
-        self.double_max_length = double.get("max_length")
+        self.double_margin_v_right = double.get("margin_v_right", 24)
+        self.double_v_spacing = double.get("v_spacing", 64)
+        self.double_margin_l = double.get("margin_l", 480)
+        self.double_margin_r = double.get("margin_r", 480)
+        self.double_max_length = double.get("max_length", 1280)
 
     def generate(
         self, lyrics: Lyrics, duration_ms: int | None = None
