@@ -67,12 +67,14 @@ def cli(ctx: click.Context, socket: str):
 @cli.command()
 @click.pass_context
 def status(ctx):
+    """Show overlay and player status"""
     _pp(_call(ctx.obj["socket"], "get_status"))
 
 
 @cli.command(name="list-players")
 @click.pass_context
 def list_players(ctx):
+    """List available MPRIS players"""
     _pp(_call(ctx.obj["socket"], "list_players"))
 
 
@@ -80,6 +82,7 @@ def list_players(ctx):
 @click.argument("name")
 @click.pass_context
 def select_player(ctx, name: str):
+    """Select MPRIS player by name"""
     _pp(_call(ctx.obj["socket"], "select_player", {"name": name}))
 
 
@@ -88,6 +91,7 @@ def select_player(ctx, name: str):
 @click.option("--limit", "-l", default=10, help="Max results", show_default=True)
 @click.pass_context
 def search(ctx, keyword: str, limit: int):
+    """Search songs by keyword across all sources"""
     _pp(_call(ctx.obj["socket"], "search_songs", {"keyword": keyword, "limit": limit}))
 
 
@@ -95,6 +99,7 @@ def search(ctx, keyword: str, limit: int):
 @click.argument("song_id", required=False, default="")
 @click.pass_context
 def fetch(ctx, song_id: str):
+    """Fetch ASS content for a song or current track"""
     params: dict[str, Any] = {}
     if song_id:
         params["song_id"] = song_id
@@ -111,30 +116,35 @@ def fetch(ctx, song_id: str):
 @click.argument("path")
 @click.pass_context
 def load(ctx, path: str):
+    """Load an ASS file and display on overlay"""
     _pp(_call(ctx.obj["socket"], "load_ass", {"path": path}))
 
 
 @cli.command()
 @click.pass_context
 def hide(ctx):
+    """Hide the overlay"""
     _pp(_call(ctx.obj["socket"], "hide"))
 
 
 @cli.command()
 @click.pass_context
 def unhide(ctx):
+    """Unhide the overlay"""
     _pp(_call(ctx.obj["socket"], "unhide"))
 
 
 @cli.command()
 @click.pass_context
 def lock(ctx):
+    """Lock overlay (click-through mode)"""
     _pp(_call(ctx.obj["socket"], "lock"))
 
 
 @cli.command()
 @click.pass_context
 def unlock(ctx):
+    """Unlock overlay (allow interaction)"""
     _pp(_call(ctx.obj["socket"], "unlock"))
 
 
@@ -142,18 +152,21 @@ def unlock(ctx):
 @click.argument("fps", type=int)
 @click.pass_context
 def set_fps(ctx, fps: int):
+    """Set target frame rate (-1 for vsync)"""
     _pp(_call(ctx.obj["socket"], "set_fps", {"fps": fps}))
 
 
 @cli.command()
 @click.pass_context
 def stop(ctx):
+    """Stop the overlay process"""
     _pp(_call(ctx.obj["socket"], "stop"))
 
 
 @cli.command()
 @click.pass_context
 def start(ctx):
+    """Start the overlay process"""
     _pp(_call(ctx.obj["socket"], "start"))
 
 
@@ -204,6 +217,7 @@ def cache(ctx):
 @cache.command(name="list")
 @click.pass_context
 def cache_list(ctx):
+    """List all cached song-to-lyrics mappings"""
     _pp(_call(ctx.obj["socket"], "cache_list"))
 
 
@@ -212,6 +226,7 @@ def cache_list(ctx):
 @click.option("--key", default="", help="Cache key (defaults to current track)")
 @click.pass_context
 def cache_set(ctx, song_id: str, key: str):
+    """Cache a song-to-lyrics mapping"""
     params: dict[str, Any] = {"song_id": song_id}
     if key:
         params["key"] = key
@@ -222,6 +237,7 @@ def cache_set(ctx, song_id: str, key: str):
 @click.option("--key", default="", help="Cache key (defaults to current track)")
 @click.pass_context
 def cache_remove(ctx, key: str):
+    """Remove a cached song-to-lyrics mapping"""
     params: dict[str, Any] = {}
     if key:
         params["key"] = key
