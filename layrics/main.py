@@ -25,6 +25,7 @@ Methods:
    cache_list                           -> [{key, song_id, lyrics_title, lyrics_artists, updated_at}]
    cache_set     {song_id, key?}       -> {cached}  (key defaults to current track)
    cache_remove  {key?}                -> {removed}  (key defaults to current track)
+   ass_set       {key, value}          -> {key, value}
 """
 
 import sys
@@ -400,7 +401,33 @@ class LayricsApp:
         logger.info("lyrics fetched (%d bytes)", len(ass_content))
         return ass_content
 
-    # ── IPC command dispatch ──────────────────────────────────────
+    _ASS_CONFIG_KEYS = {"karaoke", "line_mode", "secondary"}
+
+
+def _parse_ass_value(key: str, raw: str) -> Any:
+    if key == "line_mode":
+        v = raw.lower().strip()
+        if v == "single":
+            return "single"
+        if v == "double":
+            return "double"
+        if v == "toggle":
+            return None  # caller must resolve
+        msg = f"invalid line_mode: {raw!r} (expected single/double/toggle)"
+        raise ValueError(msg)
+    # boolean keys
+    v = raw.lower().strip()
+    if v in ("true", "on", "1", "yes"):
+        return True
+    if v in ("false", "off", "0", "no"):
+        return False
+    if v == "toggle":
+        return None
+    msg = f"invalid boolean: {raw!r}"
+    raise ValueError(msg)
+
+
+# ── IPC command dispatch ───────────────────────────────┐
 
     async def _execute(self, req: dict) -> dict:
         req_id = req.get("id")
@@ -631,6 +658,43 @@ class LayricsApp:
                 cache.remove(key)
                 logger.info("cache removed: %s", key)
                 return {"id": req_id, "type": "result", "data": {"removed": True}}
+
+            elif method == "ass_set":
+                key = params.get("key", "")
+                raw_value = params.get("value", "")
+                if not key or not raw_value:
+                    return {
+                        "id": req_id,
+                        "type": "error",
+                        "data": {"code": 400, "message": "key and value required"},
+                    }
+                if key not in _ASS_CONFIG_KEYS:
+                    return {
+                        "id": req_id,
+                        "type": "error",
+                        "data": {"code": 400, "message": f"unknown config key: {key}"},
+                    }
+                try:
+                    parsed = _parse_ass_value(key, raw_value)
+                except ValueError as e:
+                    return {
+                        "id": req_id,
+                        "type": "error",
+                        "data": {"code": 400, "message": str(e)},
+                    }
+                if parsed is None:
+                    current = self._config._provider_config.get("default", {}).get(key)
+                    if key == "line_mode":
+                        parsed = "double" if current == "single" else "single"
+                    else:
+                        parsed = not bool(current)
+                self._config._provider_config.setdefault("default", {})[key] = parsed
+                logger.info("ass config: %s = %r", key, parsed)
+                return {
+                    "id": req_id,
+                    "type": "result",
+                    "data": {"key": key, "value": parsed},
+                }
 
             else:
                 return {

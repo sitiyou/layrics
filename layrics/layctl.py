@@ -244,5 +244,14 @@ def cache_remove(ctx, key: str):
     _pp(_call(ctx.obj["socket"], "cache_remove", params))
 
 
+@cli.command()
+@click.argument("key")
+@click.argument("value")
+@click.pass_context
+def ass(ctx, key: str, value: str):
+    """Set ASS renderer config (karaoke, line_mode, secondary)"""
+    _pp(_call(ctx.obj["socket"], "ass_set", {"key": key, "value": value}))
+
+
 if __name__ == "__main__":
     cli()

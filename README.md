@@ -153,9 +153,15 @@ layctl cache remove            # 删除当前曲目缓存
 # 启停 overlay 进程
 layctl stop
 layctl start
+
+# 运行时修改 ASS 渲染配置
+layctl ass karaoke false
+layctl ass line_mode single
+layctl ass secondary toggle
 ```
 
-### IPC 协议
+###
+ IPC 协议
 
 守护进程监听 Unix domain socket。请求和响应均为 JSON 行格式：
 
@@ -164,7 +170,7 @@ layctl start
 {"id": 1, "type": "result", "data": [{"bus_name": "...", "identity": "..."}]}
 ```
 
-可用方法：`list_players`、`select_player`、`search_songs`、`fetch_lyrics`、`load_ass`、`hide`、`unhide`、`lock`、`unlock`、`set_fps`、`stop`、`start`、`get_status`、`cache_list`、`cache_set`、`cache_remove`。
+可用方法：`list_players`、`select_player`、`search_songs`、`fetch_lyrics`、`load_ass`、`hide`、`unhide`、`lock`、`unlock`、`set_fps`、`stop`、`start`、`get_status`、`cache_list`、`cache_set`、`cache_remove`、`ass_set`。
 
 ## 配置
 
@@ -414,6 +420,11 @@ layctl cache remove            # remove current track's cache entry
 # Start/stop the overlay process
 layctl stop
 layctl start
+
+# Change ASS renderer config at runtime
+layctl ass karaoke false
+layctl ass line_mode single
+layctl ass secondary toggle
 ```
 
 ### IPC Protocol
@@ -425,7 +436,7 @@ The daemon listens on a Unix domain socket. Requests and responses are JSON line
 {"id": 1, "type": "result", "data": [{"bus_name": "...", "identity": "..."}]}
 ```
 
-Available methods: `list_players`, `select_player`, `search_songs`, `fetch_lyrics`, `load_ass`, `hide`, `unhide`, `lock`, `unlock`, `set_fps`, `stop`, `start`, `get_status`, `cache_list`, `cache_set`, `cache_remove`.
+Available methods: `list_players`, `select_player`, `search_songs`, `fetch_lyrics`, `load_ass`, `hide`, `unhide`, `lock`, `unlock`, `set_fps`, `stop`, `start`, `get_status`, `cache_list`, `cache_set`, `cache_remove`, `ass_set`.
 
 ## Configuration
 
