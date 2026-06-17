@@ -93,10 +93,9 @@ def search(ctx, keyword: str, limit: int):
 
 @cli.command()
 @click.argument("song_id", required=False, default="")
-@click.option("--sync", is_flag=True, help="Also update overlay with fetched lyrics")
 @click.pass_context
-def fetch(ctx, song_id: str, sync: bool):
-    params: dict[str, Any] = {"sync": sync}
+def fetch(ctx, song_id: str):
+    params: dict[str, Any] = {}
     if song_id:
         params["song_id"] = song_id
     resp = _call(ctx.obj["socket"], "fetch_lyrics", params)
@@ -156,6 +155,44 @@ def stop(ctx):
 @click.pass_context
 def start(ctx):
     _pp(_call(ctx.obj["socket"], "start"))
+
+
+@cli.command(name="set-lrc")
+@click.argument("song_id")
+@click.pass_context
+def set_lrc(ctx, song_id: str):
+    """Set lyrics for current track and update cache"""
+    _pp(_call(ctx.obj["socket"], "cache_set", {"song_id": song_id}))
+
+
+@cli.command()
+@click.pass_context
+def dmenu(ctx):
+    """Search current playing song, output dmenu-compatible lines"""
+    status = _call(ctx.obj["socket"], "get_status")
+    if status.get("type") == "error":
+        _pp(status)
+        return
+    track = status.get("data", {}).get("mpris_player", {}).get("track")
+    if not track:
+        click.echo("Error: no current track", err=True)
+        sys.exit(1)
+    keyword = track.get("title", "") or ""
+    artists = track.get("artists") or []
+    if artists:
+        keyword += " " + " ".join(artists)
+    keyword = keyword.strip()
+    if not keyword:
+        click.echo("Error: empty keyword from current track", err=True)
+        sys.exit(1)
+    results = _call(ctx.obj["socket"], "search_songs", {"keyword": keyword, "limit": 20})
+    if results.get("type") == "error":
+        _pp(results)
+        return
+    for c in results.get("data", []):
+        name = c.get("name", "")
+        artists_str = ", ".join(c.get("artists", []))
+        click.echo(f"{c['id']}\t{name}\t{artists_str}")
 
 
 @cli.group()

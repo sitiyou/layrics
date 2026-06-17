@@ -118,11 +118,17 @@ layctl select-player spotify
 # 搜索歌曲
 layctl search "Eternal Feather"
 
-# 获取指定歌曲歌词并显示在覆盖层
-layctl fetch QM248672467 --sync
+# 获取指定歌曲的 ASS 内容
+layctl fetch QM248672467
 
-# 获取当前曲目歌词
-layctl fetch --sync
+# 获取当前曲目歌词的 ASS 内容
+layctl fetch
+
+# 设置当前曲目的歌词并更新缓存
+layctl set-lrc QM248672467
+
+# 使用 dmenu 选择当前曲目的歌词
+layctl dmenu | dmenu | cut -f1 | xargs layctl set-lrc
 
 # 显示/隐藏覆盖层
 layctl unhide
@@ -373,11 +379,17 @@ layctl select-player spotify
 # Search for songs
 layctl search "Eternal Feather"
 
-# Fetch lyrics for a specific song and display on overlay
-layctl fetch QM248672467 --sync
+# Fetch ASS content for a specific song
+layctl fetch QM248672467
 
-# Fetch lyrics for the current track
-layctl fetch --sync
+# Fetch ASS content for the current track
+layctl fetch
+
+# Set lyrics for current track and update cache
+layctl set-lrc QM248672467
+
+# Use with dmenu to select lyrics interactively
+layctl dmenu | dmenu | cut -f1 | xargs layctl set-lrc
 
 # Show/hide overlay
 layctl unhide

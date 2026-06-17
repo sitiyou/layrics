@@ -12,7 +12,7 @@ Methods:
   list_players                         -> [{bus_name, identity}]
   select_player  {name}                -> {selected}
   search_songs   {keyword, limit?}     -> [{id (composite), name, artists, album, source}]
-  fetch_lyrics   {song_id?, sync?}     -> {ass}  (song_id e.g. "QM248672467", omit for current track)
+   fetch_lyrics   {song_id?}            -> {ass}  (song_id e.g. "QM248672467", omit for current track)
    load_ass       {path}                -> {loaded}
    hide                                 -> {hidden}
    unhide                               -> {hidden}
@@ -461,12 +461,8 @@ class LayricsApp:
                             "data": {"code": 400, "message": "no current track"},
                         }
                     ass_content = await self._fetch_ass_for_track(self._last_track)
-                    if params.get("sync", False):
-                        self.ctrl.set_ass_input(ass_content)
                     return {"id": req_id, "type": "result", "data": {"ass": ass_content}}
                 ass_content = await self.fetch_lyrics(song_data)
-                if params.get("sync", False):
-                    self.ctrl.set_ass_input(ass_content)
                 return {"id": req_id, "type": "result", "data": {"ass": ass_content}}
 
             elif method == "load_ass":
