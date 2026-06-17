@@ -29,6 +29,7 @@ Methods:
 
 import sys
 import os
+import fcntl
 import json
 import asyncio
 import logging
@@ -61,6 +62,23 @@ for name in os.environ.get("LAYRICS_DEBUG", "").split(","):
     name = name.strip()
     if name and name != "core":
         logging.getLogger(f"layrics.{name}").setLevel(logging.DEBUG)
+
+
+def _acquire_instance_lock() -> int:
+    runtime_dir = os.environ.get("XDG_RUNTIME_DIR", "/tmp")
+    lock_path = os.path.join(runtime_dir, "layrics.lock")
+    try:
+        fd = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o644)
+    except OSError as e:
+        print(f"Error: Cannot create lock file {lock_path}: {e}", file=sys.stderr)
+        sys.exit(1)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        os.close(fd)
+        print("Error: Another instance of layrics is already running.", file=sys.stderr)
+        sys.exit(1)
+    return fd
 
 
 class LayricsApp:
@@ -750,6 +768,8 @@ def main():
     )
     parser.add_argument("--socket", "-s", help="IPC socket path")
     args = parser.parse_args()
+
+    _acquire_instance_lock()
 
     app = LayricsApp(socket_path=args.socket or "")
 
