@@ -94,7 +94,46 @@ def normalize_title(title: str) -> str:
     return s
 
 
-# ── similarity helpers ───────────────────────────────────────────────
+_BRACKET_PAIRS = [("(", ")"), ("[", "]"), ("【", "】"), ("〈", "〉")]
+_ANNOT_KEYWORDS_LONGEST = sorted(_ANNOT_KEYWORDS, key=len, reverse=True)
+
+
+def clean_search_keyword(keyword: str) -> str:
+    """Strip annotation keywords from search keywords, keeping the rest.
+
+    ``Mayday (feat. Laura Brehm) TheFatRat`` → ``Mayday Laura Brehm TheFatRat``
+    ``Lemon (cover)`` → ``Lemon``
+    """
+    kw = keyword
+    for lb, rb in _BRACKET_PAIRS:
+        pat = re.compile(
+            re.escape(lb) + r"([^" + re.escape(rb) + r"]*)" + re.escape(rb)
+        )
+
+        def _strip(m: re.Match) -> str:
+            inner = m.group(1)
+            if not any(re.search(r"\b" + re.escape(k) + r"\b", inner, re.IGNORECASE)
+                       for k in _ANNOT_KEYWORDS_LONGEST):
+                return m.group(0)
+            for k in _ANNOT_KEYWORDS_LONGEST:
+                inner = re.sub(r"\b" + re.escape(k) + r"\.?\s*", "", inner, flags=re.IGNORECASE)
+            inner = re.sub(r"\s+", " ", inner).strip(" ,、.")
+            return inner
+
+        kw = pat.sub(_strip, kw)
+    kw = re.sub(r"\s+", " ", kw).strip()
+    parts = kw.split(" ")
+    seen: set[str] = set()
+    deduped: list[str] = []
+    for p in parts:
+        pl = p.lower()
+        if pl not in seen:
+            seen.add(pl)
+            deduped.append(p)
+    return " ".join(deduped)
+
+
+# ── similarity helpers ───────────────────────────────┐
 
 def _title_similarity(a: str, b: str) -> float:
     if not a or not b:

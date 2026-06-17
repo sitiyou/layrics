@@ -44,7 +44,7 @@ from ._layrics import ApplicationController
 from .config import get_config
 from .cache import SongCache, make_cache_key
 from .lyricsource import search_songs as _search_songs, fetch_lyrics as _fetch_lyrics, parse_composite_id, _resolve_song_info
-from .matching import match_song
+from .matching import match_song, clean_search_keyword
 from .mpris import MPRISPlayerFinder, MprisSignalMonitor, TrackMeta
 
 logging.basicConfig(
@@ -129,7 +129,7 @@ class LayricsApp:
         keyword = (meta.title or "")
         if meta.artists:
             keyword += " " + " ".join(meta.artists)
-        keyword = keyword.strip()
+        keyword = clean_search_keyword(keyword.strip())
         if not keyword:
             raise RuntimeError(f"empty keyword for track {meta.unique_song_id}")
 
