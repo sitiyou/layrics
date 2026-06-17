@@ -158,5 +158,38 @@ def start(ctx):
     _pp(_call(ctx.obj["socket"], "start"))
 
 
+@cli.group()
+@click.pass_context
+def cache(ctx):
+    """Manage song-to-lyrics cache"""
+
+
+@cache.command(name="list")
+@click.pass_context
+def cache_list(ctx):
+    _pp(_call(ctx.obj["socket"], "cache_list"))
+
+
+@cache.command(name="set")
+@click.argument("song_id")
+@click.option("--key", default="", help="Cache key (defaults to current track)")
+@click.pass_context
+def cache_set(ctx, song_id: str, key: str):
+    params: dict[str, Any] = {"song_id": song_id}
+    if key:
+        params["key"] = key
+    _pp(_call(ctx.obj["socket"], "cache_set", params))
+
+
+@cache.command(name="remove")
+@click.option("--key", default="", help="Cache key (defaults to current track)")
+@click.pass_context
+def cache_remove(ctx, key: str):
+    params: dict[str, Any] = {}
+    if key:
+        params["key"] = key
+    _pp(_call(ctx.obj["socket"], "cache_remove", params))
+
+
 if __name__ == "__main__":
     cli()

@@ -21,7 +21,10 @@ Methods:
    set_fps      {fps}                   -> {target_fps}
    stop                                 -> {status}
    start                                -> {status}
-   get_status                           -> {mpris_player}
+   get_status                           -> {mpris_player, overlay}
+   cache_list                           -> [{key, song_id, lyrics_title, lyrics_artists, updated_at}]
+   cache_set     {song_id, key?}       -> {cached}  (key defaults to current track)
+   cache_remove  {key?}                -> {removed}  (key defaults to current track)
 """
 
 import sys
@@ -38,7 +41,8 @@ from LDDC.common.models import Artist, SongInfo, Source
 
 from ._layrics import ApplicationController
 from .config import get_config
-from .lyricsource import search_songs as _search_songs, fetch_lyrics as _fetch_lyrics, parse_composite_id
+from .cache import SongCache, make_cache_key
+from .lyricsource import search_songs as _search_songs, fetch_lyrics as _fetch_lyrics, parse_composite_id, _resolve_song_info
 from .matching import match_song
 from .mpris import MPRISPlayerFinder, MprisSignalMonitor, TrackMeta
 
@@ -110,8 +114,29 @@ class LayricsApp:
         if not keyword:
             raise RuntimeError(f"empty keyword for track {meta.unique_song_id}")
 
-        logger.info("fetch: searching %s", keyword)
         loop = asyncio.get_event_loop()
+        cache = SongCache()
+        key = make_cache_key(meta)
+        cached = cache.get(key)
+        if cached is not None:
+            logger.info("fetch: cache hit %s -> %s%s", keyword,
+                         cached.lyrics_source, cached.lyrics_song_id)
+            try:
+                src = Source[cached.lyrics_source]
+            except KeyError:
+                logger.warning("fetch: invalid source in cache %s", cached.lyrics_source)
+                cache.remove(key)
+            else:
+                song_info = SongInfo(source=src, id=cached.lyrics_song_id)
+                try:
+                    ass = await loop.run_in_executor(None, lambda: _fetch_lyrics(song_info))
+                    logger.info("fetch: cache hit %s (%d bytes)", keyword, len(ass))
+                    return ass
+                except Exception:
+                    logger.warning("fetch: stale cache entry, removing: %s", key)
+                    cache.remove(key)
+
+        logger.info("fetch: searching %s", keyword)
         results = await loop.run_in_executor(
             None, lambda: _search_songs(keyword, 20)
         )
@@ -135,6 +160,13 @@ class LayricsApp:
         )
         ass = await loop.run_in_executor(None, lambda: _fetch_lyrics(song_info))
         logger.info("fetch: %s -> %s (%d bytes)", keyword, matched["id"], len(ass))
+
+        cache.set_if_missing(
+            key, raw_id, src.name,
+            matched.get("name", ""),
+            "|".join(matched.get("artists", [])),
+        )
+
         return ass
 
     async def _auto_fetch_lyrics(self, meta: TrackMeta) -> None:
@@ -498,6 +530,90 @@ class LayricsApp:
                         "overlay": overlay,
                     },
                 }
+
+            elif method == "cache_list":
+                cache = SongCache()
+                entries = cache.list_all()
+                return {
+                    "id": req_id,
+                    "type": "result",
+                    "data": [
+                        {
+                            "key": e.cache_key,
+                            "song_id": e.lyrics_source + e.lyrics_song_id,
+                            "lyrics_title": e.lyrics_title,
+                            "lyrics_artists": e.lyrics_artists,
+                            "updated_at": e.updated_at,
+                        }
+                        for e in entries
+                    ],
+                }
+
+            elif method == "cache_set":
+                song_id = params.get("song_id", "")
+                if not song_id:
+                    return {
+                        "id": req_id,
+                        "type": "error",
+                        "data": {"code": 400, "message": "song_id required"},
+                    }
+                key = params.get("key") or ""
+                if not key:
+                    if not self._last_track:
+                        return {
+                            "id": req_id,
+                            "type": "error",
+                            "data": {"code": 400, "message": "no current track"},
+                        }
+                    key = make_cache_key(self._last_track)
+
+                src, raw_id = parse_composite_id(song_id)
+                song_info = SongInfo(source=src, id=raw_id)
+                loop = asyncio.get_event_loop()
+
+                resolved = await loop.run_in_executor(
+                    None, lambda: _resolve_song_info(song_info),
+                )
+                ass = await loop.run_in_executor(
+                    None, lambda: _fetch_lyrics(resolved),
+                )
+                cache = SongCache()
+                cache.set(
+                    key, raw_id, src.name,
+                    resolved.title or "",
+                    str(resolved.artist) if resolved.artist else "",
+                )
+
+                self.ctrl.set_ass_input(ass)
+                self.ctrl.set_hidden(False)
+                if self._paused:
+                    self.ctrl.set_paused(True)
+                else:
+                    self.ctrl.set_paused(False)
+                    now_ms = int(time.monotonic() * 1000)
+                    try:
+                        pos = self._mpris_player.get_position()
+                        self.ctrl.set_start_time(now_ms - pos // 1000)
+                    except Exception:
+                        pass
+
+                logger.info("cache set: %s -> %s%s", key, src.name, raw_id)
+                return {"id": req_id, "type": "result", "data": {"cached": True}}
+
+            elif method == "cache_remove":
+                key = params.get("key") or ""
+                if not key:
+                    if not self._last_track:
+                        return {
+                            "id": req_id,
+                            "type": "error",
+                            "data": {"code": 400, "message": "no current track"},
+                        }
+                    key = make_cache_key(self._last_track)
+                cache = SongCache()
+                cache.remove(key)
+                logger.info("cache removed: %s", key)
+                return {"id": req_id, "type": "result", "data": {"removed": True}}
 
             else:
                 return {
