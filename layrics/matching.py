@@ -177,7 +177,7 @@ def match_song(
     if not scored:
         return None
 
-    scored.sort(key=lambda x: (-x[0], x[1], -x[2]))
+    scored.sort(key=lambda x: (-x[0], -x[2], x[1]))
     best = scored[0]
     best_c = best[3]
 

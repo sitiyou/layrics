@@ -87,6 +87,7 @@ class LayricsApp:
         self._last_position_us: int = 0
         self._signal_monitor: Optional[MprisSignalMonitor] = None
         self._signal_reader: Optional[asyncio.AbstractEventLoop] = None
+        self._fetch_gen: int = 0
 
     # ── overlay control ───────────────────────────────────────────
 
@@ -169,8 +170,7 @@ class LayricsApp:
 
         return ass
 
-    async def _auto_fetch_lyrics(self, meta: TrackMeta) -> None:
-        track_id = meta.unique_song_id
+    async def _auto_fetch_lyrics(self, meta: TrackMeta, gen: int) -> None:
         try:
             ass_content = await self._fetch_ass_for_track(meta)
         except (RuntimeError, LyricsNotFoundError, json.JSONDecodeError) as e:
@@ -178,11 +178,11 @@ class LayricsApp:
             self.ctrl.set_hidden(True)
             return
         else:
-            if self._last_track is None or self._last_track.unique_song_id != track_id:
+            if self._fetch_gen != gen:
                 return
             self.ctrl.set_ass_input(ass_content)
 
-        if self._last_track is None or self._last_track.unique_song_id != track_id:
+        if self._fetch_gen != gen:
             return
         self.ctrl.set_hidden(False)
         if self._paused:
@@ -294,6 +294,7 @@ class LayricsApp:
                 self.ctrl.set_start_time(now_ms - val // 1000)
                 self._last_position_us = val
             elif typ == "track":
+                self._fetch_gen += 1
                 self._last_track = None
                 logger.info("signal: track changed: %s", val)
                 self.ctrl.set_hidden(True)
@@ -317,6 +318,7 @@ class LayricsApp:
             pos = self._mpris_player.get_position()
         except Exception as e:
             logger.warning("mpris player disconnected: %s", e)
+            self._fetch_gen += 1
             self._mpris_player = None
             self._last_track = None
             self._last_status = None
@@ -329,10 +331,12 @@ class LayricsApp:
         last_id = self._last_track.unique_song_id if self._last_track else None
         track_changed = cur_id != last_id
         if track_changed:
+            self._fetch_gen += 1
+            gen = self._fetch_gen
             self._last_track = meta
             logger.info("track changed: %s", meta.title or "?")
             self.ctrl.set_hidden(True)
-            asyncio.get_event_loop().create_task(self._auto_fetch_lyrics(meta))
+            asyncio.get_event_loop().create_task(self._auto_fetch_lyrics(meta, gen))
 
         # play / pause
         if status != self._last_status:
