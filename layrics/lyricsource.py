@@ -18,7 +18,7 @@ def _init_prefixes() -> list[tuple[str, Source]]:
     if _SOURCE_PREFIXES is None:
         cfg = get_config()
         _SOURCE_PREFIXES = sorted(
-            [(s.name, s) for s in cfg.sources],
+            [(s.name, s) for s in cfg.search.sources],
             key=lambda x: -len(x[0]),
         )
     return _SOURCE_PREFIXES
@@ -33,7 +33,9 @@ def parse_composite_id(song_id: str) -> tuple[Source, str]:
 
 
 def search_songs(keyword: str, limit: int = 10) -> list[dict[str, Any]]:
-    search_sources = get_config().sources
+    cfg = get_config()
+    search_sources = cfg.search.sources
+    per_source = cfg.search.result_count
 
     def _items(src: Source) -> list[dict[str, Any]]:
         try:
@@ -41,7 +43,7 @@ def search_songs(keyword: str, limit: int = 10) -> list[dict[str, Any]]:
         except Exception:
             return []
         items = []
-        for s in results:
+        for s in results[:per_source]:
             sid = s.id or ""
             if not sid:
                 continue
@@ -114,9 +116,9 @@ def fetch_lyrics(
     cfg = get_config()
     lyrics = Lyrics(
         lddc_lyrics,
-        fonts=cfg.fonts,
-        primary_priority=cfg.lyrics_primary,
-        secondary_priority=cfg.lyrics_secondary,
+        fonts=cfg.fonts.mapping,
+        primary_priority=cfg.lyrics.primary,
+        secondary_priority=cfg.lyrics.secondary,
         primary_override=cfg.get_style_config("primary"),
         secondary_override=cfg.get_style_config("secondary"),
     )

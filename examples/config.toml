@@ -1,43 +1,112 @@
 # layrics 配置文件
 # 路径: $XDG_CONFIG_HOME/layrics/config.toml 或 ~/.config/layrics/config.toml
+# 以下为所有配置项及其默认值。将此文件按需修改后放入配置目录即可生效。
 
-# 目标帧率（覆盖 vsync），-1 表示跟随显示器刷新率
-# target_fps = 30
-
-# 歌词搜索源（排序决定展示优先级，空列表则用默认 [QM, NE]）
+# 歌词搜索源
+# 排序决定展示优先级，空列表则默认用 [QM, NE]
 # 可选: QM, KG, NE, LRCLIB
+[search]
 sources = ["QM", "NE"]
+result_count = 5
+
+# 渲染相关
+# 目标帧率, -1 表示跟随显示器刷新率
+[overlay]
+target_fps = -1
+
+# MPRIS 播放器控制
+# include_players / exclude_players 互斥，同时设置时 exclude 优先
+# 均为正则列表，留空则不过滤，取第一个正在播放的
+[mpris]
+include_players = []
+exclude_players = []
 
 # 字体映射: 检测到的语言 → 字体名
 # 语言: ja (日语), zh (中文), ko (韩语), ru (俄语), default
 [fonts]
+default = "sans-serif"
 ja = "Noto Sans CJK JP"
 zh = "Noto Sans CJK SC"
 
-# ASS 样式覆盖
+# ASS 主样式覆盖
 [style.primary]
-# font_name = "思源黑体"
-# font_size = 48
+font_name = "sans-serif"
+font_size = 48
+primary_colour = "&H00E6D8AD"
+secondary_colour = "&H00AAAAAA"
+outline_colour = "&H88000000"
+back_colour = "&H40000000"
+bold = false
+italic = false
+underline = false
+strike_out = false
+scale_x = 100
+scale_y = 100
+spacing = 0
+angle = 0
+border_style = 1
+outline = 2
+shadow = 2
+alignment = 2
+margin_l = 480
+margin_r = 480
+margin_v = 64
+encoding = 1
 
+# ASS 副样式覆盖
 [style.secondary]
-# font_size = 36
+font_name = "sans-serif"
+font_size = 32
+primary_colour = "&H00CCCCCC"
+secondary_colour = "&H00555555"
+outline_colour = "&H00000000"
+back_colour = "&H30000000"
+bold = false
+italic = false
+underline = false
+strike_out = false
+scale_x = 100
+scale_y = 100
+spacing = 0
+angle = 0
+border_style = 1
+outline = 1
+shadow = 1
+alignment = 2
+margin_l = 480
+margin_r = 480
+margin_v = 24
+encoding = 1
 
 # 主/副歌词选择优先级
 # 每项可以是 track 类型 (orig, ts, roma) 或语言代码 (zh, ja, ko, ru)
 # 从左到右优先级依次降低
 [lyrics]
-primary = ["orig", "ja", "zh"]
-# secondary = ["ts", "roma", "en"]   # 注释掉则使用默认 ["ts"]
-
-# MPRIS 播放器过滤（正则）
-# 留空或缺失则不过滤，取第一个正在播放的
-include_players = []
+primary = ["orig"]
+secondary = ["ts"]
 
 # ASS 生成器配置
 [assprovider.default]
-primary_position = "top"
 karaoke = true
 line_mode = "single"
 secondary = true
-advance_ms = 0
-margin_v_spacing = 2
+
+# 单行模式设置
+# margin_v_bottom: 副歌词不存在时主歌词的底部边距
+[assprovider.default.single]
+margin_v_bottom = 0
+
+# 双行模式设置
+# advance_ms: 同侧递进偏移 (ms)
+# margin_v_right: 右列底部边距
+# v_spacing: 两列垂直间距
+# margin_l: 左列左边距
+# margin_r: 右列右边距
+# max_length: 每列最大宽度
+[assprovider.default.double]
+advance_ms = 5000
+margin_v_right = 24
+v_spacing = 64
+margin_l = 20
+margin_r = 20
+max_length = 960

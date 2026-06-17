@@ -31,17 +31,21 @@ class DefaultProvider(AssProvider):
         config: dict[str, Any] | None = None,
     ) -> None:
         cfg = config or {}
-        self.primary_position = str(cfg.get("primary_position", "top"))
-        self.margin_v_spacing = int(cfg.get("margin_v_spacing", 2))
         self.karaoke = bool(cfg.get("karaoke", True))
         self.line_mode = str(cfg.get("line_mode", "single"))
         self.secondary_enabled = bool(cfg.get("secondary", True))
-        self.advance_ms = int(cfg.get("advance_ms", 0))
-        self.double_margin_v_right = cfg.get("double_margin_v_right", None)
-        self.double_margin_v_spacing = cfg.get("double_margin_v_spacing", None)
-        self.double_margin_l = cfg.get("double_margin_l", None)
-        self.double_margin_r = cfg.get("double_margin_r", None)
-        self.double_margin_max_length = cfg.get("double_margin_max_length", None)
+        self.advance_ms = 0
+
+        single = cfg.get("single", {})
+        self.single_margin_v_bottom = int(single.get("margin_v_bottom", 0))
+
+        double = cfg.get("double", {})
+        self.advance_ms = int(double.get("advance_ms", 5000))
+        self.double_margin_v_right = double.get("margin_v_right")
+        self.double_v_spacing = double.get("v_spacing")
+        self.double_margin_l = double.get("margin_l")
+        self.double_margin_r = double.get("margin_r")
+        self.double_max_length = double.get("max_length")
 
     def generate(
         self, lyrics: Lyrics, duration_ms: int | None = None
@@ -76,10 +80,11 @@ class DefaultProvider(AssProvider):
                 header, orig_data, use_karaoke, advanced, lyrics,
             )
 
-        primary = self._adjust(lyrics.primary_style, is_primary=True, secondary_style=lyrics.secondary_style)
+        primary = lyrics.primary_style
         styles = [primary]
         events: list[AssDialogueLine] = []
         secondary: AssStyle | None = None
+        had_secondary = False
 
         for i, (oline, aligned) in enumerate(
             lyrics.iter_aligned(fslyrics, secondary_enabled=self.secondary_enabled)
@@ -98,12 +103,17 @@ class DefaultProvider(AssProvider):
                 if stext == text:
                     continue
                 if secondary is None:
-                    secondary = self._adjust(lyrics.secondary_style, is_primary=False, secondary_style=lyrics.secondary_style)
+                    secondary = lyrics.secondary_style
                     styles.append(secondary)
+                had_secondary = True
                 events.append(AssDialogueLine(
                     start_ms=start, end_ms=end,
                     style=secondary.name, text=stext,
                 ))
+
+        if not had_secondary and self.single_margin_v_bottom > 0:
+            primary = replace(primary, margin_v=self.single_margin_v_bottom)
+            styles[0] = primary
 
         return build_ass(header, styles, events)
 
@@ -116,7 +126,7 @@ class DefaultProvider(AssProvider):
         lyrics: Lyrics,
     ) -> str:
         left_style, right_style = self._build_double_styles(
-            self._adjust(lyrics.primary_style, is_primary=True, secondary_style=lyrics.secondary_style),
+            self._adjust(lyrics.primary_style, is_primary=True),
             header,
         )
         if not use_karaoke:
@@ -155,20 +165,12 @@ class DefaultProvider(AssProvider):
         return build_ass(header, styles, events)
 
     def _build_double_styles(self, base: AssStyle, header: AssHeader) -> tuple[AssStyle, AssStyle]:
-        right_mv = (
-            int(self.double_margin_v_right)
-            if self.double_margin_v_right is not None
-            else int(base.margin_v)
-        )
-        spacing = (
-            int(self.double_margin_v_spacing)
-            if self.double_margin_v_spacing is not None
-            else int(base.font_size) + self.margin_v_spacing * 2
-        )
+        right_mv = int(self.double_margin_v_right) if self.double_margin_v_right is not None else 24
+        spacing = int(self.double_v_spacing) if self.double_v_spacing is not None else 64
         max_len = (
-            int(self.double_margin_max_length)
-            if self.double_margin_max_length is not None
-            else header.play_res_x // 2
+            int(self.double_max_length)
+            if self.double_max_length is not None
+            else 960
         )
         left_ml = int(self.double_margin_l) if self.double_margin_l is not None else 20
         left_mr = header.play_res_x - left_ml - max_len
@@ -197,13 +199,14 @@ class DefaultProvider(AssProvider):
         ptext = ass_escape("".join(w.text for line in orig for w in line.words).strip())
         end_ms = duration_ms or 5000
 
-        primary = self._adjust(lyrics.primary_style, is_primary=True, secondary_style=lyrics.secondary_style)
+        primary = lyrics.primary_style
         styles = [primary]
         events = [AssDialogueLine(
             start_ms=0, end_ms=end_ms,
             style=primary.name, text=ptext,
         )]
 
+        had_secondary = False
         if self.secondary_enabled:
             sec = lyrics.secondary_track
             if sec:
@@ -211,29 +214,23 @@ class DefaultProvider(AssProvider):
                 if sdata:
                     stext = ass_escape("".join(w.text for line in sdata for w in line.words).strip())
                     if stext and stext != ptext:
-                        secondary = self._adjust(lyrics.secondary_style, is_primary=False, secondary_style=lyrics.secondary_style)
+                        secondary = lyrics.secondary_style
                         styles.append(secondary)
+                        had_secondary = True
                         events.append(AssDialogueLine(
                             start_ms=0, end_ms=end_ms,
                             style=secondary.name, text=stext,
                         ))
 
+        if not had_secondary and self.single_margin_v_bottom > 0:
+            primary = replace(primary, margin_v=self.single_margin_v_bottom)
+            styles[0] = primary
+
         header = AssHeader(title=lyrics.title or "lyrics")
         return build_ass(header, styles, events)
 
-    def _adjust(self, style: AssStyle | None, is_primary: bool, secondary_style: AssStyle | None) -> AssStyle:
-        if style is None:
-            style = DEFAULT_PRIMARY if is_primary else DEFAULT_SECONDARY
-        if secondary_style is None:
-            secondary_style = DEFAULT_SECONDARY
-        spacing = int(secondary_style.font_size) + self.margin_v_spacing
-        if self.primary_position == "bottom":
-            mv = style.margin_v if is_primary else style.margin_v + spacing
-        else:
-            mv = style.margin_v + spacing if is_primary else style.margin_v
-        if mv == style.margin_v:
-            return style
-        return replace(style, margin_v=mv)
+    def _adjust(self, style: AssStyle | None, is_primary: bool) -> AssStyle:
+        return style if style is not None else (DEFAULT_PRIMARY if is_primary else DEFAULT_SECONDARY)
 
     def _karaoke_text(self, line: FSLyricsLine) -> str:
         if len(line.words) <= 1:

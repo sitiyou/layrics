@@ -189,14 +189,22 @@ class LayricsApp:
 
     def _auto_select_player(self) -> bool:
         players = self.mpris_finder.find_all_players()
-        if self._config.include_players:
-            filtered = []
-            for p in players:
-                for pat in self._config.include_players:
-                    if pat.search(p.bus_name) or pat.search(p.get_identity()):
-                        filtered.append(p)
-                        break
-            players = filtered
+        if self._config.exclude_players:
+            players = [
+                p for p in players
+                if not any(
+                    pat.search(p.bus_name) or pat.search(p.get_identity())
+                    for pat in self._config.exclude_players
+                )
+            ]
+        elif self._config.include_players:
+            players = [
+                p for p in players
+                if any(
+                    pat.search(p.bus_name) or pat.search(p.get_identity())
+                    for pat in self._config.include_players
+                )
+            ]
         if not players:
             return False
         for p in players:
@@ -445,7 +453,7 @@ class LayricsApp:
                         "data": {"code": 400, "message": "fps must be > 0 or -1 (vsync)"},
                     }
                 self.ctrl.set_target_fps(fps)
-                self._config.target_fps = fps
+                self._config.overlay.target_fps = fps
                 return {"id": req_id, "type": "result", "data": {"target_fps": fps}}
 
             elif method == "stop":
@@ -569,9 +577,9 @@ class LayricsApp:
     async def run(self):
         self.start_overlay()
 
-        if self._config.target_fps > 0:
-            self.ctrl.set_target_fps(self._config.target_fps)
-            logger.info("target FPS set from config: %d", self._config.target_fps)
+        if self._config.overlay.target_fps > 0:
+            self.ctrl.set_target_fps(self._config.overlay.target_fps)
+            logger.info("target FPS set from config: %d", self._config.overlay.target_fps)
 
         try:
             os.unlink(self.socket_path)
