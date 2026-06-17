@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import logging
+import os
+import subprocess
+import tempfile
 from typing import Any
 
-from LDDC.common.models import Lyrics as _LDCLyrics, SearchType, SongInfo, Source
+from LDDC.common.models import Lyrics as _LDCLyrics, LyricsType, SearchType, SongInfo, Source
 from LDDC.core.api.lyrics import get_lyrics as _lddc_get_lyrics
 from LDDC.core.api.lyrics import search as _lddc_search
 
@@ -115,6 +118,48 @@ def _resolve_song_info(song_info: SongInfo) -> SongInfo:
     )
 
 
+def _postprocess_aegisub(ass: str, cli_path: str, automation: str = "kara-templater.lua",
+                         header_overrides: dict[str, str | int] | None = None) -> str:
+    from .karaoke.header import render_karaoke_header
+
+    karaoke_header = render_karaoke_header(**(header_overrides or {}))
+
+    dialog_lines = []
+    for line in ass.splitlines():
+        if line.startswith("Dialogue:"):
+            line = line.replace(",PrimaryLeft,", ",K1,")
+            line = line.replace(",PrimaryRight,", ",K2,")
+            line = line.replace(",Primary,", ",K1,")
+            line = line.replace(",Secondary,", ",K2,")
+            dialog_lines.append(line)
+
+    inter_ass = karaoke_header.rstrip("\n") + "\n" + "\n".join(dialog_lines) + "\n"
+
+    try:
+        with tempfile.NamedTemporaryFile(
+            suffix=".ass", mode="w", delete=False, prefix="layrics_aegisub_"
+        ) as f:
+            f.write(inter_ass)
+            tmp_path = f.name
+
+        subprocess.run(
+            [cli_path, "--automation", automation, tmp_path, tmp_path, "Apply karaoke template"],
+            check=True, capture_output=True, text=True,
+        )
+        with open(tmp_path) as f:
+            result = f.read()
+    except Exception as e:
+        logger.warning("aegisub-cli failed: %s, using intermediate ass", e)
+        result = inter_ass
+    finally:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+
+    return result
+
+
 def fetch_lyrics(
     song_info: SongInfo,
     player_name: str = "",
@@ -147,4 +192,29 @@ def fetch_lyrics(
     )
     dur_ms = song_info.duration
     ass = provider.generate(lyrics, duration_ms=dur_ms)
+
+    if provider_cls is DefaultProvider:
+        provider_cfg = cfg.get_provider_config("default")
+        if provider_cfg.get("aegisub_karaoke") and provider_cfg.get("line_mode") == "double":
+            orig_type = lyrics.types.get(lyrics.primary_track)
+            if provider_cfg.get("karaoke", True) and orig_type == LyricsType.VERBATIM:
+                cli = provider_cfg.get("aegisub_cli", "") or "aegisub-cli"
+                automation = provider_cfg.get("aegisub_automation", "") or "kara-templater.lua"
+
+                primary_style = lyrics.primary_style
+                overrides: dict[str, str | int] = {
+                    "FONTNAME": primary_style.font_name,
+                }
+                pc = primary_style.primary_colour
+                if pc.startswith("&H"):
+                    pc = pc[2:]
+                overrides["OVERLAY_COLOR"] = pc[-6:]
+
+                ass = _postprocess_aegisub(ass, cli, automation, header_overrides=overrides)
+            else:
+                logger.info(
+                    "aegisub_karaoke: lyrics lack word timing (type=%s), skipping",
+                    orig_type,
+                )
+
     return ass

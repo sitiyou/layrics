@@ -90,6 +90,11 @@ secondary = ["ts"]
 karaoke = true
 line_mode = "single"
 secondary = true
+# aegisub 卡拉OK模板模式（需要 aegisub-cli: https://github.com/Myaamori/aegisub-cli）
+# 仅当歌词有 word-level timing (VERBATIM) 时生效
+# aegisub_karaoke = false
+# aegisub_cli = ""
+# aegisub_automation = ""
 
 # 单行模式设置
 # margin_v_bottom: 副歌词不存在时主歌词的底部边距
