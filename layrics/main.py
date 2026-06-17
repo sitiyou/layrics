@@ -82,6 +82,31 @@ def _acquire_instance_lock() -> int:
     return fd
 
 
+_ASS_CONFIG_KEYS = {"karaoke", "line_mode", "secondary"}
+
+
+def _parse_ass_value(key: str, raw: str) -> Any:
+    if key == "line_mode":
+        v = raw.lower().strip()
+        if v == "single":
+            return "single"
+        if v == "double":
+            return "double"
+        if v == "toggle":
+            return None
+        msg = f"invalid line_mode: {raw!r} (expected single/double/toggle)"
+        raise ValueError(msg)
+    v = raw.lower().strip()
+    if v in ("true", "on", "1", "yes"):
+        return True
+    if v in ("false", "off", "0", "no"):
+        return False
+    if v == "toggle":
+        return None
+    msg = f"invalid boolean: {raw!r}"
+    raise ValueError(msg)
+
+
 class LayricsApp:
     """Orchestrates overlay, MPRIS monitoring, NetEase API, and IPC."""
 
@@ -401,33 +426,8 @@ class LayricsApp:
         logger.info("lyrics fetched (%d bytes)", len(ass_content))
         return ass_content
 
-    _ASS_CONFIG_KEYS = {"karaoke", "line_mode", "secondary"}
 
-
-def _parse_ass_value(key: str, raw: str) -> Any:
-    if key == "line_mode":
-        v = raw.lower().strip()
-        if v == "single":
-            return "single"
-        if v == "double":
-            return "double"
-        if v == "toggle":
-            return None  # caller must resolve
-        msg = f"invalid line_mode: {raw!r} (expected single/double/toggle)"
-        raise ValueError(msg)
-    # boolean keys
-    v = raw.lower().strip()
-    if v in ("true", "on", "1", "yes"):
-        return True
-    if v in ("false", "off", "0", "no"):
-        return False
-    if v == "toggle":
-        return None
-    msg = f"invalid boolean: {raw!r}"
-    raise ValueError(msg)
-
-
-# ── IPC command dispatch ───────────────────────────────┐
+# ── IPC command dispatch ──────────────────────────────────────
 
     async def _execute(self, req: dict) -> dict:
         req_id = req.get("id")
@@ -690,6 +690,26 @@ def _parse_ass_value(key: str, raw: str) -> Any:
                         parsed = not bool(current)
                 self._config._provider_config.setdefault("default", {})[key] = parsed
                 logger.info("ass config: %s = %r", key, parsed)
+
+                if self._last_track is not None:
+                    try:
+                        ass = await self._fetch_ass_for_track(self._last_track)
+                        self.ctrl.set_ass_input(ass)
+                        if self._paused:
+                            self.ctrl.set_paused(True)
+                        else:
+                            self.ctrl.set_paused(False)
+                            now_ms = int(time.monotonic() * 1000)
+                            try:
+                                pos = self._mpris_player.get_position()
+                                self.ctrl.set_start_time(now_ms - pos // 1000)
+                            except Exception:
+                                pass
+                        logger.info("ass config: lyrics reloaded with new %s = %r", key, parsed)
+                    except Exception as e:
+                        logger.warning("ass config: reload failed for %s = %r: %s",
+                                       key, parsed, e)
+
                 return {
                     "id": req_id,
                     "type": "result",
