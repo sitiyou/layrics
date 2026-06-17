@@ -71,14 +71,14 @@ def status(ctx):
     _pp(_call(ctx.obj["socket"], "get_status"))
 
 
-@cli.command(name="list-players")
+@cli.command(name="players")
 @click.pass_context
 def list_players(ctx):
     """List available MPRIS players"""
     _pp(_call(ctx.obj["socket"], "list_players"))
 
 
-@cli.command(name="select-player")
+@cli.command(name="set-player")
 @click.argument("name")
 @click.pass_context
 def select_player(ctx, name: str):

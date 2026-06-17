@@ -110,10 +110,10 @@ layrics
 
 ```bash
 # 列出可用 MPRIS 播放器
-layctl list-players
+layctl players
 
 # 选择播放器
-layctl select-player spotify
+layctl set-player spotify
 
 # 搜索歌曲
 layctl search "Eternal Feather"
@@ -371,10 +371,10 @@ Optional arguments:
 
 ```bash
 # List available MPRIS players
-layctl list-players
+layctl players
 
 # Select a specific player
-layctl select-player spotify
+layctl set-player spotify
 
 # Search for songs
 layctl search "Eternal Feather"
