@@ -137,10 +137,12 @@ def unhide(ctx):
 
 
 @cli.command()
+@click.argument("value", required=False)
 @click.pass_context
-def lock(ctx):
-    """Lock overlay (click-through mode)"""
-    _pp(_call(ctx.obj["socket"], "lock"))
+def lock(ctx, value: str | None = None):
+    """Lock overlay (optional: 1/0/true/false/on/off/yes/no/toggle)"""
+    params = {"value": value} if value is not None else {}
+    _pp(_call(ctx.obj["socket"], "lock", params))
 
 
 @cli.command()

@@ -117,6 +117,7 @@ class LayricsApp:
         self._server: Optional[asyncio.AbstractServer] = None
         self._paused = False
         self._hidden = False
+        self._locked = False
         self._last_status: Optional[str] = None
         self._last_position_us: int = 0
         self._signal_monitor: Optional[MprisSignalMonitor] = None
@@ -514,8 +515,19 @@ class LayricsApp:
                 return {"id": req_id, "type": "result", "data": {"hidden": False}}
 
             elif method == "lock":
-                self.ctrl.set_locked(True)
-                return {"id": req_id, "type": "result", "data": {"locked": True}}
+                raw = params.get("value", "true")
+                if isinstance(raw, bool):
+                    val = raw
+                else:
+                    try:
+                        parsed = _parse_bool(raw if isinstance(raw, str) else "true")
+                    except ValueError:
+                        return {"id": req_id, "type": "error",
+                                "data": {"code": 400, "message": f"invalid value: {raw!r}"}}
+                    val = not self._locked if parsed is None else parsed
+                self.ctrl.set_locked(val)
+                self._locked = val
+                return {"id": req_id, "type": "result", "data": {"locked": val}}
 
             elif method == "unlock":
                 self.ctrl.set_locked(False)
