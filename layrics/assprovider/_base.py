@@ -83,7 +83,7 @@ class DefaultProvider(AssProvider):
         primary = lyrics.primary_style
         styles = [primary]
         events: list[AssDialogueLine] = []
-        secondary: AssStyle | None = None
+        secondary = lyrics.secondary_style
         had_secondary = False
 
         for i, (oline, aligned) in enumerate(
@@ -98,14 +98,15 @@ class DefaultProvider(AssProvider):
                 style=primary.name, text=text,
             ))
 
-            for lang, lline in aligned.items():
+            if secondary is None:
+                continue
+            for _lang, lline in aligned.items():
                 stext = self._plain_text(lline)
                 if stext == text:
                     continue
-                if secondary is None:
-                    secondary = lyrics.secondary_style
+                if not had_secondary:
+                    had_secondary = True
                     styles.append(secondary)
-                had_secondary = True
                 events.append(AssDialogueLine(
                     start_ms=start, end_ms=end,
                     style=secondary.name, text=stext,
