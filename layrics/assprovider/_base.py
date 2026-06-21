@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import replace
 from typing import Any
 
@@ -10,16 +11,17 @@ from LDDC.common.models import (
 )
 
 from ._ass import (
-    AssHeader,
-    AssStyle,
-    AssDialogueLine,
-    build_ass,
     DEFAULT_PRIMARY,
     DEFAULT_SECONDARY,
+    AssDialogueLine,
+    AssHeader,
+    AssStyle,
+    build_ass,
 )
 from ._protocol import AssProvider, AssTrigger, Lyrics
 from ._util import ass_escape
 
+logger = logging.getLogger("layrics.assprovider")
 
 class DefaultProvider(AssProvider):
     PROVIDER = "default"
@@ -197,37 +199,12 @@ class DefaultProvider(AssProvider):
         orig = lyrics.get(lyrics.primary_track)
         if not orig:
             return ""
-        ptext = ass_escape("".join(w.text for line in orig for w in line.words).strip())
-        end_ms = duration_ms or 5000
-
-        primary = lyrics.primary_style
-        styles = [primary]
-        events = [AssDialogueLine(
-            start_ms=0, end_ms=end_ms,
-            style=primary.name, text=ptext,
-        )]
-
-        had_secondary = False
-        if self.secondary_enabled:
-            sec = lyrics.secondary_track
-            if sec:
-                sdata = lyrics.get(sec)
-                if sdata:
-                    stext = ass_escape("".join(w.text for line in sdata for w in line.words).strip())
-                    if stext and stext != ptext:
-                        secondary = lyrics.secondary_style
-                        styles.append(secondary)
-                        had_secondary = True
-                        events.append(AssDialogueLine(
-                            start_ms=0, end_ms=end_ms,
-                            style=secondary.name, text=stext,
-                        ))
-
-        if not had_secondary and self.single_margin_v_bottom > 0:
-            primary = replace(primary, margin_v=self.single_margin_v_bottom)
-            styles[0] = primary
-
+        logger.warning("PlainText lyrics have no timestamps, showing 5s fallback hint")
+        hint = "{\\an5\\fs48}无时间轴歌词\\N请尝试切换其他源"
         header = AssHeader(title=lyrics.title or "lyrics")
+        primary = lyrics.primary_style
+        styles = [replace(primary, margin_v=0)]
+        events = [AssDialogueLine(start_ms=0, end_ms=5000, style=primary.name, text=hint)]
         return build_ass(header, styles, events)
 
     def _adjust(self, style: AssStyle | None, is_primary: bool) -> AssStyle:
