@@ -1,4 +1,5 @@
 from __future__ import annotations
+import logging
 import re
 from typing import Any, ClassVar, Iterator, Protocol, runtime_checkable
 from dataclasses import dataclass, replace
@@ -7,6 +8,9 @@ from LDDC.common.models import Lyrics as _LDCLyrics, FSLyrics, FSLyricsLine, Lyr
 
 from ._ass import AssStyle, DEFAULT_PRIMARY, DEFAULT_SECONDARY
 from . import _ruby
+
+
+logger = logging.getLogger("layrics.assprovider")
 
 
 _TRACK_ORDER = ("orig", "ts", "roma")
@@ -183,10 +187,15 @@ class Lyrics(_LDCLyrics):
     def align_tracks(self, fslyrics: FSLyrics, active_tracks: list[str]) -> dict[str, dict[int, int]]:
         alignment: dict[str, dict[int, int]] = {}
         orig_data = fslyrics[self._primary_track]
+        logger.debug("align_tracks: primary=%s len=%d  active=%s",
+                     self._primary_track, len(orig_data), active_tracks)
         for track in active_tracks[1:]:
             if track not in fslyrics:
+                logger.debug("align_tracks: track %r not in fslyrics, skipping", track)
                 continue
             track_data = fslyrics[track]
+            logger.debug("align_tracks: aligning %r (%d lines) → primary (%d lines)",
+                         track, len(track_data), len(orig_data))
             mapping: dict[int, int] = {}
             for oi, oline in enumerate(orig_data):
                 best = -1
@@ -197,7 +206,14 @@ class Lyrics(_LDCLyrics):
                         best_dist = dist
                         best = li
                 mapping[oi] = best
+                otext = "".join(w.text for w in oline.words)
+                ttext = "".join(w.text for w in track_data[best].words) if best >= 0 else "?"
+                logger.debug("align_tracks:  primary[%d] start=%d %r → %r[%d] start=%d dist=%d %r",
+                             oi, oline.start, otext[:30],
+                             track, best, track_data[best].start if best >= 0 else -1,
+                             best_dist, ttext[:30])
             alignment[track] = mapping
+            logger.debug("align_tracks: %r mapping=%s", track, mapping)
         return alignment
 
     def iter_aligned(
@@ -207,6 +223,7 @@ class Lyrics(_LDCLyrics):
         secondary_enabled: bool = True,
     ) -> Iterator[tuple[FSLyricsLine, dict[str, FSLyricsLine]]]:
         active_tracks = self.active_tracks(fslyrics, secondary_enabled=secondary_enabled)
+        logger.debug("iter_aligned: active_tracks=%s", active_tracks)
         alignment = self.align_tracks(fslyrics, active_tracks)
         orig_data = fslyrics[self._primary_track]
         for i, oline in enumerate(orig_data):
