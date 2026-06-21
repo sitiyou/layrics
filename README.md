@@ -50,6 +50,7 @@ C++ overlay (core/)
 ├── DragManager      拖拽状态机                
 ├── RegionManager    input region              
 ├── CursorTracker    全局光标（Hyprland）      
+├── CursorManager    悬停/拖拽光标切换          
 ├── WaylandContext   display、全局对象、事件循 
 └── binding.cpp      pybind11 绑定              
 
@@ -186,6 +187,8 @@ layctl ass secondary toggle
 ## 配置
 
 配置文件路径：`~/.config/layrics/config.toml`（或 `$LAYRICS_CONFIG_DIR/config.toml`）。
+
+> 以下为配置文件示例，详细配置信息请参考 [examples/config.toml](https://github.com/sitiyou/layrics/blob/main/examples/config.toml)。
 
 ```toml
 # 歌词搜索源
@@ -335,7 +338,8 @@ layrics (Python)                    C++ overlay (core/)
 ├── layctl.py       control CLI    ├── DragManager       drag state machine
 ├── mpris.py        D-Bus signals  ├── RegionManager     input region
 ├── assprovider/    ASS generation ├── CursorTracker     global cursor (Hyprland)
-└── config.py       TOML config     ├── WaylandContext   display, globals, event loop
+└── config.py       TOML config     ├── CursorManager     hover/drag cursor
+                                    ├── WaylandContext   display, globals, event loop
                                     └── binding.cpp      pybind11 bindings
 ```
 
@@ -469,6 +473,8 @@ Available methods: `list_players`, `select_player`, `search_songs`, `fetch_lyric
 ## Configuration
 
 Configuration is loaded from `~/.config/layrics/config.toml` (or `$LAYRICS_CONFIG_DIR/config.toml`).
+
+> This is a config file example. See [examples/config.toml](https://github.com/sitiyou/layrics/blob/main/examples/config.toml) for full details.
 
 ```toml
 # Lyric search sources
