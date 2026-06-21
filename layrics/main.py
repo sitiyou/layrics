@@ -85,17 +85,7 @@ def _acquire_instance_lock() -> int:
 _ASS_CONFIG_KEYS = {"karaoke", "line_mode", "secondary"}
 
 
-def _parse_ass_value(key: str, raw: str) -> Any:
-    if key == "line_mode":
-        v = raw.lower().strip()
-        if v == "single":
-            return "single"
-        if v == "double":
-            return "double"
-        if v == "toggle":
-            return None
-        msg = f"invalid line_mode: {raw!r} (expected single/double/toggle)"
-        raise ValueError(msg)
+def _parse_bool(raw: str) -> bool | None:
     v = raw.lower().strip()
     if v in ("true", "on", "1", "yes"):
         return True
@@ -103,8 +93,7 @@ def _parse_ass_value(key: str, raw: str) -> Any:
         return False
     if v == "toggle":
         return None
-    msg = f"invalid boolean: {raw!r}"
-    raise ValueError(msg)
+    raise ValueError(f"invalid boolean: {raw!r}")
 
 
 class LayricsApp:
@@ -127,6 +116,7 @@ class LayricsApp:
 
         self._server: Optional[asyncio.AbstractServer] = None
         self._paused = False
+        self._hidden = False
         self._last_status: Optional[str] = None
         self._last_position_us: int = 0
         self._signal_monitor: Optional[MprisSignalMonitor] = None
@@ -504,8 +494,19 @@ class LayricsApp:
                 return {"id": req_id, "type": "result", "data": {"loaded": path}}
 
             elif method == "hide":
-                self.ctrl.set_hidden(True)
-                return {"id": req_id, "type": "result", "data": {"hidden": True}}
+                raw = params.get("value", "true")
+                if isinstance(raw, bool):
+                    val = raw
+                else:
+                    try:
+                        parsed = _parse_bool(raw if isinstance(raw, str) else "true")
+                    except ValueError:
+                        return {"id": req_id, "type": "error",
+                                "data": {"code": 400, "message": f"invalid value: {raw!r}"}}
+                    val = not self._hidden if parsed is None else parsed
+                self.ctrl.set_hidden(val)
+                self._hidden = val
+                return {"id": req_id, "type": "result", "data": {"hidden": val}}
 
             elif method == "unhide":
                 self.ctrl.set_hidden(False)
@@ -675,7 +676,22 @@ class LayricsApp:
                         "data": {"code": 400, "message": f"unknown config key: {key}"},
                     }
                 try:
-                    parsed = _parse_ass_value(key, raw_value)
+                    if key == "line_mode":
+                        v = raw_value.lower().strip()
+                        if v == "single":
+                            parsed = "single"
+                        elif v == "double":
+                            parsed = "double"
+                        elif v == "toggle":
+                            parsed = None
+                        else:
+                            return {
+                                "id": req_id,
+                                "type": "error",
+                                "data": {"code": 400, "message": f"invalid line_mode: {raw_value!r} (expected single/double/toggle)"},
+                            }
+                    else:
+                        parsed = _parse_bool(raw_value)
                 except ValueError as e:
                     return {
                         "id": req_id,

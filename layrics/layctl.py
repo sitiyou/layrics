@@ -121,10 +121,12 @@ def load(ctx, path: str):
 
 
 @cli.command()
+@click.argument("value", required=False)
 @click.pass_context
-def hide(ctx):
-    """Hide the overlay"""
-    _pp(_call(ctx.obj["socket"], "hide"))
+def hide(ctx, value: str | None = None):
+    """Hide the overlay (optional: 1/0/true/false/on/off/yes/no/toggle)"""
+    params = {"value": value} if value is not None else {}
+    _pp(_call(ctx.obj["socket"], "hide", params))
 
 
 @cli.command()
