@@ -6,6 +6,7 @@
 #include <memory>
 #include <string>
 
+#include "core/input/CursorManager.hpp"
 #include "core/input/DamageGrid.hpp"
 #include "core/input/DragManager.hpp"
 #include "core/input/InputManager.hpp"
@@ -59,6 +60,7 @@ class Application {
     InputManager m_inputMgr;
     DragManager m_dragMgr;
     RegionManager m_regionMgr;
+    CursorManager m_cursorMgr;
 
     std::atomic<bool> m_running{true};
     int64_t m_startTimeMs = 0;
@@ -82,4 +84,5 @@ class Application {
     void onFrame();
     void onPointerMotion(double x, double y);
     void onPointerButton(uint32_t button, uint32_t state, double x, double y);
+    void updateCursor();
 };

@@ -58,20 +58,31 @@ void InputManager::release() {
     }
 }
 
-void InputManager::handleEnter(void *data, wl_pointer *, uint32_t /*serial*/,
+void InputManager::handleEnter(void *data, wl_pointer *, uint32_t serial,
                                wl_surface * /*surface*/, wl_fixed_t x,
                                wl_fixed_t y) {
     auto *self = static_cast<InputManager *>(data);
     self->m_state.x = wl_fixed_to_double(x);
     self->m_state.y = wl_fixed_to_double(y);
-    LAY_DEBUG("pointer enter: %.1f %.1f", self->m_state.x, self->m_state.y);
+    self->m_enterSerial = serial;
+    self->m_hasSurface = true;
+    LAY_DEBUG("pointer enter: %.1f %.1f (serial=%u)",
+              self->m_state.x, self->m_state.y, serial);
+    if (self->m_enterCb) {
+        self->m_enterCb(serial);
+    }
 }
 
 void InputManager::handleLeave(void *data, wl_pointer *, uint32_t /*serial*/,
                                wl_surface * /*surface*/) {
     auto *self = static_cast<InputManager *>(data);
     self->m_state.buttonLeft = false;
+    self->m_enterSerial = 0;
+    self->m_hasSurface = false;
     LAY_DEBUG("pointer leave");
+    if (self->m_leaveCb) {
+        self->m_leaveCb();
+    }
 }
 
 void InputManager::handleMotion(void *data, wl_pointer *, uint32_t /*time*/,

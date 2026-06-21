@@ -9,6 +9,7 @@ project(
 wayland_scanner = find_program('wayland-scanner')
 wayland_protocols_dep = dependency('wayland-protocols')
 wayland_client_dep = dependency('wayland-client')
+wayland_cursor_dep = dependency('wayland-cursor')
 cairo_dep = dependency('cairo')
 libass_dep = dependency('libass')
 
@@ -55,6 +56,7 @@ xdg_shell_src = custom_target(
 
 dependencies = [
   wayland_client_dep,
+  wayland_cursor_dep,
   cairo_dep,
   libass_dep,
   meson.get_compiler('cpp').find_library('rt', required: false),
@@ -78,6 +80,7 @@ input_sources = files(
   'core/input/InputManager.cpp',
   'core/input/DragManager.cpp',
   'core/input/CursorTracker.cpp',
+  'core/input/CursorManager.cpp',
   'core/input/RegionManager.cpp',
   'core/input/DamageGrid.cpp',
 )

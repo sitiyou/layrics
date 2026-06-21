@@ -91,6 +91,8 @@ bool Application::initInput() {
         return false;
     }
 
+    m_cursorMgr.initialize(m_waylandCtx.compositor, m_waylandCtx.shm);
+
     m_inputMgr.setMotionCallback([this](double x, double y) {
         onPointerMotion(x, y);
     });
@@ -98,6 +100,10 @@ bool Application::initInput() {
     m_inputMgr.setButtonCallback([this](uint32_t button, uint32_t state,
                                          double x, double y) {
         onPointerButton(button, state, x, y);
+    });
+
+    m_inputMgr.setEnterCallback([this](uint32_t) {
+        updateCursor();
     });
 
     LAY_LOG("input initialized");
@@ -249,6 +255,7 @@ void Application::onPointerMotion(double x, double y) {
 void Application::onPointerButton(uint32_t button, uint32_t state, double x,
                                   double y) {
     m_dragMgr.onButton(button, state, x, y);
+    updateCursor();
 }
 
 void Application::loadAssContent(const std::string &content) {
@@ -312,10 +319,12 @@ void Application::lock() {
     if (m_surface.configured()) {
         m_regionMgr.clear(m_waylandCtx.compositor, m_surface.surface());
     }
+    updateCursor();
 }
 
 void Application::unlock() {
     m_locked = false;
+    updateCursor();
 }
 
 void Application::setTargetFps(int fps) {
@@ -344,4 +353,24 @@ AppStatus Application::getStatus() {
     s.dragOffsetY = dragState.offsetY;
     s.targetFps = m_frameRateLimiter.targetFps();
     return s;
+}
+
+void Application::updateCursor() {
+    if (!m_inputMgr.hasSurface()) {
+        return;
+    }
+
+    wl_pointer *pointer = m_inputMgr.pointer();
+    uint32_t serial = m_inputMgr.enterSerial();
+    if (!pointer || !serial) {
+        return;
+    }
+
+    if (m_locked) {
+        m_cursorMgr.restoreCursor(pointer, serial);
+    } else if (m_dragMgr.dragging()) {
+        m_cursorMgr.setGrabbingCursor(pointer, serial);
+    } else {
+        m_cursorMgr.setGrabCursor(pointer, serial);
+    }
 }
