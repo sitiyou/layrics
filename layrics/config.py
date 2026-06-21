@@ -95,6 +95,20 @@ class Config:
         self._include_patterns: list[re.Pattern] = []
         self._exclude_patterns: list[re.Pattern] = []
         self._load()
+        self._provider_config.setdefault("default", {
+            "karaoke": True,
+            "line_mode": "single",
+            "secondary": True,
+            "single": {"margin_v_bottom": 32},
+            "double": {
+                "advance_ms": 5000,
+                "margin_v_right": 24,
+                "v_spacing": 64,
+                "margin_l": 480,
+                "margin_r": 480,
+                "max_length": 1280,
+            },
+        })
 
     @staticmethod
     def _parse_sources(raw_sources: list[str]) -> list[Source]:
