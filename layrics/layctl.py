@@ -82,7 +82,7 @@ def list_players(ctx):
 @click.argument("name")
 @click.pass_context
 def select_player(ctx, name: str):
-    """Select MPRIS player by name"""
+    """Select MPRIS player by D-Bus bus name (e.g. org.mpris.MediaPlayer2.mpd)"""
     _pp(_call(ctx.obj["socket"], "select_player", {"name": name}))
 
 

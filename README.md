@@ -402,7 +402,7 @@ Optional arguments:
 layctl players
 
 # Select a specific player
-layctl set-player spotify
+layctl set-player org.mpris.MediaPlayer2.mpd
 
 # Search for songs
 layctl search "Eternal Feather"

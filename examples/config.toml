@@ -16,7 +16,10 @@ target_fps = -1
 
 # MPRIS 播放器控制
 # include_players / exclude_players 互斥，同时设置时 exclude 优先
-# 均为正则列表，留空则不过滤，取第一个正在播放的
+# 均为正则列表（re.search 子串匹配，区分大小写），留空则不过滤
+# 匹配范围: bus_name 去掉 "org.mpris.MediaPlayer2." 前缀后的部分 或 identity
+# 例: bus_name="org.mpris.MediaPlayer2.firefox.instance_1_3322", identity="Mozilla zen-browser"
+# 此时 'firefox', '^firefox\.instance_\d+_\d+$', 'zen-browser' 均可匹配
 [mpris]
 include_players = []
 exclude_players = []

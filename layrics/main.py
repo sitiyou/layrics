@@ -10,7 +10,7 @@ Protocol:
 
 Methods:
   list_players                         -> [{bus_name, identity}]
-  select_player  {name}                -> {selected}
+  select_player  {name}                -> {selected}    (name = D-Bus bus name)
   search_songs   {keyword, limit?}     -> [{id (composite), name, artists, album, source}]
    fetch_lyrics   {song_id?}            -> {ass}  (song_id e.g. "QM248672467", omit for current track)
    load_ass       {path}                -> {loaded}
@@ -235,16 +235,9 @@ class LayricsApp:
     def list_players(self):
         return [(p.bus_name, p.get_identity()) for p in self.mpris_finder.find_all_players()]
 
-    def select_mpris_player(self, name: str, match_by: str = "bus_name") -> bool:
+    def select_mpris_player(self, name: str) -> bool:
         for p in self.mpris_finder.find_all_players():
-            match = False
-            if match_by == "bus_name":
-                match = p.bus_name == name
-            elif match_by == "identity":
-                match = p.get_identity() == name
-            elif match_by == "both":
-                match = p.bus_name == name or p.get_identity() == name
-            if match:
+            if p.bus_name == name:
                 self._mpris_player = p
                 self._last_track = None
                 self._start_signal_monitor()
@@ -255,11 +248,17 @@ class LayricsApp:
 
     def _auto_select_player(self) -> bool:
         players = self.mpris_finder.find_all_players()
+
+        def _match_name(p):
+            bus = getattr(p, "bus_name", "")
+            prefix = "org.mpris.MediaPlayer2."
+            return bus[len(prefix):] if bus.startswith(prefix) else bus
+
         if self._config.exclude_players:
             players = [
                 p for p in players
                 if not any(
-                    pat.search(p.bus_name) or pat.search(p.get_identity())
+                    pat.search(_match_name(p)) or pat.search(p.get_identity())
                     for pat in self._config.exclude_players
                 )
             ]
@@ -267,7 +266,7 @@ class LayricsApp:
             players = [
                 p for p in players
                 if any(
-                    pat.search(p.bus_name) or pat.search(p.get_identity())
+                    pat.search(_match_name(p)) or pat.search(p.get_identity())
                     for pat in self._config.include_players
                 )
             ]
@@ -439,8 +438,7 @@ class LayricsApp:
 
             elif method == "select_player":
                 name = params.get("name", "")
-                match_by = params.get("match_by", "bus_name")
-                ok = self.select_mpris_player(name, match_by)
+                ok = self.select_mpris_player(name)
                 if ok:
                     return {
                         "id": req_id,
