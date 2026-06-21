@@ -118,7 +118,7 @@ layrics
 layctl players
 
 # 选择播放器
-layctl set-player spotify
+layctl set-player org.mpris.MediaPlayer2.mpd
 
 # 搜索歌曲
 layctl search "Eternal Feather"
@@ -136,12 +136,18 @@ layctl set-lrc QM248672467
 layctl dmenu | dmenu | cut -f1 | xargs layctl set-lrc
 
 # 显示/隐藏覆盖层
-layctl unhide
-layctl hide
+layctl hide              # 隐藏（默认）
+layctl hide true         # 隐藏
+layctl hide false        # 显示
+layctl hide toggle       # 切换可见性
+layctl unhide            # 等同于 hide false
 
 # 锁定/解锁（锁定后鼠标点击穿透）
-layctl lock
-layctl unlock
+layctl lock              # 锁定（默认）
+layctl lock true         # 锁定
+layctl lock false        # 解锁
+layctl lock toggle       # 切换锁定状态
+layctl unlock            # 等同于 lock false
 
 # 设置目标帧率
 layctl set-fps 30
@@ -245,7 +251,7 @@ max_length = 960
 
 | 变量 | 说明 | 默认值 |
 |---|---|---|
-| `LAYRICS_DEBUG` | 启用调试日志。逗号分隔模块名 (`lyrics`, `match`, `ruby`)，或 `core` 启用 C++ 调试日志 | 空 |
+| `LAYRICS_DEBUG` | 启用调试日志。逗号分隔模块名 (`lyrics`, `match`, `ruby`, `assprovider`)，或 `core` 启用 C++ 调试日志 | 空 |
 | `LAYRICS_CONFIG_DIR` | 配置文件目录 | `~/.config/layrics/` |
 | `LAYRICS_SOCK` | IPC socket 路径 | `$XDG_RUNTIME_DIR/layrics.sock` |
 
@@ -269,6 +275,12 @@ max_length = 960
 1. 在所有可用源中搜索歌曲
 2. 按标题相似度、时长差异、歌手相似度打分
 3. 使用级联评分系统选择最佳匹配
+
+## 路线图
+
+- [ ] **Python 输入事件接口** — 将 overlay 接收到的键盘/鼠标事件封装为 Python 接口，支持在 Python 层面处理输入事件
+- [ ] **延迟控制** — 字幕延迟偏移功能（offset）
+- [ ] **Aegisub CLI 集成** — 调用 aegisub-cli 处理 kara-templater 模板，实现高级卡拉 OK 效果
 
 ## 仅编译 C++ 部分
 
@@ -408,12 +420,18 @@ layctl set-lrc QM248672467
 layctl dmenu | dmenu | cut -f1 | xargs layctl set-lrc
 
 # Show/hide overlay
-layctl unhide
-layctl hide
+layctl hide              # hide (default)
+layctl hide true         # hide
+layctl hide false        # show
+layctl hide toggle       # toggle visibility
+layctl unhide            # alias for hide false
 
 # Lock/unlock (locked = click-through)
-layctl lock
-layctl unlock
+layctl lock              # lock (default)
+layctl lock true         # lock
+layctl lock false        # unlock
+layctl lock toggle       # toggle lock
+layctl unlock            # alias for lock false
 
 # Set target frame rate
 layctl set-fps 30
@@ -516,7 +534,7 @@ max_length = 960
 
 | Variable | Description | Default |
 |---|---|---|
-| `LAYRICS_DEBUG` | Enable debug logging. Comma-separated module names (`lyrics`, `match`, `ruby`), or `core` for C++ debug | unset |
+| `LAYRICS_DEBUG` | Enable debug logging. Comma-separated module names (`lyrics`, `match`, `ruby`, `assprovider`), or `core` for C++ debug | unset |
 | `LAYRICS_CONFIG_DIR` | Config directory | `~/.config/layrics/` |
 | `LAYRICS_SOCK` | IPC socket path | `$XDG_RUNTIME_DIR/layrics.sock` |
 
@@ -540,6 +558,12 @@ When fetching lyrics for the current track, the system:
 1. Searches for the song across all available sources
 2. Scores candidates by title similarity, duration difference, and artist similarity
 3. Selects the best match using a cascade scoring system
+
+## Roadmap
+
+- [ ] **Python input event interface** — expose keyboard/mouse events from the overlay as Python interfaces for Python-level input handling
+- [ ] **Delay control** — subtitle delay offset
+- [ ] **Aegisub CLI integration** — invoke aegisub-cli for kara-templater processing, enabling advanced karaoke effects
 
 ## Building from source (C++ only)
 
