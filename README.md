@@ -11,6 +11,8 @@
 
 layrics 是一款运行在 wlr-layer-shell 上的 ASS 字幕叠加层。可以在支持 `wlr-layer-shell` 协议的 Wayland 合成器（Sway、Hyprland、river 等）上，以overlay的形式渲染karaoke 或纯文本歌词字幕。
 
+<video src="https://github.com/user-attachments/assets/4b4c9c43-a00d-4ffd-9f7f-82a77b99e076" controls></video>
+
 ## 功能
 
 - **Layer Shell 覆盖层**：基于wlr-layer-shell协议，自动悬浮，无需在窗口管理器额外设置规则。
@@ -310,6 +312,8 @@ meson compile -C build
 ---
 
 ASS subtitle overlay for wlr-layer-shell. Renders karaoke and plain-text subtitles as an overlay on Wayland compositors that support `wlr-layer-shell` (Sway, Hyprland, river, etc.).
+
+<video src="https://github.com/user-attachments/assets/4b4c9c43-a00d-4ffd-9f7f-82a77b99e076" controls></video>
 
 ---
 
