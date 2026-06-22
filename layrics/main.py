@@ -553,6 +553,16 @@ class LayricsApp:
 
             elif method == "start":
                 self.start_overlay()
+                if self._last_track is not None and self._mpris_player is not None:
+                    try:
+                        pos = self._mpris_player.get_position()
+                        now_ms = int(time.monotonic() * 1000)
+                        self.ctrl.set_start_time(now_ms - pos // 1000)
+                        self.ctrl.set_hidden(False)
+                        self._hidden = False
+                        logger.info("re-synced start_time on start, pos=%dms", pos // 1000)
+                    except Exception as e:
+                        logger.warning("start: failed to sync position: %s", e)
                 return {
                     "id": req_id,
                     "type": "result",

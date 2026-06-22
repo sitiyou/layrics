@@ -37,9 +37,26 @@ Application::~Application() {
 }
 
 void Application::run() {
-    LAY_LOG("starting main loop");
+    LAY_LOG("starting application");
+    m_running = true;
+
+    if (m_startTimeMs == 0) {
+        struct timespec ts;
+        clock_gettime(CLOCK_MONOTONIC, &ts);
+        m_startTimeMs = ts.tv_sec * 1000LL + ts.tv_nsec / 1000000LL;
+    }
+
+    requestFrame();
+    m_surface.commitFrame(m_buffer.buffer());
+
+    LAY_LOG("entering main loop");
     mainLoop();
-    LAY_LOG("exit main loop");
+
+    LAY_DEBUG("clean up for stop");
+    m_buffer.clear();
+    m_regionMgr.clear(m_waylandCtx.compositor, m_surface.surface());
+    m_surface.commitFrame(m_buffer.buffer());
+    m_waylandCtx.dispatch();
 }
 
 bool Application::initWayland() {
@@ -118,17 +135,6 @@ void Application::initBuffers() {
 }
 
 void Application::mainLoop() {
-    m_running = true;
-
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    m_startTimeMs = ts.tv_sec * 1000LL + ts.tv_nsec / 1000000LL;
-
-    requestFrame();
-    m_surface.commitFrame(m_buffer.buffer());
-
-    LAY_LOG("entering main loop");
-
     while (m_running && m_surface.configured()) {
         while (!m_waylandCtx.prepareRead()) {
             if (m_waylandCtx.dispatchPending() < 0) {
@@ -165,12 +171,6 @@ void Application::mainLoop() {
             m_waylandCtx.cancelRead();
         }
     }
-
-    LAY_DEBUG("Start clear screen");
-    m_buffer.clear();
-    m_regionMgr.clear(m_waylandCtx.compositor, m_surface.surface());
-    m_surface.commitFrame(m_buffer.buffer());
-    m_waylandCtx.dispatch();
 }
 
 void Application::frameDone(void *data, wl_callback * /*cb*/,
