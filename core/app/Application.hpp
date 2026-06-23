@@ -84,5 +84,6 @@ class Application {
     void onFrame();
     void onPointerMotion(double x, double y);
     void onPointerButton(uint32_t button, uint32_t state, double x, double y);
+    void onSurfaceConfigure(int width, int height);
     void updateCursor();
 };

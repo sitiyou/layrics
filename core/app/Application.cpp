@@ -96,6 +96,10 @@ bool Application::initWayland() {
 
     m_damageGrid.setSurfaceSize(m_surface.width(), m_surface.height());
 
+    m_surface.setConfigureCallback([this](int width, int height) {
+        onSurfaceConfigure(width, height);
+    });
+
     return m_buffer.operator bool();
 }
 
@@ -377,4 +381,11 @@ void Application::updateCursor() {
     } else {
         m_cursorMgr.setGrabCursor(pointer, serial);
     }
+}
+
+void Application::onSurfaceConfigure(int width, int height) {
+    LAY_LOG("surface resized: %dx%d", width, height);
+    m_buffer.allocate(m_waylandCtx.shmFd, m_waylandCtx.shm, width, height);
+    m_damageGrid.setSurfaceSize(width, height);
+    m_renderMgr.setSize(width, height);
 }

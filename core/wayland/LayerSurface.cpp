@@ -12,10 +12,15 @@ void LayerSurface::onConfigure(void *data, zwlr_layer_surface_v1 *surface,
                                uint32_t height) {
     auto *self = static_cast<LayerSurface *>(data);
     zwlr_layer_surface_v1_ack_configure(surface, serial);
+    bool resized = self->m_width != static_cast<int>(width) ||
+                   self->m_height != static_cast<int>(height);
     self->m_width = static_cast<int>(width);
     self->m_height = static_cast<int>(height);
     self->m_configured = true;
     LAY_DEBUG("configured: %dx%d serial=%u", width, height, serial);
+    if (resized && self->m_configureCb) {
+        self->m_configureCb(self->m_width, self->m_height);
+    }
 }
 
 void LayerSurface::onClosed(void *data, zwlr_layer_surface_v1 *surface) {

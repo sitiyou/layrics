@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <vector>
 
 #include "core/types/Common.hpp"
@@ -48,6 +49,9 @@ class LayerSurface {
     int height() const { return m_height; }
     bool configured() const { return m_configured; }
 
+    using ConfigureCallback = std::function<void(int, int)>;
+    void setConfigureCallback(ConfigureCallback cb) { m_configureCb = std::move(cb); }
+
     static void onConfigure(void *data, zwlr_layer_surface_v1 *surface,
                             uint32_t serial, uint32_t width, uint32_t height);
     static void onClosed(void *data, zwlr_layer_surface_v1 *surface);
@@ -58,4 +62,5 @@ class LayerSurface {
     int m_width = 0;
     int m_height = 0;
     bool m_configured = false;
+    ConfigureCallback m_configureCb;
 };
