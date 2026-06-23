@@ -40,6 +40,18 @@ void Application::run() {
     LAY_LOG("starting application");
     m_running = true;
 
+    if (!m_surface.configured()) {
+        LAY_LOG("layer surface was closed, re-initializing");
+        if (!initWayland()) {
+            LAY_ERR("failed to re-initialize layer surface");
+            m_running = false;
+            return;
+        }
+        if (m_locked) {
+            m_regionMgr.clear(m_waylandCtx.compositor, m_surface.surface());
+        }
+    }
+
     if (m_startTimeMs == 0) {
         struct timespec ts;
         clock_gettime(CLOCK_MONOTONIC, &ts);
@@ -177,7 +189,6 @@ void Application::frameDone(void *data, wl_callback * /*cb*/,
                             uint32_t /*time*/) {
     auto *self = static_cast<Application *>(data);
     self->m_frameCallback = nullptr;
-    LAY_DEBUG("frame done");
     self->onFrame();
 }
 
@@ -210,9 +221,6 @@ void Application::onFrame() {
         timestampMs = now - m_startTimeMs;
     }
 
-    LAY_DEBUG("onFrame: ts=%lld offset=(%.1f, %.1f)",
-              (long long)timestampMs, dragState.offsetX, dragState.offsetY);
-
     uint8_t *bufData = static_cast<uint8_t *>(m_buffer.data());
     RenderResult result = m_renderMgr.render(bufData, timestampMs);
 
@@ -222,9 +230,7 @@ void Application::onFrame() {
             m_damageGrid.addRegion(rect.x, rect.y, rect.w, rect.h);
         }
 
-        if (m_locked) {
-            m_regionMgr.clear(m_waylandCtx.compositor, m_surface.surface());
-        } else {
+        if (!m_locked) {
             m_regionMgr.update(m_waylandCtx.compositor, m_surface.surface(),
                                m_damageGrid.buildRegions(),
                                m_surface.width(), m_surface.height());
@@ -233,9 +239,7 @@ void Application::onFrame() {
         requestFrame();
         m_surface.commitFrame(m_buffer.buffer(), m_damageGrid.buildDamage());
     } else {
-        if (m_locked) {
-            m_regionMgr.clear(m_waylandCtx.compositor, m_surface.surface());
-        } else {
+        if (!m_locked) {
             m_regionMgr.update(m_waylandCtx.compositor, m_surface.surface(),
                                result.regions,
                                m_surface.width(), m_surface.height());
