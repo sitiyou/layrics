@@ -144,6 +144,13 @@ if pybind11_dep.found()
     exclude_directories : ['__pycache__', 'res', 'gui'],
     exclude_files : ['*.pyc'],
   )
+  install_subdir(
+    'vendor/LDDC/LDDC/res',
+    install_dir : py.get_install_dir(subdir: 'LDDC/res'),
+    strip_directory : true,
+    exclude_directories : ['__pycache__', 'img', 'i18n'],
+    exclude_files : ['*.pyc', 'resource_rc.py', 'resource.qrc'],
+  )
 endif
 
 subdir('examples')

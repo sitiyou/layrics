@@ -48,7 +48,8 @@ def search_songs(keyword: str, limit: int = 10) -> list[dict[str, Any]]:
     def _items(src: Source) -> list[dict[str, Any]]:
         try:
             results = _lddc_search(src, keyword, SearchType.SONG, page=1)
-        except Exception:
+        except Exception as e:
+            logger.error("search: error %s", e)
             return []
         logger.debug("search: %s  from %s -> %d raw results", keyword, src.name, len(results))
         items = []

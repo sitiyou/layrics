@@ -168,7 +168,8 @@ class LayricsApp:
                     ass = await loop.run_in_executor(None, lambda: _fetch_lyrics(song_info))
                     logger.info("fetch: cache hit %s (%d bytes)", keyword, len(ass))
                     return ass
-                except Exception:
+                except Exception as e:
+                    logger.warning("fetch: error fetch lyrics: %s", e)
                     logger.warning("fetch: stale cache entry, removing: %s", key)
                     cache.remove(key)
 
