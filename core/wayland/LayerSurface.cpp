@@ -29,6 +29,8 @@ void LayerSurface::onClosed(void *data, zwlr_layer_surface_v1 *surface) {
     self->m_width = 0;
     self->m_height = 0;
     self->m_configured = false;
+    self->m_layerSurface = nullptr;
+    self->m_surface = nullptr;
     LAY_LOG("layer surface closed");
 }
 

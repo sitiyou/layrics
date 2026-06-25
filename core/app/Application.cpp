@@ -40,35 +40,42 @@ void Application::run() {
     LAY_LOG("starting application");
     m_running = true;
 
-    if (!m_surface.configured()) {
-        LAY_LOG("layer surface was closed, re-initializing");
-        if (!initWayland()) {
-            LAY_ERR("failed to re-initialize layer surface");
-            m_running = false;
-            return;
-        }
-        if (m_locked) {
-            m_regionMgr.clear(m_waylandCtx.compositor, m_surface.surface());
-        }
-    }
-
     if (m_startTimeMs == 0) {
         struct timespec ts;
         clock_gettime(CLOCK_MONOTONIC, &ts);
         m_startTimeMs = ts.tv_sec * 1000LL + ts.tv_nsec / 1000000LL;
     }
 
-    requestFrame();
-    m_surface.commitFrame(m_buffer.buffer());
+    while (m_running) {
+        if (!m_surface.configured()) {
+            LAY_LOG("layer surface re-initializing");
+            m_frameCallback = nullptr;
+            if (!initWayland()) {
+                LAY_ERR("failed to re-initialize layer surface");
+                m_running = false;
+                break;
+            }
+            if (m_locked || m_hidden) {
+                m_regionMgr.clear(m_waylandCtx.compositor, m_surface.surface());
+            }
+        }
 
-    LAY_LOG("entering main loop");
-    mainLoop();
+        requestFrame();
+        m_surface.commitFrame(m_buffer.buffer());
 
-    LAY_DEBUG("clean up for stop");
-    m_buffer.clear();
-    m_regionMgr.clear(m_waylandCtx.compositor, m_surface.surface());
-    m_surface.commitFrame(m_buffer.buffer());
-    m_waylandCtx.dispatch();
+        LAY_LOG("entering main loop");
+        mainLoop();
+
+        if (!m_running) {
+            LAY_DEBUG("clean up for stop");
+            m_buffer.clear();
+            if (m_surface.configured()) {
+                m_regionMgr.clear(m_waylandCtx.compositor, m_surface.surface());
+                m_surface.commitFrame(m_buffer.buffer());
+                m_waylandCtx.dispatch();
+            }
+        }
+    }
 }
 
 bool Application::initWayland() {
