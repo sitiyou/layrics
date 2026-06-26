@@ -105,50 +105,6 @@ def search_songs(keyword: str, limit: int = 10) -> list[dict[str, Any]]:
     return interleaved
 
 
-def _resolve_song_info(song_info: SongInfo) -> SongInfo:
-    """SongInfo 缺少 title/album/duration 时先用 ID 搜索补齐。"""
-    if song_info.title and song_info.duration is not None and song_info.album:
-        return song_info
-
-    logger.debug("resolve: %s/%s  searching by ID", song_info.source.name, song_info.id)
-    results = _lddc_search(  # noqa: SLF001
-        song_info.source, song_info.id or "", SearchType.SONG, page=1
-    )
-    for s in results:
-        if s.id == song_info.id:
-            logger.debug(
-                "resolve: %s/%s -> title=%s  artist=%s  dur=%s",
-                song_info.source.name,
-                song_info.id,
-                s.title,
-                s.artist,
-                s.duration,
-            )
-            return SongInfo(
-                source=song_info.source,
-                id=s.id,
-                title=s.title,
-                artist=s.artist,
-                album=s.album,
-                duration=s.duration,
-            )
-
-    logger.debug(
-        "resolve: %s/%s  no match in %d results, using fallback",
-        song_info.source.name,
-        song_info.id,
-        len(results),
-    )
-    return SongInfo(
-        source=song_info.source,
-        id=song_info.id,
-        title=song_info.title or "",
-        artist=song_info.artist,
-        album=song_info.album or "",
-        duration=song_info.duration or 0,
-    )
-
-
 def _postprocess_aegisub(
     ass: str,
     cli_path: str,
@@ -208,7 +164,6 @@ def fetch_lyrics(
     song_info: SongInfo,
     player_name: str = "",
 ) -> str:
-    song_info = _resolve_song_info(song_info)
     logger.debug(
         "fetch: %s/%s  title=%s  artist=%s  dur=%s",
         song_info.source.name,

@@ -45,7 +45,6 @@ from ._layrics import ApplicationController
 from .cache import SongCache, make_cache_key
 from .config import get_config
 from .lyricsource import (
-    _resolve_song_info,
     parse_composite_id,
 )
 from .lyricsource import (
@@ -165,18 +164,22 @@ class LayricsApp:
                 cached.lyrics_source,
                 cached.lyrics_song_id,
             )
-            try:
-                src = Source[cached.lyrics_source]
-            except KeyError:
-                logger.warning(
-                    "fetch: invalid source in cache %s", cached.lyrics_source
-                )
-                cache.remove(key)
-            else:
-                song_info = SongInfo(source=src, id=cached.lyrics_song_id)
+            si = cache.lookup_song_info(cached.lyrics_song_id, cached.lyrics_source)
+            if si is None:
+                try:
+                    src = Source[cached.lyrics_source]
+                except KeyError:
+                    logger.warning(
+                        "fetch: invalid source in cache %s", cached.lyrics_source
+                    )
+                    cache.remove(key)
+                    si = None
+                else:
+                    si = SongInfo(source=src, id=cached.lyrics_song_id)
+            if si is not None:
                 try:
                     ass = await loop.run_in_executor(
-                        None, lambda: _fetch_lyrics(song_info)
+                        None, lambda: _fetch_lyrics(si)
                     )
                     logger.info("fetch: cache hit %s (%d bytes)", keyword, len(ass))
                     return ass
@@ -189,6 +192,8 @@ class LayricsApp:
         results = await loop.run_in_executor(None, lambda: _search_songs(keyword, 20))
         if not results:
             raise RuntimeError(f"no search results for {keyword!r}")
+
+        cache.store_search_results(results)
 
         matched = match_song(meta, results)
         if not matched:
@@ -209,13 +214,7 @@ class LayricsApp:
         ass = await loop.run_in_executor(None, lambda: _fetch_lyrics(song_info))
         logger.info("fetch: %s -> %s (%d bytes)", keyword, matched["id"], len(ass))
 
-        cache.set_if_missing(
-            key,
-            raw_id,
-            src.name,
-            matched.get("name", ""),
-            "|".join(matched.get("artists", [])),
-        )
+        cache.set_if_missing(key, raw_id, src.name)
 
         return ass
 
@@ -629,11 +628,13 @@ class LayricsApp:
                     "type": "result",
                     "data": [
                         {
-                            "key": e.cache_key,
-                            "song_id": e.lyrics_source + e.lyrics_song_id,
-                            "lyrics_title": e.lyrics_title,
-                            "lyrics_artists": e.lyrics_artists,
-                            "updated_at": e.updated_at,
+                            "key": e["key"],
+                            "song_id": e["song_id"],
+                            "lyrics_title": e["lyrics_title"],
+                            "lyrics_artists": e["lyrics_artists"],
+                            "lyrics_album": e["lyrics_album"],
+                            "lyrics_duration": e["lyrics_duration"],
+                            "updated_at": e["updated_at"],
                         }
                         for e in entries
                     ],
@@ -657,26 +658,16 @@ class LayricsApp:
                         }
                     key = make_cache_key(self._last_track)
 
+                cache = SongCache()
                 src, raw_id = parse_composite_id(song_id)
-                song_info = SongInfo(source=src, id=raw_id)
+                si = cache.lookup_song_info(raw_id, src.name)
+                song_info = si or SongInfo(source=src, id=raw_id)
                 loop = asyncio.get_event_loop()
-
-                resolved = await loop.run_in_executor(
-                    None,
-                    lambda: _resolve_song_info(song_info),
-                )
                 ass = await loop.run_in_executor(
                     None,
-                    lambda: _fetch_lyrics(resolved),
+                    lambda: _fetch_lyrics(song_info),
                 )
-                cache = SongCache()
-                cache.set(
-                    key,
-                    raw_id,
-                    src.name,
-                    resolved.title or "",
-                    str(resolved.artist) if resolved.artist else "",
-                )
+                cache.set(key, raw_id, src.name)
 
                 self.ctrl.set_ass_input(ass)
                 now_ms = int(time.monotonic() * 1000)
