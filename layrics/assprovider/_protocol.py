@@ -196,6 +196,13 @@ class Lyrics(_LDCLyrics):
             for i in range(len(data) - 1):
                 if data[i].end > data[i + 1].start:
                     data[i] = data[i]._replace(end=data[i + 1].start)
+            if not data:
+                continue
+            last = data[-1]
+            if last.end <= last.start:
+                data[-1] = last._replace(
+                    end=duration_ms if duration_ms else last.start + 5000
+                )
         return fslyrics
 
     def active_tracks(
