@@ -16,8 +16,8 @@ class InputManager {
     };
 
     using MotionCallback = std::function<void(double x, double y)>;
-    using ButtonCallback =
-        std::function<void(uint32_t button, uint32_t state, double x, double y)>;
+    using ButtonCallback = std::function<void(uint32_t button, uint32_t state,
+                                              double x, double y)>;
     using AxisCallback = std::function<void(double dx, double dy)>;
     using EnterCallback = std::function<void(uint32_t serial)>;
     using LeaveCallback = std::function<void()>;

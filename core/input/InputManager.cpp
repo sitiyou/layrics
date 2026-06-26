@@ -66,8 +66,8 @@ void InputManager::handleEnter(void *data, wl_pointer *, uint32_t serial,
     self->m_state.y = wl_fixed_to_double(y);
     self->m_enterSerial = serial;
     self->m_hasSurface = true;
-    LAY_DEBUG("pointer enter: %.1f %.1f (serial=%u)",
-              self->m_state.x, self->m_state.y, serial);
+    LAY_DEBUG("pointer enter: %.1f %.1f (serial=%u)", self->m_state.x,
+              self->m_state.y, serial);
     if (self->m_enterCb) {
         self->m_enterCb(serial);
     }
@@ -123,4 +123,3 @@ void InputManager::handleAxis(void *data, wl_pointer *, uint32_t /*time*/,
         self->m_axisCb(dx, dy);
     }
 }
-

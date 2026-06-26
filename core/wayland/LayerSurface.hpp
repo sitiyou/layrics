@@ -13,7 +13,7 @@ struct zwlr_layer_surface_v1;
 struct WaylandContext;
 
 struct LayerSurfaceConfig {
-    uint32_t anchor = 5;        /* ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP | LEFT */
+    uint32_t anchor = 5; /* ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP | LEFT */
     uint32_t desiredWidth = 0;
     uint32_t desiredHeight = 0;
     int32_t exclusiveZone = -1;
@@ -50,7 +50,9 @@ class LayerSurface {
     bool configured() const { return m_configured; }
 
     using ConfigureCallback = std::function<void(int, int)>;
-    void setConfigureCallback(ConfigureCallback cb) { m_configureCb = std::move(cb); }
+    void setConfigureCallback(ConfigureCallback cb) {
+        m_configureCb = std::move(cb);
+    }
 
     static void onConfigure(void *data, zwlr_layer_surface_v1 *surface,
                             uint32_t serial, uint32_t width, uint32_t height);

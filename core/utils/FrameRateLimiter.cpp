@@ -14,8 +14,7 @@ static double nowSec() {
            static_cast<double>(ts.tv_nsec) / 1000000000.0;
 }
 
-FrameRateLimiter::FrameRateLimiter()
-    : m_logStart(nowSec()) {}
+FrameRateLimiter::FrameRateLimiter() : m_logStart(nowSec()) {}
 
 void FrameRateLimiter::setTargetFps(int fps) {
     m_targetFps = fps;

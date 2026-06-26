@@ -3,9 +3,7 @@
 #include <algorithm>
 #include <cstring>
 
-DamageGrid::DamageGrid(int width, int height) {
-    setSurfaceSize(width, height);
-}
+DamageGrid::DamageGrid(int width, int height) { setSurfaceSize(width, height); }
 
 void DamageGrid::setSurfaceSize(int width, int height) {
     m_width = width;
@@ -53,8 +51,8 @@ std::vector<RenderRect> DamageGrid::buildDamage() const {
     return cellsToRects(damage);
 }
 
-std::vector<RenderRect> DamageGrid::cellsToRects(
-    const std::vector<char> &cells) const {
+std::vector<RenderRect>
+DamageGrid::cellsToRects(const std::vector<char> &cells) const {
 
     std::vector<RenderRect> rects;
     if (m_cellsX <= 0 || m_cellsY <= 0) {

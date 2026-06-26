@@ -35,11 +35,13 @@ class MprisConfig:
 
 @dataclass
 class FontsConfig:
-    mapping: dict[str, str] = field(default_factory=lambda: {
-        "default": "sans-serif",
-        "ja": "Noto Sans CJK JP",
-        "zh": "Noto Sans CJK SC",
-    })
+    mapping: dict[str, str] = field(
+        default_factory=lambda: {
+            "default": "sans-serif",
+            "ja": "Noto Sans CJK JP",
+            "zh": "Noto Sans CJK SC",
+        }
+    )
 
 
 @dataclass
@@ -68,7 +70,9 @@ class StyleOverrideConfig:
     encoding: int | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return {f.name: v for f in fields(self) if (v := getattr(self, f.name)) is not None}
+        return {
+            f.name: v for f in fields(self) if (v := getattr(self, f.name)) is not None
+        }
 
 
 @dataclass
@@ -95,20 +99,23 @@ class Config:
         self._include_patterns: list[re.Pattern] = []
         self._exclude_patterns: list[re.Pattern] = []
         self._load()
-        self._provider_config.setdefault("default", {
-            "karaoke": True,
-            "line_mode": "single",
-            "secondary": True,
-            "single": {"margin_v_bottom": 32},
-            "double": {
-                "advance_ms": 5000,
-                "margin_v_right": 24,
-                "v_spacing": 64,
-                "margin_l": 480,
-                "margin_r": 480,
-                "max_length": 1280,
+        self._provider_config.setdefault(
+            "default",
+            {
+                "karaoke": True,
+                "line_mode": "single",
+                "secondary": True,
+                "single": {"margin_v_bottom": 32},
+                "double": {
+                    "advance_ms": 5000,
+                    "margin_v_right": 24,
+                    "v_spacing": 64,
+                    "margin_l": 480,
+                    "margin_r": 480,
+                    "max_length": 1280,
+                },
             },
-        })
+        )
 
     @staticmethod
     def _parse_sources(raw_sources: list[str]) -> list[Source]:
@@ -192,7 +199,9 @@ class Config:
         if isinstance(raw_assprovider, dict):
             for k, v in raw_assprovider.items():
                 if isinstance(v, dict):
-                    self._provider_config[str(k)] = {str(kk): vv for kk, vv in v.items()}
+                    self._provider_config[str(k)] = {
+                        str(kk): vv for kk, vv in v.items()
+                    }
 
     def get_style_config(self, key: str) -> dict[str, Any]:
         d = getattr(self.style, key, None)

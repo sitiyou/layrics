@@ -23,6 +23,7 @@ from ._util import ass_escape
 
 logger = logging.getLogger("layrics.assprovider")
 
+
 class DefaultProvider(AssProvider):
     PROVIDER = "default"
     priority = 100
@@ -49,9 +50,7 @@ class DefaultProvider(AssProvider):
         self.double_margin_r = double.get("margin_r", 480)
         self.double_max_length = double.get("max_length", 1280)
 
-    def generate(
-        self, lyrics: Lyrics, duration_ms: int | None = None
-    ) -> str:
+    def generate(self, lyrics: Lyrics, duration_ms: int | None = None) -> str:
         orig_type = lyrics.types.get(lyrics.primary_track)
 
         if orig_type == LyricsType.PlainText:
@@ -79,7 +78,11 @@ class DefaultProvider(AssProvider):
 
         if is_double:
             return self._generate_double(
-                header, orig_data, use_karaoke, advanced, lyrics,
+                header,
+                orig_data,
+                use_karaoke,
+                advanced,
+                lyrics,
             )
 
         primary = lyrics.primary_style
@@ -95,10 +98,14 @@ class DefaultProvider(AssProvider):
             text = self._karaoke_text(oline) if use_karaoke else self._plain_text(oline)
             if shift > 0 and use_karaoke:
                 text = f"{{\\k{shift // 10}}}{text}"
-            events.append(AssDialogueLine(
-                start_ms=start, end_ms=end,
-                style=primary.name, text=text,
-            ))
+            events.append(
+                AssDialogueLine(
+                    start_ms=start,
+                    end_ms=end,
+                    style=primary.name,
+                    text=text,
+                )
+            )
 
             if secondary is None:
                 continue
@@ -109,10 +116,14 @@ class DefaultProvider(AssProvider):
                 if not had_secondary:
                     had_secondary = True
                     styles.append(secondary)
-                events.append(AssDialogueLine(
-                    start_ms=start, end_ms=end,
-                    style=secondary.name, text=stext,
-                ))
+                events.append(
+                    AssDialogueLine(
+                        start_ms=start,
+                        end_ms=end,
+                        style=secondary.name,
+                        text=stext,
+                    )
+                )
 
         if not had_secondary and self.single_margin_v_bottom > 0:
             primary = replace(primary, margin_v=self.single_margin_v_bottom)
@@ -134,8 +145,12 @@ class DefaultProvider(AssProvider):
         )
         if not use_karaoke:
             dim_colour = lyrics.primary_style.secondary_colour
-            left_dim = replace(left_style, name=left_style.name + "Dim", primary_colour=dim_colour)
-            right_dim = replace(right_style, name=right_style.name + "Dim", primary_colour=dim_colour)
+            left_dim = replace(
+                left_style, name=left_style.name + "Dim", primary_colour=dim_colour
+            )
+            right_dim = replace(
+                right_style, name=right_style.name + "Dim", primary_colour=dim_colour
+            )
             styles = [left_style, left_dim, right_style, right_dim]
         else:
             styles = [left_style, right_style]
@@ -150,43 +165,63 @@ class DefaultProvider(AssProvider):
                 original_start = orig_data[i].start
                 dim_style = left_dim if i % 2 == 0 else right_dim
                 bright_style = left_style if i % 2 == 0 else right_style
-                events.append(AssDialogueLine(
-                    start_ms=start, end_ms=original_start,
-                    style=dim_style.name, text=text,
-                ))
-                events.append(AssDialogueLine(
-                    start_ms=original_start, end_ms=end,
-                    style=bright_style.name, text=text,
-                ))
+                events.append(
+                    AssDialogueLine(
+                        start_ms=start,
+                        end_ms=original_start,
+                        style=dim_style.name,
+                        text=text,
+                    )
+                )
+                events.append(
+                    AssDialogueLine(
+                        start_ms=original_start,
+                        end_ms=end,
+                        style=bright_style.name,
+                        text=text,
+                    )
+                )
             else:
                 style = left_style if i % 2 == 0 else right_style
-                events.append(AssDialogueLine(
-                    start_ms=start, end_ms=end,
-                    style=style.name, text=text,
-                ))
+                events.append(
+                    AssDialogueLine(
+                        start_ms=start,
+                        end_ms=end,
+                        style=style.name,
+                        text=text,
+                    )
+                )
 
         return build_ass(header, styles, events)
 
-    def _build_double_styles(self, base: AssStyle, header: AssHeader) -> tuple[AssStyle, AssStyle]:
-        right_mv = int(self.double_margin_v_right) if self.double_margin_v_right is not None else 24
-        spacing = int(self.double_v_spacing) if self.double_v_spacing is not None else 64
+    def _build_double_styles(
+        self, base: AssStyle, header: AssHeader
+    ) -> tuple[AssStyle, AssStyle]:
+        right_mv = (
+            int(self.double_margin_v_right)
+            if self.double_margin_v_right is not None
+            else 24
+        )
+        spacing = (
+            int(self.double_v_spacing) if self.double_v_spacing is not None else 64
+        )
         max_len = (
-            int(self.double_max_length)
-            if self.double_max_length is not None
-            else 960
+            int(self.double_max_length) if self.double_max_length is not None else 960
         )
         left_ml = int(self.double_margin_l) if self.double_margin_l is not None else 20
         left_mr = header.play_res_x - left_ml - max_len
         right_mr = int(self.double_margin_r) if self.double_margin_r is not None else 20
         right_ml = header.play_res_x - right_mr - max_len
-        left = replace(base,
+        left = replace(
+            base,
             name=base.name + "Left",
             alignment=1,
             margin_l=left_ml,
             margin_r=left_mr,
             margin_v=right_mv + spacing,
         )
-        right = replace(base,
+        right = replace(
+            base,
             name=base.name + "Right",
             alignment=3,
             margin_l=right_ml,
@@ -195,7 +230,9 @@ class DefaultProvider(AssProvider):
         )
         return left, right
 
-    def _generate_plaintext(self, lyrics: Lyrics, duration_ms: int | None = None) -> str:
+    def _generate_plaintext(
+        self, lyrics: Lyrics, duration_ms: int | None = None
+    ) -> str:
         orig = lyrics.get(lyrics.primary_track)
         if not orig:
             return ""
@@ -204,11 +241,17 @@ class DefaultProvider(AssProvider):
         header = AssHeader(title=lyrics.title or "lyrics")
         primary = lyrics.primary_style
         styles = [replace(primary, margin_v=0)]
-        events = [AssDialogueLine(start_ms=0, end_ms=5000, style=primary.name, text=hint)]
+        events = [
+            AssDialogueLine(start_ms=0, end_ms=5000, style=primary.name, text=hint)
+        ]
         return build_ass(header, styles, events)
 
     def _adjust(self, style: AssStyle | None, is_primary: bool) -> AssStyle:
-        return style if style is not None else (DEFAULT_PRIMARY if is_primary else DEFAULT_SECONDARY)
+        return (
+            style
+            if style is not None
+            else (DEFAULT_PRIMARY if is_primary else DEFAULT_SECONDARY)
+        )
 
     def _karaoke_text(self, line: FSLyricsLine) -> str:
         if len(line.words) <= 1:

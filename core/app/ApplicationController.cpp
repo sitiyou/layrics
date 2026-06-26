@@ -36,16 +36,22 @@ void ApplicationController::join() {
 void ApplicationController::setAssInput(const std::string &content) {
     std::lock_guard<std::mutex> lock(m_mutex);
     m_pendingAssContent = content;
-    LAY_DEBUG("ApplicationController: pending ASS content (%zu bytes)", content.size());
+    LAY_DEBUG("ApplicationController: pending ASS content (%zu bytes)",
+              content.size());
 }
 
 void ApplicationController::setStatus(const PendingUpdate &update) {
     std::lock_guard<std::mutex> lock(m_mutex);
-    if (update.mask & PendingUpdate::PAUSED)     m_pending.paused     = update.paused;
-    if (update.mask & PendingUpdate::HIDDEN)     m_pending.hidden     = update.hidden;
-    if (update.mask & PendingUpdate::LOCKED)     m_pending.locked     = update.locked;
-    if (update.mask & PendingUpdate::START_TIME) m_pending.startTimeMs = update.startTimeMs;
-    if (update.mask & PendingUpdate::TARGET_FPS) m_pending.targetFps   = update.targetFps;
+    if (update.mask & PendingUpdate::PAUSED)
+        m_pending.paused = update.paused;
+    if (update.mask & PendingUpdate::HIDDEN)
+        m_pending.hidden = update.hidden;
+    if (update.mask & PendingUpdate::LOCKED)
+        m_pending.locked = update.locked;
+    if (update.mask & PendingUpdate::START_TIME)
+        m_pending.startTimeMs = update.startTimeMs;
+    if (update.mask & PendingUpdate::TARGET_FPS)
+        m_pending.targetFps = update.targetFps;
     m_pending.mask |= update.mask;
 }
 
@@ -59,10 +65,16 @@ void ApplicationController::processPendingCommands() {
         assContent = std::move(m_pendingAssContent);
     }
 
-    if (pending.mask & PendingUpdate::PAUSED)     m_app.setPaused(pending.paused);
-    if (pending.mask & PendingUpdate::HIDDEN)     m_app.setHidden(pending.hidden);
-    if (pending.mask & PendingUpdate::LOCKED)     m_app.setLocked(pending.locked);
-    if (pending.mask & PendingUpdate::START_TIME) m_app.setStartTime(pending.startTimeMs);
-    if (pending.mask & PendingUpdate::TARGET_FPS) m_app.setTargetFps(pending.targetFps);
-    if (!assContent.empty())                      m_app.loadAssContent(std::move(assContent));
+    if (pending.mask & PendingUpdate::PAUSED)
+        m_app.setPaused(pending.paused);
+    if (pending.mask & PendingUpdate::HIDDEN)
+        m_app.setHidden(pending.hidden);
+    if (pending.mask & PendingUpdate::LOCKED)
+        m_app.setLocked(pending.locked);
+    if (pending.mask & PendingUpdate::START_TIME)
+        m_app.setStartTime(pending.startTimeMs);
+    if (pending.mask & PendingUpdate::TARGET_FPS)
+        m_app.setTargetFps(pending.targetFps);
+    if (!assContent.empty())
+        m_app.loadAssContent(std::move(assContent));
 }

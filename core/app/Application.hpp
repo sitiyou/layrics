@@ -25,6 +25,7 @@ class ApplicationController;
 
 class Application {
     friend class ApplicationController;
+
   public:
     Application();
     ~Application();
@@ -38,9 +39,9 @@ class Application {
     void requestStop();
 
     // Pure state setters — no side-effects
-    void setPaused(bool v)       { m_state.paused = v; }
-    void setHidden(bool v)       { m_state.hidden = v; }
-    void setLocked(bool v)       { m_state.locked = v; }
+    void setPaused(bool v) { m_state.paused = v; }
+    void setHidden(bool v) { m_state.hidden = v; }
+    void setLocked(bool v) { m_state.locked = v; }
     void setStartTime(int64_t v) { m_state.startTimeMs = v; }
     void setTargetFps(int v);
 
@@ -49,7 +50,7 @@ class Application {
     void applyLockedInputRegion();
     void updateCursor();
 
-    const AppState& state() const { return m_state; }
+    const AppState &state() const { return m_state; }
 
     static void frameDone(void *data, wl_callback *cb, uint32_t time);
 
@@ -87,4 +88,3 @@ class Application {
     void onPointerButton(uint32_t button, uint32_t state, double x, double y);
     void onSurfaceConfigure(int width, int height);
 };
-

@@ -60,10 +60,11 @@ void CursorManager::applyCursor(wl_pointer *pointer, uint32_t serial,
         return;
     }
 
-    wl_pointer_set_cursor(pointer, serial, m_cursorSurface,
-                          image->hotspot_x, image->hotspot_y);
+    wl_pointer_set_cursor(pointer, serial, m_cursorSurface, image->hotspot_x,
+                          image->hotspot_y);
     wl_surface_attach(m_cursorSurface, buffer, 0, 0);
-    wl_surface_damage_buffer(m_cursorSurface, 0, 0, image->width, image->height);
+    wl_surface_damage_buffer(m_cursorSurface, 0, 0, image->width,
+                             image->height);
     wl_surface_commit(m_cursorSurface);
 }
 

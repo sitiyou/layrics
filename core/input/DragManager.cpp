@@ -19,7 +19,8 @@ void DragManager::onButton(uint32_t button, uint32_t wlState, double x,
         LAY_DEBUG("drag start: %.1f %.1f", x, y);
     } else {
         m_dragging = false;
-        LAY_DEBUG("drag end: offset=(%.1f, %.1f)", m_state.offsetX, m_state.offsetY);
+        LAY_DEBUG("drag end: offset=(%.1f, %.1f)", m_state.offsetX,
+                  m_state.offsetY);
     }
 }
 

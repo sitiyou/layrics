@@ -12,15 +12,18 @@ inline bool g_debugEnabled = []() -> bool {
     if (val) {
         const char *p = val;
         while (*p) {
-            while (*p == ' ') p++;
+            while (*p == ' ')
+                p++;
             if (std::strncmp(p, "core", 4) == 0) {
                 char c = p[4];
                 if (c == '\0' || c == ',' || c == ' ') {
                     return true;
                 }
             }
-            while (*p && *p != ',') p++;
-            if (*p == ',') p++;
+            while (*p && *p != ',')
+                p++;
+            if (*p == ',')
+                p++;
         }
     }
     return false;
@@ -37,32 +40,32 @@ inline void logTimestamp(FILE *fp) {
 
 } // namespace layrics
 
-#define LAY_ERR(...)                                                    \
-    do {                                                                \
-        ::layrics::logTimestamp(stderr);                                \
-        fprintf(stderr, "[ERROR] " __VA_ARGS__);                        \
-        fputc('\n', stderr);                                            \
+#define LAY_ERR(...)                                                           \
+    do {                                                                       \
+        ::layrics::logTimestamp(stderr);                                       \
+        fprintf(stderr, "[ERROR] " __VA_ARGS__);                               \
+        fputc('\n', stderr);                                                   \
     } while (0)
 
-#define LAY_WARN(...)                                                   \
-    do {                                                                \
-        ::layrics::logTimestamp(stderr);                                \
-        fprintf(stderr, "[WARN] " __VA_ARGS__);                         \
-        fputc('\n', stderr);                                            \
+#define LAY_WARN(...)                                                          \
+    do {                                                                       \
+        ::layrics::logTimestamp(stderr);                                       \
+        fprintf(stderr, "[WARN] " __VA_ARGS__);                                \
+        fputc('\n', stderr);                                                   \
     } while (0)
 
-#define LAY_LOG(...)                                                    \
-    do {                                                                \
-        ::layrics::logTimestamp(stderr);                                \
-        fprintf(stderr, "[INFO] " __VA_ARGS__);                         \
-        fputc('\n', stderr);                                            \
+#define LAY_LOG(...)                                                           \
+    do {                                                                       \
+        ::layrics::logTimestamp(stderr);                                       \
+        fprintf(stderr, "[INFO] " __VA_ARGS__);                                \
+        fputc('\n', stderr);                                                   \
     } while (0)
 
-#define LAY_DEBUG(...)                                                  \
-    do {                                                                \
-        if (::layrics::g_debugEnabled) {                                \
-            ::layrics::logTimestamp(stderr);                            \
-            fprintf(stderr, "[DEBUG] " __VA_ARGS__);                    \
-            fputc('\n', stderr);                                        \
-        }                                                               \
+#define LAY_DEBUG(...)                                                         \
+    do {                                                                       \
+        if (::layrics::g_debugEnabled) {                                       \
+            ::layrics::logTimestamp(stderr);                                   \
+            fprintf(stderr, "[DEBUG] " __VA_ARGS__);                           \
+            fputc('\n', stderr);                                               \
+        }                                                                      \
     } while (0)

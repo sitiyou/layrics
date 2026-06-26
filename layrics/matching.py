@@ -17,47 +17,77 @@ _DURATION_MAX_DIFF_SEC = 5
 # Key: ordinal, Value: replacement string
 _CHAR_MAP = {
     # wave dashes → ~
-    0x301C: "~",   # 〜 WAVE DASH
-    0x223C: "~",   # ∼ TILDE OPERATOR
-    0x223E: "~",   # ∾ INVERTED LAZY S
-    0x3030: "~",   # 〰 WAVY DASH
-
+    0x301C: "~",  # 〜 WAVE DASH
+    0x223C: "~",  # ∼ TILDE OPERATOR
+    0x223E: "~",  # ∾ INVERTED LAZY S
+    0x3030: "~",  # 〰 WAVY DASH
     # dashes → -
-    0x2010: "-",   # ‐ HYPHEN
-    0x2011: "-",   # ‑ NON-BREAKING HYPHEN
-    0x2012: "-",   # ‒ FIGURE DASH
-    0x2013: "-",   # – EN DASH
-    0x2014: "-",   # — EM DASH
-    0x2015: "-",   # ― HORIZONTAL BAR
-    0x2212: "-",   # − MINUS SIGN
-
+    0x2010: "-",  # ‐ HYPHEN
+    0x2011: "-",  # ‑ NON-BREAKING HYPHEN
+    0x2012: "-",  # ‒ FIGURE DASH
+    0x2013: "-",  # – EN DASH
+    0x2014: "-",  # — EM DASH
+    0x2015: "-",  # ― HORIZONTAL BAR
+    0x2212: "-",  # − MINUS SIGN
     # Japanese brackets → "
-    0x300C: '"',   # 「
-    0x300D: '"',   # 」
-    0x300E: '"',   # 『
-    0x300F: '"',   # 』
-    0x3014: '"',   # 〔
-    0x3015: '"',   # 〕
-
+    0x300C: '"',  # 「
+    0x300D: '"',  # 」
+    0x300E: '"',  # 『
+    0x300F: '"',  # 』
+    0x3014: '"',  # 〔
+    0x3015: '"',  # 〕
     # spaces
-    0x3000: " ",   # ideographic space
-    0x00A0: " ",   # no-break space
+    0x3000: " ",  # ideographic space
+    0x00A0: " ",  # no-break space
 }
 
 # ── annotation keywords ──────────────────────────────────────────────
 _ANNOT_KEYWORDS = [
-    "inst", "instrumental",
-    "feat", "ft", "featuring",
-    "live", "remix", "cover", "demo", "edit",
-    "acoustic", "off vocal", "offvocal", "karaoke",
-    "ver", "version", "tv.size", "tv size", "radio.edit", "radio edit",
-    "solo", "reprise", "intro", "outro",
-    "bonus.track", "bonus track", "single.version", "single version",
-    "album.version", "album version", "original.mix", "original mix",
-    "extended", "extended.mix", "extended mix",
-    "インスト", "オフヴォーカル", "オフボーカル",
-    "カラオケ", "ライブ", "リミックス", "カバー",
-    "デモ", "アコースティック", "テレビサイズ",
+    "inst",
+    "instrumental",
+    "feat",
+    "ft",
+    "featuring",
+    "live",
+    "remix",
+    "cover",
+    "demo",
+    "edit",
+    "acoustic",
+    "off vocal",
+    "offvocal",
+    "karaoke",
+    "ver",
+    "version",
+    "tv.size",
+    "tv size",
+    "radio.edit",
+    "radio edit",
+    "solo",
+    "reprise",
+    "intro",
+    "outro",
+    "bonus.track",
+    "bonus track",
+    "single.version",
+    "single version",
+    "album.version",
+    "album version",
+    "original.mix",
+    "original mix",
+    "extended",
+    "extended.mix",
+    "extended mix",
+    "インスト",
+    "オフヴォーカル",
+    "オフボーカル",
+    "カラオケ",
+    "ライブ",
+    "リミックス",
+    "カバー",
+    "デモ",
+    "アコースティック",
+    "テレビサイズ",
 ]
 
 _KEYWORD_OR = "|".join(_ANNOT_KEYWORDS)
@@ -82,6 +112,7 @@ _TRACK_PREFIX_RE = re.compile(r"^\d+[.．\-\)\s]+")
 
 
 # ── normalization ────────────────────────────────────────────────────
+
 
 def normalize_title(title: str) -> str:
     s = unicodedata.normalize("NFKC", title)
@@ -112,11 +143,15 @@ def clean_search_keyword(keyword: str) -> str:
 
         def _strip(m: re.Match) -> str:
             inner = m.group(1)
-            if not any(re.search(r"\b" + re.escape(k) + r"\b", inner, re.IGNORECASE)
-                       for k in _ANNOT_KEYWORDS_LONGEST):
+            if not any(
+                re.search(r"\b" + re.escape(k) + r"\b", inner, re.IGNORECASE)
+                for k in _ANNOT_KEYWORDS_LONGEST
+            ):
                 return m.group(0)
             for k in _ANNOT_KEYWORDS_LONGEST:
-                inner = re.sub(r"\b" + re.escape(k) + r"\.?\s*", "", inner, flags=re.IGNORECASE)
+                inner = re.sub(
+                    r"\b" + re.escape(k) + r"\.?\s*", "", inner, flags=re.IGNORECASE
+                )
             inner = re.sub(r"\s+", " ", inner).strip(" ,、.")
             return inner
 
@@ -134,6 +169,7 @@ def clean_search_keyword(keyword: str) -> str:
 
 
 # ── similarity helpers ───────────────────────────────┐
+
 
 def _title_similarity(a: str, b: str) -> float:
     if not a or not b:
@@ -158,6 +194,7 @@ def _artist_similarity(local: list[str], remote: list[str]) -> float:
 
 # ── matching ─────────────────────────────────────────────────────────
 
+
 def match_song(
     meta: TrackMeta,
     candidates: list[dict[str, Any]],
@@ -173,7 +210,7 @@ def match_song(
     def _with_artist_stripped(title_norm: str) -> str:
         for art in q_artists:
             if title_norm.startswith(art):
-                rest = title_norm[len(art):].lstrip("-–—~ ")
+                rest = title_norm[len(art) :].lstrip("-–—~ ")
                 if rest:
                     return rest
         return title_norm
@@ -195,12 +232,20 @@ def match_song(
 
         # Stage 2: duration check
         dur_diff = 999999.0
-        if q_duration_s is not None and q_duration_s > 0 and c_duration_s and c_duration_s > 0:
+        if (
+            q_duration_s is not None
+            and q_duration_s > 0
+            and c_duration_s
+            and c_duration_s > 0
+        ):
             dur_diff = abs(q_duration_s - c_duration_s)
             if dur_diff > _DURATION_MAX_DIFF_SEC:
                 logger.info(
                     "  skip %s: title=%.3f OK but duration diff=%.1fs > %ds",
-                    c.get("id", "?"), title_score, dur_diff, _DURATION_MAX_DIFF_SEC,
+                    c.get("id", "?"),
+                    title_score,
+                    dur_diff,
+                    _DURATION_MAX_DIFF_SEC,
                 )
                 continue
 
@@ -209,7 +254,10 @@ def match_song(
 
         logger.debug(
             "  candidate %s: title=%.3f dur_diff=%.1fs artist=%.2f",
-            c.get("id", "?"), title_score, dur_diff, artist_score,
+            c.get("id", "?"),
+            title_score,
+            dur_diff,
+            artist_score,
         )
         scored.append((title_score, dur_diff, artist_score, c))
 
@@ -222,6 +270,9 @@ def match_song(
 
     logger.info(
         "match: pick %s (title=%.3f dur_diff=%.1fs artist=%.2f)",
-        best_c.get("id", "?"), best[0], best[1], best[2],
+        best_c.get("id", "?"),
+        best[0],
+        best[1],
+        best[2],
     )
     return best_c

@@ -65,7 +65,8 @@ bool ShmBuffer::allocate(int shmFd, wl_shm *shm, int width, int height,
     m_stride = width * 4;
     m_size = static_cast<size_t>(m_stride) * height;
 
-    LAY_DEBUG("allocating %dx%d stride=%d size=%zu", width, height, m_stride, m_size);
+    LAY_DEBUG("allocating %dx%d stride=%d size=%zu", width, height, m_stride,
+              m_size);
 
     if (ftruncate(shmFd, static_cast<off_t>(m_size)) != 0) {
         LAY_ERR("ftruncate(%d, %zu) failed: %s", shmFd, m_size,

@@ -44,8 +44,8 @@ RenderResult RenderManager::render(uint8_t *buffer, int64_t timestampMs) {
     int stride = cairo_format_stride_for_width(CAIRO_FORMAT_ARGB32, m_width);
 
     bool anyContentChanged = false;
-    bool offsetChanged = (m_offsetX != m_lastOffsetX ||
-                          m_offsetY != m_lastOffsetY);
+    bool offsetChanged =
+        (m_offsetX != m_lastOffsetX || m_offsetY != m_lastOffsetY);
     struct RenderItem {
         cairo_surface_t *surf;
     };
@@ -61,9 +61,9 @@ RenderResult RenderManager::render(uint8_t *buffer, int64_t timestampMs) {
         anyContentChanged = anyContentChanged || r->contentChanged;
 
         for (const auto &rect : r->lastRegions) {
-            result.regions.push_back(
-                {static_cast<int>(rect.x + m_offsetX),
-                 static_cast<int>(rect.y + m_offsetY), rect.w, rect.h});
+            result.regions.push_back({static_cast<int>(rect.x + m_offsetX),
+                                      static_cast<int>(rect.y + m_offsetY),
+                                      rect.w, rect.h});
         }
 
         items[numItems++].surf = surf;

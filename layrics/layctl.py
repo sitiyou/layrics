@@ -13,7 +13,8 @@ SOCKET_PATH = os.environ.get(
 
 _common_params = [
     click.option(
-        "--socket", "-s",
+        "--socket",
+        "-s",
         default=SOCKET_PATH,
         envvar="LAYRICS_SOCK",
         help="IPC socket path",
@@ -202,7 +203,9 @@ def dmenu(ctx):
     if not keyword:
         click.echo("Error: empty keyword from current track", err=True)
         sys.exit(1)
-    results = _call(ctx.obj["socket"], "search_songs", {"keyword": keyword, "limit": 20})
+    results = _call(
+        ctx.obj["socket"], "search_songs", {"keyword": keyword, "limit": 20}
+    )
     if results.get("type") == "error":
         _pp(results)
         return

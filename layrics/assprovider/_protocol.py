@@ -1,14 +1,24 @@
 from __future__ import annotations
+
 import logging
 import re
-from typing import Any, ClassVar, Iterator, Protocol, runtime_checkable
 from dataclasses import dataclass, replace
+from typing import Any, ClassVar, Iterator, Protocol, runtime_checkable
 
-from LDDC.common.models import Lyrics as _LDCLyrics, FSLyrics, FSLyricsLine, LyricsType, Source, LyricsLine, LyricsWord
+from LDDC.common.models import (
+    FSLyrics,
+    FSLyricsLine,
+    LyricsLine,
+    LyricsType,
+    LyricsWord,
+    Source,
+)
+from LDDC.common.models import (
+    Lyrics as _LDCLyrics,
+)
 
-from ._ass import AssStyle, DEFAULT_PRIMARY, DEFAULT_SECONDARY
 from . import _ruby
-
+from ._ass import DEFAULT_PRIMARY, DEFAULT_SECONDARY, AssStyle
 
 logger = logging.getLogger("layrics.assprovider")
 
@@ -35,13 +45,13 @@ def _detect_lang(lyrics_data: _LDCLyrics, key: str) -> str:
     if not data:
         return "default"
     text = "".join(w.text for line in data for w in line.words)
-    if re.search(r'[\u3040-\u309f\u30a0-\u30ff]', text):
+    if re.search(r"[\u3040-\u309f\u30a0-\u30ff]", text):
         return "ja"
-    if re.search(r'[\uac00-\ud7af]', text):
+    if re.search(r"[\uac00-\ud7af]", text):
         return "ko"
-    if re.search(r'[\u0400-\u04ff]', text):
+    if re.search(r"[\u0400-\u04ff]", text):
         return "ru"
-    if re.search(r'[\u4e00-\u9fff]', text):
+    if re.search(r"[\u4e00-\u9fff]", text):
         return "zh"
     return "default"
 
@@ -101,7 +111,9 @@ class Lyrics(_LDCLyrics):
         self._fonts = dict(fonts)
         self._primary_override = primary_override or {}
         self._secondary_override = secondary_override or {}
-        self._init_tracks(primary_track, secondary_track, primary_priority, secondary_priority)
+        self._init_tracks(
+            primary_track, secondary_track, primary_priority, secondary_priority
+        )
         self._strip_ruby()
 
     def _init_tracks(
@@ -142,15 +154,24 @@ class Lyrics(_LDCLyrics):
 
     @property
     def primary_style(self) -> AssStyle:
-        return self._build_style(DEFAULT_PRIMARY, "Primary", self._primary_track, self._primary_override)
+        return self._build_style(
+            DEFAULT_PRIMARY, "Primary", self._primary_track, self._primary_override
+        )
 
     @property
     def secondary_style(self) -> AssStyle | None:
         if not self._secondary_track:
             return None
-        return self._build_style(DEFAULT_SECONDARY, "Secondary", self._secondary_track, self._secondary_override)
+        return self._build_style(
+            DEFAULT_SECONDARY,
+            "Secondary",
+            self._secondary_track,
+            self._secondary_override,
+        )
 
-    def _build_style(self, base: AssStyle, name: str, lang_key: str, override: dict[str, Any]) -> AssStyle:
+    def _build_style(
+        self, base: AssStyle, name: str, lang_key: str, override: dict[str, Any]
+    ) -> AssStyle:
         if override:
             base = replace(base, name=name, **override)
         else:
@@ -177,25 +198,37 @@ class Lyrics(_LDCLyrics):
                     data[i] = data[i]._replace(end=data[i + 1].start)
         return fslyrics
 
-    def active_tracks(self, fslyrics: FSLyrics, *, secondary_enabled: bool = True) -> list[str]:
+    def active_tracks(
+        self, fslyrics: FSLyrics, *, secondary_enabled: bool = True
+    ) -> list[str]:
         langs = [self._primary_track]
         sec = self._secondary_track
         if secondary_enabled and sec and sec in fslyrics and len(fslyrics[sec]) > 0:
             langs.append(sec)
         return langs
 
-    def align_tracks(self, fslyrics: FSLyrics, active_tracks: list[str]) -> dict[str, dict[int, int]]:
+    def align_tracks(
+        self, fslyrics: FSLyrics, active_tracks: list[str]
+    ) -> dict[str, dict[int, int]]:
         alignment: dict[str, dict[int, int]] = {}
         orig_data = fslyrics[self._primary_track]
-        logger.debug("align_tracks: primary=%s len=%d  active=%s",
-                     self._primary_track, len(orig_data), active_tracks)
+        logger.debug(
+            "align_tracks: primary=%s len=%d  active=%s",
+            self._primary_track,
+            len(orig_data),
+            active_tracks,
+        )
         for track in active_tracks[1:]:
             if track not in fslyrics:
                 logger.debug("align_tracks: track %r not in fslyrics, skipping", track)
                 continue
             track_data = fslyrics[track]
-            logger.debug("align_tracks: aligning %r (%d lines) → primary (%d lines)",
-                         track, len(track_data), len(orig_data))
+            logger.debug(
+                "align_tracks: aligning %r (%d lines) → primary (%d lines)",
+                track,
+                len(track_data),
+                len(orig_data),
+            )
             mapping: dict[int, int] = {}
             for oi, oline in enumerate(orig_data):
                 best = -1
@@ -207,11 +240,22 @@ class Lyrics(_LDCLyrics):
                         best = li
                 mapping[oi] = best
                 otext = "".join(w.text for w in oline.words)
-                ttext = "".join(w.text for w in track_data[best].words) if best >= 0 else "?"
-                logger.debug("align_tracks:  primary[%d] start=%d %r → %r[%d] start=%d dist=%d %r",
-                             oi, oline.start, otext[:30],
-                             track, best, track_data[best].start if best >= 0 else -1,
-                             best_dist, ttext[:30])
+                ttext = (
+                    "".join(w.text for w in track_data[best].words)
+                    if best >= 0
+                    else "?"
+                )
+                logger.debug(
+                    "align_tracks:  primary[%d] start=%d %r → %r[%d] start=%d dist=%d %r",
+                    oi,
+                    oline.start,
+                    otext[:30],
+                    track,
+                    best,
+                    track_data[best].start if best >= 0 else -1,
+                    best_dist,
+                    ttext[:30],
+                )
             alignment[track] = mapping
             logger.debug("align_tracks: %r mapping=%s", track, mapping)
         return alignment
@@ -222,7 +266,9 @@ class Lyrics(_LDCLyrics):
         *,
         secondary_enabled: bool = True,
     ) -> Iterator[tuple[FSLyricsLine, dict[str, FSLyricsLine]]]:
-        active_tracks = self.active_tracks(fslyrics, secondary_enabled=secondary_enabled)
+        active_tracks = self.active_tracks(
+            fslyrics, secondary_enabled=secondary_enabled
+        )
         logger.debug("iter_aligned: active_tracks=%s", active_tracks)
         alignment = self.align_tracks(fslyrics, active_tracks)
         orig_data = fslyrics[self._primary_track]
@@ -249,9 +295,7 @@ def register_ass_provider(provider: type[AssProvider]) -> None:
     _ass_providers.sort(key=lambda p: p.priority)
 
 
-def match_provider(
-    player_name: str, lyrics: _LDCLyrics
-) -> type[AssProvider] | None:
+def match_provider(player_name: str, lyrics: _LDCLyrics) -> type[AssProvider] | None:
     for p in _ass_providers:
         if p.trigger.matches(player_name, lyrics):
             return p

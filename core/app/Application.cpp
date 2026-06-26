@@ -14,8 +14,7 @@
 #include <stdexcept>
 #include <unistd.h>
 
-static const wl_callback_listener frameListener = {
-    Application::frameDone};
+static const wl_callback_listener frameListener = {Application::frameDone};
 
 Application::Application() {
     if (!initWayland()) {
@@ -99,9 +98,8 @@ bool Application::initWayland() {
 
     m_damageGrid.setSurfaceSize(m_surface.width(), m_surface.height());
 
-    m_surface.setConfigureCallback([this](int width, int height) {
-        onSurfaceConfigure(width, height);
-    });
+    m_surface.setConfigureCallback(
+        [this](int width, int height) { onSurfaceConfigure(width, height); });
 
     return m_buffer.operator bool();
 }
@@ -129,18 +127,15 @@ bool Application::initInput() {
 
     m_cursorMgr.initialize(m_waylandCtx.compositor, m_waylandCtx.shm);
 
-    m_inputMgr.setMotionCallback([this](double x, double y) {
-        onPointerMotion(x, y);
-    });
+    m_inputMgr.setMotionCallback(
+        [this](double x, double y) { onPointerMotion(x, y); });
 
-    m_inputMgr.setButtonCallback([this](uint32_t button, uint32_t state,
-                                         double x, double y) {
-        onPointerButton(button, state, x, y);
-    });
+    m_inputMgr.setButtonCallback(
+        [this](uint32_t button, uint32_t state, double x, double y) {
+            onPointerButton(button, state, x, y);
+        });
 
-    m_inputMgr.setEnterCallback([this](uint32_t) {
-        updateCursor();
-    });
+    m_inputMgr.setEnterCallback([this](uint32_t) { updateCursor(); });
 
     LAY_LOG("input initialized");
     return true;
@@ -192,8 +187,7 @@ void Application::mainLoop() {
     }
 }
 
-void Application::frameDone(void *data, wl_callback * /*cb*/,
-                            uint32_t time) {
+void Application::frameDone(void *data, wl_callback * /*cb*/, uint32_t time) {
     auto *self = static_cast<Application *>(data);
     self->m_frameCallback = nullptr;
     self->onFrame(time);
@@ -255,8 +249,8 @@ void Application::onFrame(uint32_t time) {
 
         if (!m_state.locked) {
             m_regionMgr.update(m_waylandCtx.compositor, m_surface.surface(),
-                               m_damageGrid.buildRegions(),
-                               m_surface.width(), m_surface.height());
+                               m_damageGrid.buildRegions(), m_surface.width(),
+                               m_surface.height());
         }
 
         requestFrame();
@@ -264,8 +258,8 @@ void Application::onFrame(uint32_t time) {
     } else {
         if (!m_state.locked) {
             m_regionMgr.update(m_waylandCtx.compositor, m_surface.surface(),
-                               result.regions,
-                               m_surface.width(), m_surface.height());
+                               result.regions, m_surface.width(),
+                               m_surface.height());
         }
 
         requestFrame();
@@ -290,9 +284,7 @@ void Application::loadAssContent(const std::string &content) {
     LAY_LOG("Loaded ASS content (%zu bytes)", content.size());
 }
 
-void Application::requestStop() {
-    m_running = false;
-}
+void Application::requestStop() { m_running = false; }
 
 void Application::setTargetFps(int fps) {
     m_state.targetFps = fps;

@@ -17,9 +17,9 @@ struct PendingUpdate {
     uint8_t mask = 0;
 
     enum Mask : uint8_t {
-        PAUSED     = 1 << 0,
-        HIDDEN     = 1 << 1,
-        LOCKED     = 1 << 2,
+        PAUSED = 1 << 0,
+        HIDDEN = 1 << 1,
+        LOCKED = 1 << 2,
         START_TIME = 1 << 3,
         TARGET_FPS = 1 << 4,
     };
@@ -39,7 +39,7 @@ class ApplicationController {
 
     void setAssInput(const std::string &path);
     void setStatus(const PendingUpdate &update);
-    const AppState& state() const { return m_app.state(); }
+    const AppState &state() const { return m_app.state(); }
 
   private:
     void processPendingCommands();

@@ -1,6 +1,5 @@
 import re
 
-
 KARAOKE_HEADER_TEMPLATE = r"""[Script Info]
 Title: Karaoke Subtitle
 ScriptType: v4.00+
@@ -57,14 +56,20 @@ _DEFAULTS: dict[str, str | int] = {
 def render_karaoke_header(**overrides: str | int) -> str:
     values = dict(_DEFAULTS)
     values.update(overrides)
-    values.setdefault("MARGIN_K1", int(values["MARGIN_V"]) * 2 + int(values["FONTSIZE"]) // 2 * 3)
-    values.setdefault("MARGIN_LEAD", int(values["MARGIN_V"]) * 3 + int(values["FONTSIZE"]) * 3)
+    values.setdefault(
+        "MARGIN_K1", int(values["MARGIN_V"]) * 2 + int(values["FONTSIZE"]) // 2 * 3
+    )
+    values.setdefault(
+        "MARGIN_LEAD", int(values["MARGIN_V"]) * 3 + int(values["FONTSIZE"]) * 3
+    )
 
     def _repl(m: re.Match) -> str:
         key = m.group(1)
         return str(values.get(key, m.group(0)))
 
-    return re.sub(r"__([A-Z][A-Z0-9]*(_[A-Z][A-Z0-9]*)*)__", _repl, KARAOKE_HEADER_TEMPLATE)
+    return re.sub(
+        r"__([A-Z][A-Z0-9]*(_[A-Z][A-Z0-9]*)*)__", _repl, KARAOKE_HEADER_TEMPLATE
+    )
 
 
 KARAOKE_HEADER = render_karaoke_header()

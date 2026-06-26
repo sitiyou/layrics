@@ -1,7 +1,7 @@
 #include "core/wayland/LayerSurface.hpp"
+#include "core/utils/Logger.hpp"
 #include "core/wayland/LayerShellProtocol.hpp"
 #include "core/wayland/WaylandContext.hpp"
-#include "core/utils/Logger.hpp"
 
 #include <wayland-client.h>
 
@@ -42,9 +42,11 @@ static const zwlr_layer_surface_v1_listener layerSurfaceListener = {
 LayerSurface::~LayerSurface() { destroy(); }
 
 bool LayerSurface::initialize(WaylandContext &ctx, wl_output *output,
-                               uint32_t layer, const LayerSurfaceConfig &config) {
+                              uint32_t layer,
+                              const LayerSurfaceConfig &config) {
     if (!ctx.compositor || !ctx.layerShell) {
-        LAY_ERR("WaylandContext not connected, missing compositor or layer_shell");
+        LAY_ERR(
+            "WaylandContext not connected, missing compositor or layer_shell");
         return false;
     }
 
@@ -65,19 +67,21 @@ bool LayerSurface::initialize(WaylandContext &ctx, wl_output *output,
         return false;
     }
 
-    zwlr_layer_surface_v1_add_listener(m_layerSurface, &layerSurfaceListener, this);
+    zwlr_layer_surface_v1_add_listener(m_layerSurface, &layerSurfaceListener,
+                                       this);
 
     zwlr_layer_surface_v1_set_anchor(m_layerSurface, config.anchor);
     zwlr_layer_surface_v1_set_size(m_layerSurface, config.desiredWidth,
-                                    config.desiredHeight);
-    zwlr_layer_surface_v1_set_exclusive_zone(m_layerSurface, config.exclusiveZone);
-    zwlr_layer_surface_v1_set_keyboard_interactivity(m_layerSurface,
-                                                      config.keyboardInteractivity);
+                                   config.desiredHeight);
+    zwlr_layer_surface_v1_set_exclusive_zone(m_layerSurface,
+                                             config.exclusiveZone);
+    zwlr_layer_surface_v1_set_keyboard_interactivity(
+        m_layerSurface, config.keyboardInteractivity);
     if (config.marginTop || config.marginRight || config.marginBottom ||
         config.marginLeft) {
-        zwlr_layer_surface_v1_set_margin(m_layerSurface, config.marginTop,
-                                          config.marginRight, config.marginBottom,
-                                          config.marginLeft);
+        zwlr_layer_surface_v1_set_margin(
+            m_layerSurface, config.marginTop, config.marginRight,
+            config.marginBottom, config.marginLeft);
     }
 
     wl_surface_commit(m_surface);
@@ -119,9 +123,7 @@ void LayerSurface::damageFull() {
     wl_surface_damage_buffer(m_surface, 0, 0, INT32_MAX, INT32_MAX);
 }
 
-void LayerSurface::commit() {
-    wl_surface_commit(m_surface);
-}
+void LayerSurface::commit() { wl_surface_commit(m_surface); }
 
 void LayerSurface::commitFrame(wl_buffer *buffer, bool fullDamage) {
     wl_surface_attach(m_surface, buffer, 0, 0);

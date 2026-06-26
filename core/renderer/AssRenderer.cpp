@@ -4,9 +4,9 @@
 #include <ass/ass.h>
 #include <cairo.h>
 
+#include <cstdint>
 #include <cstdio>
 #include <cstring>
-#include <cstdint>
 
 AssRenderer::AssRenderer(std::string assContent)
     : m_assContent(std::move(assContent)) {}
@@ -47,9 +47,8 @@ bool AssRenderer::initialize() {
                   ASS_FONTPROVIDER_AUTODETECT, nullptr, 1);
 
     if (!m_assContent.empty()) {
-        m_track = ass_read_memory(m_library,
-                                  m_assContent.data(), m_assContent.size(),
-                                  nullptr);
+        m_track = ass_read_memory(m_library, m_assContent.data(),
+                                  m_assContent.size(), nullptr);
         if (!m_track) {
             LAY_ERR("Failed to load ASS content");
         } else {
@@ -103,9 +102,8 @@ void AssRenderer::loadContent(const std::string &content) {
         ass_free_track(m_track);
         m_track = nullptr;
     }
-    m_track = ass_read_memory(m_library,
-                              m_assContent.data(), m_assContent.size(),
-                              nullptr);
+    m_track = ass_read_memory(m_library, m_assContent.data(),
+                              m_assContent.size(), nullptr);
     if (!m_track) {
         LAY_ERR("Failed to load ASS content");
     } else {

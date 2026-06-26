@@ -59,8 +59,9 @@ class SongCache:
             return None
         return CacheEntry(*row)
 
-    def set(self, key: str, song_id: str, source: str,
-            title: str = "", artists: str = ""):
+    def set(
+        self, key: str, song_id: str, source: str, title: str = "", artists: str = ""
+    ):
         now = int(time.time())
         self._conn.execute(
             "INSERT OR REPLACE INTO song_cache "
@@ -73,8 +74,9 @@ class SongCache:
         )
         self._conn.commit()
 
-    def set_if_missing(self, key: str, song_id: str, source: str,
-                       title: str = "", artists: str = "") -> bool:
+    def set_if_missing(
+        self, key: str, song_id: str, source: str, title: str = "", artists: str = ""
+    ) -> bool:
         now = int(time.time())
         cur = self._conn.execute(
             "INSERT OR IGNORE INTO song_cache "

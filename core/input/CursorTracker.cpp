@@ -40,7 +40,7 @@ static bool getHyprlandCursor(int &x, int &y) {
         return false;
     }
 
-    struct sockaddr_un addr {};
+    struct sockaddr_un addr{};
     addr.sun_family = AF_UNIX;
 
     const char *xdg = getenv("XDG_RUNTIME_DIR");

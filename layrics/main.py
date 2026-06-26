@@ -28,12 +28,12 @@ Methods:
    ass_set       {key, value}          -> {key, value}
 """
 
-import sys
-import os
+import asyncio
 import fcntl
 import json
-import asyncio
 import logging
+import os
+import sys
 import time
 from dataclasses import asdict
 from typing import Any, Optional
@@ -42,10 +42,19 @@ from LDDC.common.exceptions import LyricsNotFoundError
 from LDDC.common.models import Artist, SongInfo, Source
 
 from ._layrics import ApplicationController
-from .config import get_config
 from .cache import SongCache, make_cache_key
-from .lyricsource import search_songs as _search_songs, fetch_lyrics as _fetch_lyrics, parse_composite_id, _resolve_song_info
-from .matching import match_song, clean_search_keyword
+from .config import get_config
+from .lyricsource import (
+    _resolve_song_info,
+    parse_composite_id,
+)
+from .lyricsource import (
+    fetch_lyrics as _fetch_lyrics,
+)
+from .lyricsource import (
+    search_songs as _search_songs,
+)
+from .matching import clean_search_keyword, match_song
 from .mpris import MPRISPlayerFinder, MprisSignalMonitor, TrackMeta
 
 logging.basicConfig(
@@ -109,9 +118,7 @@ class LayricsApp:
         self.socket_path = (
             socket_path
             or os.environ.get("LAYRICS_SOCK")
-            or os.path.join(
-                os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "layrics.sock"
-            )
+            or os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "layrics.sock")
         )
 
         self._server: Optional[asyncio.AbstractServer] = None
@@ -140,7 +147,7 @@ class LayricsApp:
     # ── auto-fetch ────────────────────────────────────────────────
 
     async def _fetch_ass_for_track(self, meta: TrackMeta) -> str:
-        keyword = (meta.title or "")
+        keyword = meta.title or ""
         if meta.artists:
             keyword += " " + " ".join(meta.artists)
         keyword = clean_search_keyword(keyword.strip())
@@ -152,17 +159,25 @@ class LayricsApp:
         key = make_cache_key(meta)
         cached = cache.get(key)
         if cached is not None:
-            logger.info("fetch: cache hit %s -> %s%s", keyword,
-                         cached.lyrics_source, cached.lyrics_song_id)
+            logger.info(
+                "fetch: cache hit %s -> %s%s",
+                keyword,
+                cached.lyrics_source,
+                cached.lyrics_song_id,
+            )
             try:
                 src = Source[cached.lyrics_source]
             except KeyError:
-                logger.warning("fetch: invalid source in cache %s", cached.lyrics_source)
+                logger.warning(
+                    "fetch: invalid source in cache %s", cached.lyrics_source
+                )
                 cache.remove(key)
             else:
                 song_info = SongInfo(source=src, id=cached.lyrics_song_id)
                 try:
-                    ass = await loop.run_in_executor(None, lambda: _fetch_lyrics(song_info))
+                    ass = await loop.run_in_executor(
+                        None, lambda: _fetch_lyrics(song_info)
+                    )
                     logger.info("fetch: cache hit %s (%d bytes)", keyword, len(ass))
                     return ass
                 except Exception as e:
@@ -171,15 +186,15 @@ class LayricsApp:
                     cache.remove(key)
 
         logger.info("fetch: searching %s", keyword)
-        results = await loop.run_in_executor(
-            None, lambda: _search_songs(keyword, 20)
-        )
+        results = await loop.run_in_executor(None, lambda: _search_songs(keyword, 20))
         if not results:
             raise RuntimeError(f"no search results for {keyword!r}")
 
         matched = match_song(meta, results)
         if not matched:
-            logger.info("fetch: no match for %s in %d candidates", keyword, len(results))
+            logger.info(
+                "fetch: no match for %s in %d candidates", keyword, len(results)
+            )
             raise RuntimeError(f"no match found for {keyword!r}")
 
         src, raw_id = parse_composite_id(matched["id"])
@@ -195,7 +210,9 @@ class LayricsApp:
         logger.info("fetch: %s -> %s (%d bytes)", keyword, matched["id"], len(ass))
 
         cache.set_if_missing(
-            key, raw_id, src.name,
+            key,
+            raw_id,
+            src.name,
             matched.get("name", ""),
             "|".join(matched.get("artists", [])),
         )
@@ -229,7 +246,9 @@ class LayricsApp:
     # ── MPRIS ─────────────────────────────────────────────────────
 
     def list_players(self):
-        return [(p.bus_name, p.get_identity()) for p in self.mpris_finder.find_all_players()]
+        return [
+            (p.bus_name, p.get_identity()) for p in self.mpris_finder.find_all_players()
+        ]
 
     def select_mpris_player(self, name: str) -> bool:
         for p in self.mpris_finder.find_all_players():
@@ -248,11 +267,12 @@ class LayricsApp:
         def _match_name(p):
             bus = getattr(p, "bus_name", "")
             prefix = "org.mpris.MediaPlayer2."
-            return bus[len(prefix):] if bus.startswith(prefix) else bus
+            return bus[len(prefix) :] if bus.startswith(prefix) else bus
 
         if self._config.exclude_players:
             players = [
-                p for p in players
+                p
+                for p in players
                 if not any(
                     pat.search(_match_name(p)) or pat.search(p.get_identity())
                     for pat in self._config.exclude_players
@@ -260,7 +280,8 @@ class LayricsApp:
             ]
         elif self._config.include_players:
             players = [
-                p for p in players
+                p
+                for p in players
                 if any(
                     pat.search(_match_name(p)) or pat.search(p.get_identity())
                     for pat in self._config.include_players
@@ -387,9 +408,7 @@ class LayricsApp:
 
     async def search_songs(self, keyword: str, limit: int = 10):
         loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(
-            None, lambda: _search_songs(keyword, limit)
-        )
+        return await loop.run_in_executor(None, lambda: _search_songs(keyword, limit))
 
     async def fetch_lyrics(self, song_data: dict) -> str:
         song_info = SongInfo(
@@ -401,14 +420,11 @@ class LayricsApp:
             duration=song_data.get("duration"),
         )
         loop = asyncio.get_event_loop()
-        ass_content = await loop.run_in_executor(
-            None, lambda: _fetch_lyrics(song_info)
-        )
+        ass_content = await loop.run_in_executor(None, lambda: _fetch_lyrics(song_info))
         logger.info("lyrics fetched (%d bytes)", len(ass_content))
         return ass_content
 
-
-# ── IPC command dispatch ──────────────────────────────────────
+    # ── IPC command dispatch ──────────────────────────────────────
 
     async def _execute(self, req: dict) -> dict:
         req_id = req.get("id")
@@ -421,10 +437,7 @@ class LayricsApp:
                 return {
                     "id": req_id,
                     "type": "result",
-                    "data": [
-                        {"bus_name": bn, "identity": id_}
-                        for bn, id_ in players
-                    ],
+                    "data": [{"bus_name": bn, "identity": id_} for bn, id_ in players],
                 }
 
             elif method == "select_player":
@@ -468,7 +481,11 @@ class LayricsApp:
                             "data": {"code": 400, "message": "no current track"},
                         }
                     ass_content = await self._fetch_ass_for_track(self._last_track)
-                    return {"id": req_id, "type": "result", "data": {"ass": ass_content}}
+                    return {
+                        "id": req_id,
+                        "type": "result",
+                        "data": {"ass": ass_content},
+                    }
                 ass_content = await self.fetch_lyrics(song_data)
                 return {"id": req_id, "type": "result", "data": {"ass": ass_content}}
 
@@ -491,8 +508,11 @@ class LayricsApp:
                     try:
                         parsed = _parse_bool(raw if isinstance(raw, str) else "true")
                     except ValueError:
-                        return {"id": req_id, "type": "error",
-                                "data": {"code": 400, "message": f"invalid value: {raw!r}"}}
+                        return {
+                            "id": req_id,
+                            "type": "error",
+                            "data": {"code": 400, "message": f"invalid value: {raw!r}"},
+                        }
                     val = not self.ctrl.state.hidden if parsed is None else parsed
                 self.ctrl.set_status(hidden=val)
                 return {"id": req_id, "type": "result", "data": {"hidden": val}}
@@ -509,8 +529,11 @@ class LayricsApp:
                     try:
                         parsed = _parse_bool(raw if isinstance(raw, str) else "true")
                     except ValueError:
-                        return {"id": req_id, "type": "error",
-                                "data": {"code": 400, "message": f"invalid value: {raw!r}"}}
+                        return {
+                            "id": req_id,
+                            "type": "error",
+                            "data": {"code": 400, "message": f"invalid value: {raw!r}"},
+                        }
                     val = not self.ctrl.state.locked if parsed is None else parsed
                 self.ctrl.set_status(locked=val)
                 return {"id": req_id, "type": "result", "data": {"locked": val}}
@@ -525,7 +548,10 @@ class LayricsApp:
                     return {
                         "id": req_id,
                         "type": "error",
-                        "data": {"code": 400, "message": "fps must be > 0 or -1 (vsync)"},
+                        "data": {
+                            "code": 400,
+                            "message": "fps must be > 0 or -1 (vsync)",
+                        },
                     }
                 self.ctrl.set_status(target_fps=fps)
                 self._config.overlay.target_fps = fps
@@ -545,8 +571,12 @@ class LayricsApp:
                     try:
                         pos = self._mpris_player.get_position()
                         now_ms = int(time.monotonic() * 1000)
-                        self.ctrl.set_status(hidden=False, start_time_ms=now_ms - pos // 1000)
-                        logger.info("re-synced start_time on start, pos=%dms", pos // 1000)
+                        self.ctrl.set_status(
+                            hidden=False, start_time_ms=now_ms - pos // 1000
+                        )
+                        logger.info(
+                            "re-synced start_time on start, pos=%dms", pos // 1000
+                        )
                     except Exception as e:
                         logger.warning("start: failed to sync position: %s", e)
                 return {
@@ -632,14 +662,18 @@ class LayricsApp:
                 loop = asyncio.get_event_loop()
 
                 resolved = await loop.run_in_executor(
-                    None, lambda: _resolve_song_info(song_info),
+                    None,
+                    lambda: _resolve_song_info(song_info),
                 )
                 ass = await loop.run_in_executor(
-                    None, lambda: _fetch_lyrics(resolved),
+                    None,
+                    lambda: _fetch_lyrics(resolved),
                 )
                 cache = SongCache()
                 cache.set(
-                    key, raw_id, src.name,
+                    key,
+                    raw_id,
+                    src.name,
                     resolved.title or "",
                     str(resolved.artist) if resolved.artist else "",
                 )
@@ -701,7 +735,10 @@ class LayricsApp:
                             return {
                                 "id": req_id,
                                 "type": "error",
-                                "data": {"code": 400, "message": f"invalid line_mode: {raw_value!r} (expected single/double/toggle)"},
+                                "data": {
+                                    "code": 400,
+                                    "message": f"invalid line_mode: {raw_value!r} (expected single/double/toggle)",
+                                },
                             }
                     else:
                         parsed = _parse_bool(raw_value)
@@ -733,10 +770,13 @@ class LayricsApp:
                             except Exception:
                                 pass
                         self.ctrl.set_status(**kwargs)
-                        logger.info("ass config: lyrics reloaded with new %s = %r", key, parsed)
+                        logger.info(
+                            "ass config: lyrics reloaded with new %s = %r", key, parsed
+                        )
                     except Exception as e:
-                        logger.warning("ass config: reload failed for %s = %r: %s",
-                                       key, parsed, e)
+                        logger.warning(
+                            "ass config: reload failed for %s = %r: %s", key, parsed, e
+                        )
 
                 return {
                     "id": req_id,
@@ -824,7 +864,9 @@ class LayricsApp:
 
         if self._config.overlay.target_fps > 0:
             self.ctrl.set_status(target_fps=self._config.overlay.target_fps)
-            logger.info("target FPS set from config: %d", self._config.overlay.target_fps)
+            logger.info(
+                "target FPS set from config: %d", self._config.overlay.target_fps
+            )
 
         try:
             os.unlink(self.socket_path)

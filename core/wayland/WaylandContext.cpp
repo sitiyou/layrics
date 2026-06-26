@@ -1,6 +1,6 @@
 #include "core/wayland/WaylandContext.hpp"
-#include "core/wayland/LayerShellProtocol.hpp"
 #include "core/utils/Logger.hpp"
+#include "core/wayland/LayerShellProtocol.hpp"
 
 #include <wayland-client.h>
 
@@ -178,8 +178,7 @@ static void registryHandleGlobal(void *data, wl_registry *registry,
             layerShellVersion = ZWLR_LAYER_SHELL_V1_DESTROY_SINCE_VERSION;
         }
         ctx->layerShell = static_cast<zwlr_layer_shell_v1 *>(wl_registry_bind(
-            registry, name, &zwlr_layer_shell_v1_interface,
-            layerShellVersion));
+            registry, name, &zwlr_layer_shell_v1_interface, layerShellVersion));
         LAY_DEBUG("bound layer_shell v%u", layerShellVersion);
     } else if (strcmp(interface, wl_output_interface.name) == 0) {
         ctx->outputs.emplace_back();
@@ -259,33 +258,21 @@ void WaylandContext::connect() {
     LAY_LOG("Wayland connected, %zu output(s) discovered", outputs.size());
 }
 
-void WaylandContext::roundtrip() {
-    wl_display_roundtrip(display);
-}
+void WaylandContext::roundtrip() { wl_display_roundtrip(display); }
 
-int WaylandContext::dispatch() {
-    return wl_display_dispatch(display);
-}
+int WaylandContext::dispatch() { return wl_display_dispatch(display); }
 
-void WaylandContext::flush() {
-    wl_display_flush(display);
-}
+void WaylandContext::flush() { wl_display_flush(display); }
 
-int WaylandContext::displayFd() const {
-    return wl_display_get_fd(display);
-}
+int WaylandContext::displayFd() const { return wl_display_get_fd(display); }
 
 bool WaylandContext::prepareRead() {
     return wl_display_prepare_read(display) == 0;
 }
 
-void WaylandContext::cancelRead() {
-    wl_display_cancel_read(display);
-}
+void WaylandContext::cancelRead() { wl_display_cancel_read(display); }
 
-int WaylandContext::readEvents() {
-    return wl_display_read_events(display);
-}
+int WaylandContext::readEvents() { return wl_display_read_events(display); }
 
 int WaylandContext::dispatchPending() {
     return wl_display_dispatch_pending(display);
@@ -318,8 +305,7 @@ void WaylandContext::disconnect() {
             ZWLR_LAYER_SHELL_V1_DESTROY_SINCE_VERSION) {
             zwlr_layer_shell_v1_destroy(layerShell);
         } else {
-            wl_proxy_destroy(
-                reinterpret_cast<struct wl_proxy *>(layerShell));
+            wl_proxy_destroy(reinterpret_cast<struct wl_proxy *>(layerShell));
         }
         layerShell = nullptr;
     }

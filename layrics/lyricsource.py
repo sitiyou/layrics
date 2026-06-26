@@ -6,13 +6,20 @@ import subprocess
 import tempfile
 from typing import Any
 
-from LDDC.common.models import Lyrics as _LDCLyrics, LyricsType, SearchType, SongInfo, Source
+from LDDC.common.models import (
+    Lyrics as _LDCLyrics,
+)
+from LDDC.common.models import (
+    LyricsType,
+    SearchType,
+    SongInfo,
+    Source,
+)
 from LDDC.core.api.lyrics import get_lyrics as _lddc_get_lyrics
 from LDDC.core.api.lyrics import search as _lddc_search
 
 from .assprovider import AssProvider, DefaultProvider, Lyrics, match_provider
 from .config import get_config
-
 
 logger = logging.getLogger("layrics.lyrics")
 
@@ -35,7 +42,7 @@ def parse_composite_id(song_id: str) -> tuple[Source, str]:
     """Parse a composite song id like ``QM248672467`` into ``(Source.QM, "248672467")``."""
     for prefix, src in _init_prefixes():
         if song_id.startswith(prefix):
-            return src, song_id[len(prefix):]
+            return src, song_id[len(prefix) :]
     raise ValueError(f"cannot parse composite song id: {song_id!r}")
 
 
@@ -43,7 +50,12 @@ def search_songs(keyword: str, limit: int = 10) -> list[dict[str, Any]]:
     cfg = get_config()
     search_sources = cfg.search.sources
     per_source = cfg.search.result_count
-    logger.debug("search: %s  sources=%s  per_source=%d", keyword, [s.name for s in search_sources], per_source)
+    logger.debug(
+        "search: %s  sources=%s  per_source=%d",
+        keyword,
+        [s.name for s in search_sources],
+        per_source,
+    )
 
     def _items(src: Source) -> list[dict[str, Any]]:
         try:
@@ -51,7 +63,9 @@ def search_songs(keyword: str, limit: int = 10) -> list[dict[str, Any]]:
         except Exception as e:
             logger.error("search: error %s", e)
             return []
-        logger.debug("search: %s  from %s -> %d raw results", keyword, src.name, len(results))
+        logger.debug(
+            "search: %s  from %s -> %d raw results", keyword, src.name, len(results)
+        )
         items = []
         for s in list(results)[:per_source]:
             sid = s.id or ""
@@ -71,7 +85,9 @@ def search_songs(keyword: str, limit: int = 10) -> list[dict[str, Any]]:
         return items
 
     all_results = [_items(src) for src in search_sources]
-    logger.debug("search: total %d interleaved candidates", sum(len(r) for r in all_results))
+    logger.debug(
+        "search: total %d interleaved candidates", sum(len(r) for r in all_results)
+    )
     interleaved = []
     max_len = max(len(r) for r in all_results)
     for i in range(max_len):
@@ -79,7 +95,11 @@ def search_songs(keyword: str, limit: int = 10) -> list[dict[str, Any]]:
             if i < len(src_results):
                 interleaved.append(src_results[i])
                 if len(interleaved) >= limit:
-                    logger.debug("search: returning %d results (limit=%d)", len(interleaved), limit)
+                    logger.debug(
+                        "search: returning %d results (limit=%d)",
+                        len(interleaved),
+                        limit,
+                    )
                     return interleaved
     logger.debug("search: returning %d results", len(interleaved))
     return interleaved
@@ -96,8 +116,14 @@ def _resolve_song_info(song_info: SongInfo) -> SongInfo:
     )
     for s in results:
         if s.id == song_info.id:
-            logger.debug("resolve: %s/%s -> title=%s  artist=%s  dur=%s",
-                         song_info.source.name, song_info.id, s.title, s.artist, s.duration)
+            logger.debug(
+                "resolve: %s/%s -> title=%s  artist=%s  dur=%s",
+                song_info.source.name,
+                song_info.id,
+                s.title,
+                s.artist,
+                s.duration,
+            )
             return SongInfo(
                 source=song_info.source,
                 id=s.id,
@@ -107,8 +133,12 @@ def _resolve_song_info(song_info: SongInfo) -> SongInfo:
                 duration=s.duration,
             )
 
-    logger.debug("resolve: %s/%s  no match in %d results, using fallback",
-                 song_info.source.name, song_info.id, len(results))
+    logger.debug(
+        "resolve: %s/%s  no match in %d results, using fallback",
+        song_info.source.name,
+        song_info.id,
+        len(results),
+    )
     return SongInfo(
         source=song_info.source,
         id=song_info.id,
@@ -119,8 +149,12 @@ def _resolve_song_info(song_info: SongInfo) -> SongInfo:
     )
 
 
-def _postprocess_aegisub(ass: str, cli_path: str, automation: str = "kara-templater.lua",
-                         header_overrides: dict[str, str | int] | None = None) -> str:
+def _postprocess_aegisub(
+    ass: str,
+    cli_path: str,
+    automation: str = "kara-templater.lua",
+    header_overrides: dict[str, str | int] | None = None,
+) -> str:
     from .karaoke.header import render_karaoke_header
 
     karaoke_header = render_karaoke_header(**(header_overrides or {}))
@@ -144,8 +178,17 @@ def _postprocess_aegisub(ass: str, cli_path: str, automation: str = "kara-templa
             tmp_path = f.name
 
         subprocess.run(
-            [cli_path, "--automation", automation, tmp_path, tmp_path, "Apply karaoke template"],
-            check=True, capture_output=True, text=True,
+            [
+                cli_path,
+                "--automation",
+                automation,
+                tmp_path,
+                tmp_path,
+                "Apply karaoke template",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
         )
         with open(tmp_path) as f:
             result = f.read()
@@ -166,17 +209,26 @@ def fetch_lyrics(
     player_name: str = "",
 ) -> str:
     song_info = _resolve_song_info(song_info)
-    logger.debug("fetch: %s/%s  title=%s  artist=%s  dur=%s",
-                 song_info.source.name, song_info.id,
-                 song_info.title, song_info.artist, song_info.duration)
+    logger.debug(
+        "fetch: %s/%s  title=%s  artist=%s  dur=%s",
+        song_info.source.name,
+        song_info.id,
+        song_info.title,
+        song_info.artist,
+        song_info.duration,
+    )
     lddc_lyrics = _lddc_get_lyrics(song_info)
     if not lddc_lyrics:
         msg = f"no lyrics returned for {song_info.title}"
         logger.debug("fetch: %s/%s  %s", song_info.source.name, song_info.id, msg)
         raise RuntimeError(msg)
 
-    logger.debug("fetch: %s/%s  got %d lyric lines",
-                 song_info.source.name, song_info.id, len(lddc_lyrics))
+    logger.debug(
+        "fetch: %s/%s  got %d lyric lines",
+        song_info.source.name,
+        song_info.id,
+        len(lddc_lyrics),
+    )
 
     provider_cls = match_provider(player_name, lddc_lyrics) or DefaultProvider
     cfg = get_config()
@@ -196,11 +248,16 @@ def fetch_lyrics(
 
     if provider_cls is DefaultProvider:
         provider_cfg = cfg.get_provider_config("default")
-        if provider_cfg.get("aegisub_karaoke") and provider_cfg.get("line_mode") == "double":
+        if (
+            provider_cfg.get("aegisub_karaoke")
+            and provider_cfg.get("line_mode") == "double"
+        ):
             orig_type = lyrics.types.get(lyrics.primary_track)
             if provider_cfg.get("karaoke", True) and orig_type == LyricsType.VERBATIM:
                 cli = provider_cfg.get("aegisub_cli", "") or "aegisub-cli"
-                automation = provider_cfg.get("aegisub_automation", "") or "kara-templater.lua"
+                automation = (
+                    provider_cfg.get("aegisub_automation", "") or "kara-templater.lua"
+                )
 
                 primary_style = lyrics.primary_style
                 overrides: dict[str, str | int] = {
@@ -211,7 +268,9 @@ def fetch_lyrics(
                     pc = pc[2:]
                 overrides["OVERLAY_COLOR"] = pc[-6:]
 
-                ass = _postprocess_aegisub(ass, cli, automation, header_overrides=overrides)
+                ass = _postprocess_aegisub(
+                    ass, cli, automation, header_overrides=overrides
+                )
             else:
                 logger.info(
                     "aegisub_karaoke: lyrics lack word timing (type=%s), skipping",

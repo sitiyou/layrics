@@ -1,7 +1,7 @@
 #include "core/app/ApplicationController.hpp"
 
-#include <cstdio>
 #include <csignal>
+#include <cstdio>
 #include <stdexcept>
 
 static ApplicationController *gCtrl = nullptr;
