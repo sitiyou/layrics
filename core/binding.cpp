@@ -54,17 +54,5 @@ PYBIND11_MODULE(_layrics, m) {
         })
         .def_property_readonly("state", [](ApplicationController &ctrl) -> const AppState& {
             return ctrl.state();
-        }, py::return_value_policy::reference_internal)
-        .def("get_status", [](ApplicationController &ctrl) {
-            auto s = ctrl.getStatus();
-            py::dict d;
-            d["paused"] = s.paused;
-            d["hidden"] = s.hidden;
-            d["locked"] = s.locked;
-            d["start_time_ms"] = s.startTimeMs;
-            d["drag_offset_x"] = s.dragOffsetX;
-            d["drag_offset_y"] = s.dragOffsetY;
-            d["target_fps"] = s.targetFps;
-            return d;
-        });
+        }, py::return_value_policy::reference_internal);
 }

@@ -10,7 +10,6 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
-#include <ctime>
 #include <poll.h>
 #include <stdexcept>
 #include <unistd.h>
@@ -24,6 +23,9 @@ Application::Application() {
     }
     if (!initInput()) {
         throw std::runtime_error("Failed to initialize input");
+    }
+    if (!initRenderer()) {
+        throw std::runtime_error("Failed to initialize ASS renderer");
     }
     LAY_LOG("application initialized");
 }
@@ -39,12 +41,6 @@ Application::~Application() {
 void Application::run() {
     LAY_LOG("starting application");
     m_running = true;
-
-    if (m_state.startTimeMs == 0) {
-        struct timespec ts;
-        clock_gettime(CLOCK_MONOTONIC, &ts);
-        m_state.startTimeMs = ts.tv_sec * 1000LL + ts.tv_nsec / 1000000LL;
-    }
 
     while (m_running) {
         if (!m_surface.configured()) {
@@ -110,8 +106,8 @@ bool Application::initWayland() {
     return m_buffer.operator bool();
 }
 
-bool Application::initRenderer(const char *assFile) {
-    auto renderer = std::make_unique<AssRenderer>(assFile);
+bool Application::initRenderer() {
+    auto renderer = std::make_unique<AssRenderer>("");
     if (!renderer->initialize()) {
         LAY_ERR("Failed to initialize ASS renderer");
         return false;
@@ -197,19 +193,23 @@ void Application::mainLoop() {
 }
 
 void Application::frameDone(void *data, wl_callback * /*cb*/,
-                            uint32_t /*time*/) {
+                            uint32_t time) {
     auto *self = static_cast<Application *>(data);
     self->m_frameCallback = nullptr;
-    self->onFrame();
+    self->onFrame(time);
 }
 
-void Application::onFrame() {
+void Application::onFrame(uint32_t time) {
     if (!m_surface.configured() || !m_buffer) {
         return;
     }
 
-    if (m_preFrameCallback) {
-        m_preFrameCallback();
+    bool prePaused = m_state.paused;
+    bool preHidden = m_state.hidden;
+    bool preLocked = m_state.locked;
+
+    if (m_processCommands) {
+        m_processCommands();
     }
 
     auto dragState = m_dragMgr.state();
@@ -218,34 +218,26 @@ void Application::onFrame() {
     m_renderMgr.setOffset(dragState.offsetX, dragState.offsetY);
 
     if (m_state.hidden) {
-        if (!m_wasHidden) {
+        if (!preHidden) {
             hideDisplay();
         }
-        m_wasHidden = true;
-        m_wasPaused = m_state.paused;
-        m_wasLocked = m_state.locked;
         requestFrame();
         m_surface.commitFrame(m_buffer.buffer(), true);
         m_frameRateLimiter.wait();
         return;
     }
-    m_wasHidden = false;
 
     int64_t timestampMs;
     if (m_state.paused) {
-        if (!m_wasPaused) {
-            captureFreezeTimestamp();
+        if (!prePaused) {
+            m_freezeTimestampMs = (int64_t)time - m_state.startTimeMs;
         }
         timestampMs = m_freezeTimestampMs;
     } else {
-        timestampMs = [this]() -> int64_t {
-            struct timespec ts;
-            clock_gettime(CLOCK_MONOTONIC, &ts);
-            return ts.tv_sec * 1000LL + ts.tv_nsec / 1000000LL;
-        }() - m_state.startTimeMs;
+        timestampMs = (int64_t)time - m_state.startTimeMs;
     }
 
-    if (m_state.locked != m_wasLocked) {
+    if (m_state.locked != preLocked) {
         updateCursor();
         if (m_state.locked && m_surface.configured()) {
             applyLockedInputRegion();
@@ -280,8 +272,6 @@ void Application::onFrame() {
         m_surface.commitFrame(m_buffer.buffer(), false);
     }
 
-    m_wasPaused = m_state.paused;
-    m_wasLocked = m_state.locked;
     m_frameRateLimiter.wait();
 }
 
@@ -296,27 +286,8 @@ void Application::onPointerButton(uint32_t button, uint32_t state, double x,
 }
 
 void Application::loadAssContent(const std::string &content) {
-    if (m_assRenderer) {
-        m_assRenderer->loadContent(content);
-        LAY_LOG("Loaded ASS content (reused renderer, %zu bytes)", content.size());
-        return;
-    }
-
-    auto renderer = std::make_unique<AssRenderer>(content);
-    if (!renderer->initialize()) {
-        LAY_ERR("Failed to initialize ASS renderer (%zu bytes)", content.size());
-        return;
-    }
-
-    m_renderMgr.setSize(m_surface.width(), m_surface.height());
-    m_assRenderer = renderer.get();
-    m_renderMgr.addRenderer(std::move(renderer));
-
-    LAY_LOG("Loaded ASS content (new renderer, %zu bytes)", content.size());
-}
-
-void Application::setPreFrameCallback(std::function<void()> cb) {
-    m_preFrameCallback = std::move(cb);
+    m_assRenderer->loadContent(content);
+    LAY_LOG("Loaded ASS content (%zu bytes)", content.size());
 }
 
 void Application::requestStop() {
@@ -334,13 +305,6 @@ void Application::requestFrame() {
     wl_callback_add_listener(m_frameCallback, &frameListener, this);
 }
 
-void Application::captureFreezeTimestamp() {
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    int64_t now = ts.tv_sec * 1000LL + ts.tv_nsec / 1000000LL;
-    m_freezeTimestampMs = now - m_state.startTimeMs;
-}
-
 void Application::hideDisplay() {
     m_buffer.clear();
     m_regionMgr.clear(m_waylandCtx.compositor, m_surface.surface());
@@ -349,10 +313,6 @@ void Application::hideDisplay() {
 
 void Application::applyLockedInputRegion() {
     m_regionMgr.clear(m_waylandCtx.compositor, m_surface.surface());
-}
-
-AppState Application::getStatus() {
-    return m_state;
 }
 
 void Application::updateCursor() {

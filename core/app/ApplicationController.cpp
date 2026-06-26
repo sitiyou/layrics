@@ -13,7 +13,7 @@ void ApplicationController::start() {
         m_thread.join();
     }
 
-    m_app.setPreFrameCallback([this]() { processPendingCommands(); });
+    m_app.m_processCommands = [this]() { processPendingCommands(); };
 
     m_thread = std::thread([this]() {
         LAY_LOG("ApplicationController: thread started");
@@ -47,14 +47,6 @@ void ApplicationController::setStatus(const PendingUpdate &update) {
     if (update.mask & PendingUpdate::START_TIME) m_pending.startTimeMs = update.startTimeMs;
     if (update.mask & PendingUpdate::TARGET_FPS) m_pending.targetFps   = update.targetFps;
     m_pending.mask |= update.mask;
-}
-
-int ApplicationController::getStartTime() {
-    return m_app.getStartTime();
-}
-
-AppState ApplicationController::getStatus() {
-    return m_app.getStatus();
 }
 
 void ApplicationController::processPendingCommands() {

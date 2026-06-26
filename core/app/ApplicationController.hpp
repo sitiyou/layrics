@@ -39,8 +39,6 @@ class ApplicationController {
 
     void setAssInput(const std::string &path);
     void setStatus(const PendingUpdate &update);
-    int getStartTime();
-    AppState getStatus();
     const AppState& state() const { return m_app.state(); }
 
   private:

@@ -571,8 +571,17 @@ class LayricsApp:
                             player_info["track"] = asdict(self._last_track)
                     except Exception:
                         player_info = {"error": "disconnected"}
-                overlay = self.ctrl.get_status()
-                overlay["position_ms"] = int(time.monotonic() * 1000) - overlay["start_time_ms"]
+                s = self.ctrl.state
+                overlay = {
+                    "paused": s.paused,
+                    "hidden": s.hidden,
+                    "locked": s.locked,
+                    "start_time_ms": s.start_time_ms,
+                    "drag_offset_x": s.drag_offset_x,
+                    "drag_offset_y": s.drag_offset_y,
+                    "target_fps": s.target_fps,
+                    "position_ms": int(time.monotonic() * 1000) - s.start_time_ms,
+                }
                 return {
                     "id": req_id,
                     "type": "result",

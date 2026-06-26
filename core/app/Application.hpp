@@ -21,7 +21,10 @@
 struct wl_callback;
 class AssRenderer;
 
+class ApplicationController;
+
 class Application {
+    friend class ApplicationController;
   public:
     Application();
     ~Application();
@@ -32,7 +35,6 @@ class Application {
     void run();
 
     void loadAssContent(const std::string &content);
-    void setPreFrameCallback(std::function<void()> cb);
     void requestStop();
 
     // Pure state setters — no side-effects
@@ -47,8 +49,6 @@ class Application {
     void applyLockedInputRegion();
     void updateCursor();
 
-    int getStartTime() { return m_state.startTimeMs; };
-    AppState getStatus();
     const AppState& state() const { return m_state; }
 
     static void frameDone(void *data, wl_callback *cb, uint32_t time);
@@ -68,26 +68,21 @@ class Application {
     std::atomic<bool> m_running{true};
     wl_callback *m_frameCallback = nullptr;
     AssRenderer *m_assRenderer = nullptr;
-    std::function<void()> m_preFrameCallback;
+    std::function<void()> m_processCommands;
 
     int64_t m_freezeTimestampMs = 0;
 
     AppState m_state{};
 
-    bool m_wasPaused = false;
-    bool m_wasHidden = false;
-    bool m_wasLocked = false;
-
     bool initWayland();
-    bool initRenderer(const char *assFile);
+    bool initRenderer();
     bool initInput();
     void initBuffers();
 
     void mainLoop();
     void requestFrame();
-    void captureFreezeTimestamp();
 
-    void onFrame();
+    void onFrame(uint32_t time);
     void onPointerMotion(double x, double y);
     void onPointerButton(uint32_t button, uint32_t state, double x, double y);
     void onSurfaceConfigure(int width, int height);
