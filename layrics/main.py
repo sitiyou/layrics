@@ -115,9 +115,6 @@ class LayricsApp:
         )
 
         self._server: Optional[asyncio.AbstractServer] = None
-        self._paused = False
-        self._hidden = False
-        self._locked = False
         self._last_status: Optional[str] = None
         self._last_position_us: int = 0
         self._signal_monitor: Optional[MprisSignalMonitor] = None
@@ -210,7 +207,7 @@ class LayricsApp:
             ass_content = await self._fetch_ass_for_track(meta)
         except (RuntimeError, LyricsNotFoundError, json.JSONDecodeError) as e:
             logger.info("auto-fetch: %s — hiding overlay", e)
-            self.ctrl.set_hidden(True)
+            self.ctrl.set_status(hidden=True)
             return
         else:
             if self._fetch_gen != gen:
@@ -219,17 +216,15 @@ class LayricsApp:
 
         if self._fetch_gen != gen:
             return
-        self.ctrl.set_hidden(False)
-        if self._paused:
-            self.ctrl.set_paused(True)
-        else:
-            self.ctrl.set_paused(False)
-            now_ms = int(time.monotonic() * 1000)
+        now_ms = int(time.monotonic() * 1000)
+        kwargs = {"hidden": False, "paused": self.ctrl.state.paused}
+        if not self.ctrl.state.paused:
             try:
                 pos = self._mpris_player.get_position()
-                self.ctrl.set_start_time(now_ms - pos // 1000)
+                kwargs["start_time_ms"] = now_ms - pos // 1000
             except Exception:
                 pass
+        self.ctrl.set_status(**kwargs)
 
     # ── MPRIS ─────────────────────────────────────────────────────
 
@@ -308,30 +303,29 @@ class LayricsApp:
             val = event.get("value")
             if typ == "status":
                 if val == "Playing":
-                    if not self._paused:
+                    if not self.ctrl.state.paused:
                         continue
-                    self._paused = False
-                    self.ctrl.set_paused(False)
                     now_ms = int(time.monotonic() * 1000)
+                    kwargs = {"paused": False}
                     try:
                         pos = self._mpris_player.get_position()
-                        self.ctrl.set_start_time(now_ms - pos // 1000)
+                        kwargs["start_time_ms"] = now_ms - pos // 1000
                     except Exception:
                         pass
+                    self.ctrl.set_status(**kwargs)
                 elif val in ("Paused", "Stopped"):
-                    if self._paused:
+                    if self.ctrl.state.paused:
                         continue
-                    self._paused = True
-                    self.ctrl.set_paused(True)
+                    self.ctrl.set_status(paused=True)
             elif typ == "seeked":
                 now_ms = int(time.monotonic() * 1000)
-                self.ctrl.set_start_time(now_ms - val // 1000)
+                self.ctrl.set_status(start_time_ms=now_ms - val // 1000)
                 self._last_position_us = val
             elif typ == "track":
                 self._fetch_gen += 1
                 self._last_track = None
                 logger.info("signal: track changed: %s", val)
-                self.ctrl.set_hidden(True)
+                self.ctrl.set_status(hidden=True)
 
     def _stop_signal_monitor(self):
         if self._signal_reader:
@@ -356,9 +350,8 @@ class LayricsApp:
             self._mpris_player = None
             self._last_track = None
             self._last_status = None
-            self._paused = False
             self._stop_signal_monitor()
-            self.ctrl.set_hidden(True)
+            self.ctrl.set_status(hidden=True)
             return
 
         cur_id = meta.unique_song_id
@@ -369,27 +362,24 @@ class LayricsApp:
             gen = self._fetch_gen
             self._last_track = meta
             logger.info("track changed: %s", meta.title or "?")
-            self.ctrl.set_hidden(True)
+            self.ctrl.set_status(hidden=True)
             asyncio.get_event_loop().create_task(self._auto_fetch_lyrics(meta, gen))
 
         # play / pause
         if status != self._last_status:
             self._last_status = status
             if status == "Playing":
-                self._paused = False
-                self.ctrl.set_paused(False)
                 now_ms = int(time.monotonic() * 1000)
-                self.ctrl.set_start_time(now_ms - pos // 1000)
+                self.ctrl.set_status(paused=False, start_time_ms=now_ms - pos // 1000)
             elif status in ("Paused", "Stopped"):
-                self._paused = True
-                self.ctrl.set_paused(True)
+                self.ctrl.set_status(paused=True)
 
         # seek detection (position jump)
         if status == "Playing":
             expected = self._last_position_us + 1_000_000
             if abs(pos - expected) > 500_000:
                 now_ms = int(time.monotonic() * 1000)
-                self.ctrl.set_start_time(now_ms - pos // 1000)
+                self.ctrl.set_status(start_time_ms=now_ms - pos // 1000)
 
         self._last_position_us = pos
 
@@ -503,14 +493,12 @@ class LayricsApp:
                     except ValueError:
                         return {"id": req_id, "type": "error",
                                 "data": {"code": 400, "message": f"invalid value: {raw!r}"}}
-                    val = not self._hidden if parsed is None else parsed
-                self.ctrl.set_hidden(val)
-                self._hidden = val
+                    val = not self.ctrl.state.hidden if parsed is None else parsed
+                self.ctrl.set_status(hidden=val)
                 return {"id": req_id, "type": "result", "data": {"hidden": val}}
 
             elif method == "unhide":
-                self.ctrl.set_hidden(False)
-                self.ctrl.set_paused(self._paused)
+                self.ctrl.set_status(hidden=False)
                 return {"id": req_id, "type": "result", "data": {"hidden": False}}
 
             elif method == "lock":
@@ -523,13 +511,12 @@ class LayricsApp:
                     except ValueError:
                         return {"id": req_id, "type": "error",
                                 "data": {"code": 400, "message": f"invalid value: {raw!r}"}}
-                    val = not self._locked if parsed is None else parsed
-                self.ctrl.set_locked(val)
-                self._locked = val
+                    val = not self.ctrl.state.locked if parsed is None else parsed
+                self.ctrl.set_status(locked=val)
                 return {"id": req_id, "type": "result", "data": {"locked": val}}
 
             elif method == "unlock":
-                self.ctrl.set_locked(False)
+                self.ctrl.set_status(locked=False)
                 return {"id": req_id, "type": "result", "data": {"locked": False}}
 
             elif method == "set_fps":
@@ -540,7 +527,7 @@ class LayricsApp:
                         "type": "error",
                         "data": {"code": 400, "message": "fps must be > 0 or -1 (vsync)"},
                     }
-                self.ctrl.set_target_fps(fps)
+                self.ctrl.set_status(target_fps=fps)
                 self._config.overlay.target_fps = fps
                 return {"id": req_id, "type": "result", "data": {"target_fps": fps}}
 
@@ -558,9 +545,7 @@ class LayricsApp:
                     try:
                         pos = self._mpris_player.get_position()
                         now_ms = int(time.monotonic() * 1000)
-                        self.ctrl.set_start_time(now_ms - pos // 1000)
-                        self.ctrl.set_hidden(False)
-                        self._hidden = False
+                        self.ctrl.set_status(hidden=False, start_time_ms=now_ms - pos // 1000)
                         logger.info("re-synced start_time on start, pos=%dms", pos // 1000)
                     except Exception as e:
                         logger.warning("start: failed to sync position: %s", e)
@@ -651,17 +636,15 @@ class LayricsApp:
                 )
 
                 self.ctrl.set_ass_input(ass)
-                self.ctrl.set_hidden(False)
-                if self._paused:
-                    self.ctrl.set_paused(True)
-                else:
-                    self.ctrl.set_paused(False)
-                    now_ms = int(time.monotonic() * 1000)
+                now_ms = int(time.monotonic() * 1000)
+                kwargs = {"hidden": False, "paused": self.ctrl.state.paused}
+                if not self.ctrl.state.paused:
                     try:
                         pos = self._mpris_player.get_position()
-                        self.ctrl.set_start_time(now_ms - pos // 1000)
+                        kwargs["start_time_ms"] = now_ms - pos // 1000
                     except Exception:
                         pass
+                self.ctrl.set_status(**kwargs)
 
                 logger.info("cache set: %s -> %s%s", key, src.name, raw_id)
                 return {"id": req_id, "type": "result", "data": {"cached": True}}
@@ -732,16 +715,15 @@ class LayricsApp:
                     try:
                         ass = await self._fetch_ass_for_track(self._last_track)
                         self.ctrl.set_ass_input(ass)
-                        if self._paused:
-                            self.ctrl.set_paused(True)
-                        else:
-                            self.ctrl.set_paused(False)
-                            now_ms = int(time.monotonic() * 1000)
+                        now_ms = int(time.monotonic() * 1000)
+                        kwargs = {"paused": self.ctrl.state.paused}
+                        if not self.ctrl.state.paused:
                             try:
                                 pos = self._mpris_player.get_position()
-                                self.ctrl.set_start_time(now_ms - pos // 1000)
+                                kwargs["start_time_ms"] = now_ms - pos // 1000
                             except Exception:
                                 pass
+                        self.ctrl.set_status(**kwargs)
                         logger.info("ass config: lyrics reloaded with new %s = %r", key, parsed)
                     except Exception as e:
                         logger.warning("ass config: reload failed for %s = %r: %s",
@@ -832,7 +814,7 @@ class LayricsApp:
         self.start_overlay()
 
         if self._config.overlay.target_fps > 0:
-            self.ctrl.set_target_fps(self._config.overlay.target_fps)
+            self.ctrl.set_status(target_fps=self._config.overlay.target_fps)
             logger.info("target FPS set from config: %d", self._config.overlay.target_fps)
 
         try:

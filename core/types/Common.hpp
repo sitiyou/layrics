@@ -12,7 +12,7 @@ struct RenderResult {
     bool contentChanged = true;
 };
 
-struct AppStatus {
+struct AppState {
     bool paused = false;
     bool hidden = false;
     bool locked = false;

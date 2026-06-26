@@ -1,12 +1,29 @@
 #pragma once
 
 #include <atomic>
+#include <cstdint>
 #include <mutex>
-#include <queue>
 #include <string>
 #include <thread>
 
 #include "core/app/Application.hpp"
+
+struct PendingUpdate {
+    bool paused = false;
+    bool hidden = false;
+    bool locked = false;
+    int64_t startTimeMs = 0;
+    int targetFps = -1;
+    uint8_t mask = 0;
+
+    enum Mask : uint8_t {
+        PAUSED     = 1 << 0,
+        HIDDEN     = 1 << 1,
+        LOCKED     = 1 << 2,
+        START_TIME = 1 << 3,
+        TARGET_FPS = 1 << 4,
+    };
+};
 
 class ApplicationController {
   public:
@@ -21,13 +38,10 @@ class ApplicationController {
     void join();
 
     void setAssInput(const std::string &path);
-    void setPaused(bool paused);
-    void setStartTime(int64_t ms);
-    void setTargetFps(int fps);
+    void setStatus(const PendingUpdate &update);
     int getStartTime();
-    AppStatus getStatus();
-    void setHidden(bool hidden);
-    void setLocked(bool locked);
+    AppState getStatus();
+    const AppState& state() const { return m_app.state(); }
 
   private:
     void processPendingCommands();
@@ -36,10 +50,6 @@ class ApplicationController {
     std::thread m_thread;
 
     std::mutex m_mutex;
-    std::queue<std::string> m_pendingAssContents;
-    std::queue<bool> m_pendingPause;
-    std::queue<int64_t> m_pendingStartTime;
-    std::queue<int> m_pendingTargetFps;
-    std::queue<bool> m_pendingHide;
-    std::queue<bool> m_pendingLock;
+    PendingUpdate m_pending;
+    std::string m_pendingAssContent;
 };

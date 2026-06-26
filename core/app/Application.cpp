@@ -40,10 +40,10 @@ void Application::run() {
     LAY_LOG("starting application");
     m_running = true;
 
-    if (m_startTimeMs == 0) {
+    if (m_state.startTimeMs == 0) {
         struct timespec ts;
         clock_gettime(CLOCK_MONOTONIC, &ts);
-        m_startTimeMs = ts.tv_sec * 1000LL + ts.tv_nsec / 1000000LL;
+        m_state.startTimeMs = ts.tv_sec * 1000LL + ts.tv_nsec / 1000000LL;
     }
 
     while (m_running) {
@@ -55,7 +55,7 @@ void Application::run() {
                 m_running = false;
                 break;
             }
-            if (m_locked || m_hidden) {
+            if (m_state.locked || m_state.hidden) {
                 m_regionMgr.clear(m_waylandCtx.compositor, m_surface.surface());
             }
         }
@@ -213,23 +213,43 @@ void Application::onFrame() {
     }
 
     auto dragState = m_dragMgr.state();
+    m_state.dragOffsetX = dragState.offsetX;
+    m_state.dragOffsetY = dragState.offsetY;
     m_renderMgr.setOffset(dragState.offsetX, dragState.offsetY);
 
-    if (m_hidden) {
+    if (m_state.hidden) {
+        if (!m_wasHidden) {
+            hideDisplay();
+        }
+        m_wasHidden = true;
+        m_wasPaused = m_state.paused;
+        m_wasLocked = m_state.locked;
         requestFrame();
         m_surface.commitFrame(m_buffer.buffer(), true);
         m_frameRateLimiter.wait();
         return;
     }
+    m_wasHidden = false;
 
     int64_t timestampMs;
-    if (m_paused) {
+    if (m_state.paused) {
+        if (!m_wasPaused) {
+            captureFreezeTimestamp();
+        }
         timestampMs = m_freezeTimestampMs;
     } else {
-        struct timespec ts;
-        clock_gettime(CLOCK_MONOTONIC, &ts);
-        int64_t now = ts.tv_sec * 1000LL + ts.tv_nsec / 1000000LL;
-        timestampMs = now - m_startTimeMs;
+        timestampMs = [this]() -> int64_t {
+            struct timespec ts;
+            clock_gettime(CLOCK_MONOTONIC, &ts);
+            return ts.tv_sec * 1000LL + ts.tv_nsec / 1000000LL;
+        }() - m_state.startTimeMs;
+    }
+
+    if (m_state.locked != m_wasLocked) {
+        updateCursor();
+        if (m_state.locked && m_surface.configured()) {
+            applyLockedInputRegion();
+        }
     }
 
     uint8_t *bufData = static_cast<uint8_t *>(m_buffer.data());
@@ -241,7 +261,7 @@ void Application::onFrame() {
             m_damageGrid.addRegion(rect.x, rect.y, rect.w, rect.h);
         }
 
-        if (!m_locked) {
+        if (!m_state.locked) {
             m_regionMgr.update(m_waylandCtx.compositor, m_surface.surface(),
                                m_damageGrid.buildRegions(),
                                m_surface.width(), m_surface.height());
@@ -250,7 +270,7 @@ void Application::onFrame() {
         requestFrame();
         m_surface.commitFrame(m_buffer.buffer(), m_damageGrid.buildDamage());
     } else {
-        if (!m_locked) {
+        if (!m_state.locked) {
             m_regionMgr.update(m_waylandCtx.compositor, m_surface.surface(),
                                result.regions,
                                m_surface.width(), m_surface.height());
@@ -260,6 +280,8 @@ void Application::onFrame() {
         m_surface.commitFrame(m_buffer.buffer(), false);
     }
 
+    m_wasPaused = m_state.paused;
+    m_wasLocked = m_state.locked;
     m_frameRateLimiter.wait();
 }
 
@@ -301,18 +323,10 @@ void Application::requestStop() {
     m_running = false;
 }
 
-void Application::pause() {
-    if (!m_paused) {
-        struct timespec ts;
-        clock_gettime(CLOCK_MONOTONIC, &ts);
-        int64_t now = ts.tv_sec * 1000LL + ts.tv_nsec / 1000000LL;
-        m_freezeTimestampMs = now - m_startTimeMs;
-    }
-    m_paused = true;
-}
-
-void Application::resume() {
-    m_paused = false;
+void Application::setTargetFps(int fps) {
+    m_state.targetFps = fps;
+    m_frameRateLimiter.setTargetFps(fps);
+    LAY_LOG("target FPS set to %d", fps);
 }
 
 void Application::requestFrame() {
@@ -320,54 +334,25 @@ void Application::requestFrame() {
     wl_callback_add_listener(m_frameCallback, &frameListener, this);
 }
 
-void Application::hide() {
-    m_hidden = true;
-    clear();
+void Application::captureFreezeTimestamp() {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    int64_t now = ts.tv_sec * 1000LL + ts.tv_nsec / 1000000LL;
+    m_freezeTimestampMs = now - m_state.startTimeMs;
 }
 
-void Application::show() {
-    m_hidden = false;
-}
-
-void Application::lock() {
-    m_locked = true;
-    if (m_surface.configured()) {
-        m_regionMgr.clear(m_waylandCtx.compositor, m_surface.surface());
-    }
-    updateCursor();
-}
-
-void Application::unlock() {
-    m_locked = false;
-    updateCursor();
-}
-
-void Application::setTargetFps(int fps) {
-    m_frameRateLimiter.setTargetFps(fps);
-    LAY_LOG("target FPS set to %d", fps);
-}
-
-void Application::clear() {
+void Application::hideDisplay() {
     m_buffer.clear();
     m_regionMgr.clear(m_waylandCtx.compositor, m_surface.surface());
     m_renderMgr.reset();
 }
 
-void Application::setStartTime(int64_t ms) {
-    m_startTimeMs = ms;
+void Application::applyLockedInputRegion() {
+    m_regionMgr.clear(m_waylandCtx.compositor, m_surface.surface());
 }
 
-AppStatus Application::getStatus() {
-    auto dragState = m_dragMgr.state();
-    AppStatus s;
-    s.paused = m_paused;
-    s.hidden = m_hidden;
-    s.locked = m_locked;
-    s.startTimeMs = m_startTimeMs;
-    s.dragOffsetX = dragState.offsetX;
-    s.dragOffsetY = dragState.offsetY;
-    s.targetFps = m_frameRateLimiter.targetFps();
-    return s;
+AppState Application::getStatus() {
+    return m_state;
 }
 
 void Application::updateCursor() {
@@ -381,7 +366,7 @@ void Application::updateCursor() {
         return;
     }
 
-    if (m_locked) {
+    if (m_state.locked) {
         m_cursorMgr.restoreCursor(pointer, serial);
     } else if (m_dragMgr.dragging()) {
         m_cursorMgr.setGrabbingCursor(pointer, serial);

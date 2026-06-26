@@ -32,21 +32,24 @@ class Application {
     void run();
 
     void loadAssContent(const std::string &content);
-    void clearRenderer();
-    void clearInputRegions();
     void setPreFrameCallback(std::function<void()> cb);
     void requestStop();
-    void pause();
-    void resume();
-    void setStartTime(int64_t ms);
-    void setTargetFps(int fps);
-    void hide();
-    void show();
-    void lock();
-    void unlock();
-    void clear();
-    int getStartTime() { return m_startTimeMs; };
-    AppStatus getStatus();
+
+    // Pure state setters — no side-effects
+    void setPaused(bool v)       { m_state.paused = v; }
+    void setHidden(bool v)       { m_state.hidden = v; }
+    void setLocked(bool v)       { m_state.locked = v; }
+    void setStartTime(int64_t v) { m_state.startTimeMs = v; }
+    void setTargetFps(int v);
+
+    // Explicit actions — must be called explicitly
+    void hideDisplay();
+    void applyLockedInputRegion();
+    void updateCursor();
+
+    int getStartTime() { return m_state.startTimeMs; };
+    AppState getStatus();
+    const AppState& state() const { return m_state; }
 
     static void frameDone(void *data, wl_callback *cb, uint32_t time);
 
@@ -63,15 +66,17 @@ class Application {
     CursorManager m_cursorMgr;
 
     std::atomic<bool> m_running{true};
-    int64_t m_startTimeMs = 0;
     wl_callback *m_frameCallback = nullptr;
     AssRenderer *m_assRenderer = nullptr;
     std::function<void()> m_preFrameCallback;
 
-    bool m_paused = false;
-    bool m_hidden = false;
-    bool m_locked = false;
     int64_t m_freezeTimestampMs = 0;
+
+    AppState m_state{};
+
+    bool m_wasPaused = false;
+    bool m_wasHidden = false;
+    bool m_wasLocked = false;
 
     bool initWayland();
     bool initRenderer(const char *assFile);
@@ -80,10 +85,11 @@ class Application {
 
     void mainLoop();
     void requestFrame();
+    void captureFreezeTimestamp();
 
     void onFrame();
     void onPointerMotion(double x, double y);
     void onPointerButton(uint32_t button, uint32_t state, double x, double y);
     void onSurfaceConfigure(int width, int height);
-    void updateCursor();
 };
+

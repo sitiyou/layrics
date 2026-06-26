@@ -35,91 +35,42 @@ void ApplicationController::join() {
 
 void ApplicationController::setAssInput(const std::string &content) {
     std::lock_guard<std::mutex> lock(m_mutex);
-    m_pendingAssContents.push(content);
-    LAY_DEBUG("ApplicationController: queued ASS content (%zu bytes)", content.size());
+    m_pendingAssContent = content;
+    LAY_DEBUG("ApplicationController: pending ASS content (%zu bytes)", content.size());
 }
 
-void ApplicationController::setPaused(bool paused) {
+void ApplicationController::setStatus(const PendingUpdate &update) {
     std::lock_guard<std::mutex> lock(m_mutex);
-    m_pendingPause.push(paused);
-}
-
-void ApplicationController::setStartTime(int64_t ms) {
-    std::lock_guard<std::mutex> lock(m_mutex);
-    m_pendingStartTime.push(ms);
-}
-
-void ApplicationController::setTargetFps(int fps) {
-    std::lock_guard<std::mutex> lock(m_mutex);
-    m_pendingTargetFps.push(fps);
+    if (update.mask & PendingUpdate::PAUSED)     m_pending.paused     = update.paused;
+    if (update.mask & PendingUpdate::HIDDEN)     m_pending.hidden     = update.hidden;
+    if (update.mask & PendingUpdate::LOCKED)     m_pending.locked     = update.locked;
+    if (update.mask & PendingUpdate::START_TIME) m_pending.startTimeMs = update.startTimeMs;
+    if (update.mask & PendingUpdate::TARGET_FPS) m_pending.targetFps   = update.targetFps;
+    m_pending.mask |= update.mask;
 }
 
 int ApplicationController::getStartTime() {
     return m_app.getStartTime();
 }
 
-AppStatus ApplicationController::getStatus() {
+AppState ApplicationController::getStatus() {
     return m_app.getStatus();
 }
 
-void ApplicationController::setHidden(bool hidden) {
-    std::lock_guard<std::mutex> lock(m_mutex);
-    m_pendingHide.push(hidden);
-}
-
-void ApplicationController::setLocked(bool locked) {
-    std::lock_guard<std::mutex> lock(m_mutex);
-    m_pendingLock.push(locked);
-}
-
 void ApplicationController::processPendingCommands() {
-    std::lock_guard<std::mutex> lock(m_mutex);
-
-    while (!m_pendingPause.empty()) {
-        bool paused = m_pendingPause.front();
-        m_pendingPause.pop();
-        if (paused) {
-            m_app.pause();
-        } else {
-            m_app.resume();
-        }
+    PendingUpdate pending;
+    std::string assContent;
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        pending = m_pending;
+        m_pending = {};
+        assContent = std::move(m_pendingAssContent);
     }
 
-    while (!m_pendingStartTime.empty()) {
-        int64_t ms = m_pendingStartTime.front();
-        m_pendingStartTime.pop();
-        m_app.setStartTime(ms);
-    }
-
-    while (!m_pendingAssContents.empty()) {
-        std::string content = m_pendingAssContents.front();
-        m_pendingAssContents.pop();
-        m_app.loadAssContent(content);
-    }
-
-    while (!m_pendingTargetFps.empty()) {
-        int fps = m_pendingTargetFps.front();
-        m_pendingTargetFps.pop();
-        m_app.setTargetFps(fps);
-    }
-
-    while (!m_pendingHide.empty()) {
-        bool hidden = m_pendingHide.front();
-        m_pendingHide.pop();
-        if (hidden) {
-            m_app.hide();
-        } else {
-            m_app.show();
-        }
-    }
-
-    while (!m_pendingLock.empty()) {
-        bool locked = m_pendingLock.front();
-        m_pendingLock.pop();
-        if (locked) {
-            m_app.lock();
-        } else {
-            m_app.unlock();
-        }
-    }
+    if (pending.mask & PendingUpdate::PAUSED)     m_app.setPaused(pending.paused);
+    if (pending.mask & PendingUpdate::HIDDEN)     m_app.setHidden(pending.hidden);
+    if (pending.mask & PendingUpdate::LOCKED)     m_app.setLocked(pending.locked);
+    if (pending.mask & PendingUpdate::START_TIME) m_app.setStartTime(pending.startTimeMs);
+    if (pending.mask & PendingUpdate::TARGET_FPS) m_app.setTargetFps(pending.targetFps);
+    if (!assContent.empty())                      m_app.loadAssContent(std::move(assContent));
 }
