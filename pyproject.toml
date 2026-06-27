@@ -19,6 +19,7 @@ dependencies = [
     "charset-normalizer",
     "pyaes",
     "appdirs",
+    "opencc",
     "tomli; python_version < '3.11'",
 ]
 

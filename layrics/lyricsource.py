@@ -2,15 +2,20 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import subprocess
 import tempfile
 from typing import Any
+
+from opencc import OpenCC
 
 from LDDC.common.models import (
     Lyrics as _LDCLyrics,
 )
 from LDDC.common.models import (
+    LyricsLine,
     LyricsType,
+    LyricsWord,
     SearchType,
     SongInfo,
     Source,
@@ -160,6 +165,28 @@ def _postprocess_aegisub(
     return result
 
 
+_KANA_RE = re.compile(r"[\u3040-\u309f\u30a0-\u30ff]")
+
+
+def _convert_japanese(lyrics_data: _LDCLyrics) -> None:
+    for data in lyrics_data.values():
+        text = "".join(w.text for line in data for w in line.words)
+        if not _KANA_RE.search(text):
+            continue
+        cc_s2t = OpenCC("s2t.json")
+        cc_t2jp = OpenCC("t2jp.json")
+        for i, line in enumerate(data):
+            new_words = [
+                LyricsWord(
+                    w.start,
+                    w.end,
+                    cc_t2jp.convert(cc_s2t.convert(w.text)),
+                )
+                for w in line.words
+            ]
+            data[i] = LyricsLine(line.start, line.end, new_words)
+
+
 def fetch_lyrics(
     song_info: SongInfo,
     player_name: str = "",
@@ -177,6 +204,8 @@ def fetch_lyrics(
         msg = f"no lyrics returned for {song_info.title}"
         logger.debug("fetch: %s/%s  %s", song_info.source.name, song_info.id, msg)
         raise RuntimeError(msg)
+
+    _convert_japanese(lddc_lyrics)
 
     logger.debug(
         "fetch: %s/%s  got %d lyric lines",
