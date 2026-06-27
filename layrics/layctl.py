@@ -212,7 +212,13 @@ def dmenu(ctx):
     for c in results.get("data", []):
         name = c.get("name", "")
         artists_str = ", ".join(c.get("artists", []))
-        click.echo(f"{c['id']}\t{name}\t{artists_str}")
+        dur = c.get("duration")
+        dur_str = ""
+        if dur and dur > 0:
+            m, s = divmod(dur // 1000, 60)
+            dur_str = f"{m}:{s:02d}"
+        album = c.get("album", "")
+        click.echo(f"{c['id']}\t{dur_str}\t{name}\t{artists_str}\t{album}")
 
 
 @cli.group()
