@@ -92,6 +92,20 @@ def _acquire_instance_lock() -> int:
 
 _ASS_CONFIG_KEYS = {"karaoke", "line_mode", "secondary"}
 
+_EMPTY_ASS = """\
+[Script Info]
+ScriptType: v4.00+
+PlayResX: 384
+PlayResY: 288
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Sans,20,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,2,2,10,10,10,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+"""
+
 
 def _parse_bool(raw: str) -> bool | None:
     v = raw.lower().strip()
@@ -222,8 +236,7 @@ class LayricsApp:
         try:
             ass_content = await self._fetch_ass_for_track(meta)
         except (RuntimeError, LyricsNotFoundError, json.JSONDecodeError) as e:
-            logger.info("auto-fetch: %s — hiding overlay", e)
-            self.ctrl.set_status(hidden=True)
+            logger.info("auto-fetch: %s", e)
             return
         else:
             if self._fetch_gen != gen:
@@ -233,7 +246,7 @@ class LayricsApp:
         if self._fetch_gen != gen:
             return
         now_ms = int(time.monotonic() * 1000)
-        kwargs = {"hidden": False, "paused": self.ctrl.state.paused}
+        kwargs = {"paused": self.ctrl.state.paused}
         if not self.ctrl.state.paused:
             try:
                 pos = self._mpris_player.get_position()
@@ -345,7 +358,7 @@ class LayricsApp:
                 self._fetch_gen += 1
                 self._last_track = None
                 logger.info("signal: track changed: %s", val)
-                self.ctrl.set_status(hidden=True)
+                self.ctrl.set_ass_input(_EMPTY_ASS)
 
     def _stop_signal_monitor(self):
         if self._signal_reader:
@@ -371,7 +384,7 @@ class LayricsApp:
             self._last_track = None
             self._last_status = None
             self._stop_signal_monitor()
-            self.ctrl.set_status(hidden=True)
+            self.ctrl.set_ass_input(_EMPTY_ASS)
             return
 
         cur_id = meta.unique_song_id
@@ -382,7 +395,7 @@ class LayricsApp:
             gen = self._fetch_gen
             self._last_track = meta
             logger.info("track changed: %s", meta.title or "?")
-            self.ctrl.set_status(hidden=True)
+            self.ctrl.set_ass_input(_EMPTY_ASS)
             asyncio.get_event_loop().create_task(self._auto_fetch_lyrics(meta, gen))
 
         # play / pause
@@ -671,7 +684,7 @@ class LayricsApp:
 
                 self.ctrl.set_ass_input(ass)
                 now_ms = int(time.monotonic() * 1000)
-                kwargs = {"hidden": False, "paused": self.ctrl.state.paused}
+                kwargs = {"paused": self.ctrl.state.paused}
                 if not self.ctrl.state.paused:
                     try:
                         pos = self._mpris_player.get_position()
