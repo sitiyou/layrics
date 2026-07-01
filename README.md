@@ -177,6 +177,15 @@ layctl ass line_mode single
 layctl ass secondary toggle
 ```
 
+### 快捷键控制
+以Hyprland为例，示例快捷键如下：
+```lua
+-- 长按左ctrl控制锁定，长按左alt控制显示/隐藏，SUPER + SHIFT + M 选择歌词源
+hl.bind("Control_L", hl.dsp.exec_cmd [[layctl lock toggle]], { long_press = true })
+hl.bind("Alt_L", hl.dsp.exec_cmd [[layctl hide toggle]], { long_press = true })
+hl.bind("SUPER + SHIFT + M", hl.dsp.exec_cmd[[layctl dmenu | rofi -dmenu | cut -f1 | xargs layctl set-lrc]])
+```
+
 ###
  IPC 协议
 
@@ -464,6 +473,17 @@ layctl start
 layctl ass karaoke false
 layctl ass line_mode single
 layctl ass secondary toggle
+```
+
+### Hotkeys
+
+Example Hyprland keybindings:
+
+```lua
+-- Long-press Left Ctrl to toggle lock, Left Alt to toggle hide/show, SUPER + SHIFT + M to pick lyrics source
+hl.bind("Control_L", hl.dsp.exec_cmd [[layctl lock toggle]], { long_press = true })
+hl.bind("Alt_L", hl.dsp.exec_cmd [[layctl hide toggle]], { long_press = true })
+hl.bind("SUPER + SHIFT + M", hl.dsp.exec_cmd[[layctl dmenu | rofi -dmenu | cut -f1 | xargs layctl set-lrc]])
 ```
 
 ### IPC Protocol
