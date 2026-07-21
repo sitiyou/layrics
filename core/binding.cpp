@@ -6,7 +6,7 @@
 
 namespace py = pybind11;
 
-PYBIND11_MODULE(_layrics, m) {
+PYBIND11_MODULE(core, m) {
     m.doc() = "layrics - ASS subtitle overlay on wlr-layer-shell";
 
     py::class_<AppState>(m, "StateView")

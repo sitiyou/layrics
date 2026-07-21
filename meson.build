@@ -121,7 +121,7 @@ if pybind11_dep.found()
   ]
 
   py.extension_module(
-    '_layrics',
+    'core',
     [binding_sources, all_core_sources],
     include_directories : inc,
     dependencies : [py_dep, pybind11_dep, dependencies],

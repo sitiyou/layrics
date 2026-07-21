@@ -41,7 +41,7 @@ from typing import Any, Optional
 from LDDC.common.exceptions import LyricsNotFoundError
 from LDDC.common.models import Artist, SongInfo, Source
 
-from ._layrics import ApplicationController
+from .core import ApplicationController
 from .cache import SongCache, make_cache_key
 from .config import get_config
 from .lyricsource import (
