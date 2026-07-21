@@ -606,9 +606,9 @@ meson compile -C build
 ./build/examples/layrics test.ass
 ```
 
-## License
+ ## License
 
-MIT
+GNU General Public License v3.0 only
 
 ---
 

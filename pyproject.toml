@@ -7,7 +7,7 @@ name = "layrics"
 version = "0.1.0"
 description = "ASS subtitle overlay on wlr-layer-shell"
 requires-python = ">=3.10"
-license = {text = "MIT"}
+license = {text = "GPL-3.0-only"}
 dependencies = [
     "httpx[brotli,http2]",
     "dbus-python",
