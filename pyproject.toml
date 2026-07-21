@@ -13,7 +13,6 @@ dependencies = [
     "dbus-python",
     "PyGObject",
     "click>=8.4.1",
-    "PySide6-Essentials>=6.8.0",
     "mutagen",
     "diskcache",
     "charset-normalizer",
@@ -31,5 +30,5 @@ layctl = "layrics.layctl:cli"
 setup = ["-Dbuildtype=release"]
 
 [tool.pyright]
-extraPaths = ["./vendor/LDDC"]
+extraPaths = ["./layrics/vendor"]
 typeCheckingMode = "basic"
