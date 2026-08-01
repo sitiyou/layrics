@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=layrics
+GenericName=Subtitle Overlay
+Comment=ASS subtitle overlay for wlr-layer-shell with karaoke support
+Exec=layrics
+Icon=layrics
+Terminal=false
+Categories=AudioVideo;Utility;
+StartupNotify=false
