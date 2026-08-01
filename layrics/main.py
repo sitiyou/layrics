@@ -711,6 +711,18 @@ class LayricsApp:
                 logger.info("cache removed: %s", key)
                 return {"id": req_id, "type": "result", "data": {"removed": True}}
 
+            elif method == "ass_get":
+                prov = self._config._provider_config.get("default", {})
+                return {
+                    "id": req_id,
+                    "type": "result",
+                    "data": {
+                        "karaoke": prov.get("karaoke"),
+                        "line_mode": prov.get("line_mode"),
+                        "secondary": prov.get("secondary"),
+                    },
+                }
+
             elif method == "ass_set":
                 key = params.get("key", "")
                 raw_value = params.get("value", "")

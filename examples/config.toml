@@ -99,6 +99,12 @@ secondary = true
 # aegisub_cli = ""
 # aegisub_automation = ""
 
+# layctl dmenu 使用的菜单程序
+# 可带参数，如 "rofi -dmenu"、"fuzzel --dmenu"、"bemenu"
+# 也可通过环境变量 LAYRICS_DMENU 覆盖
+[dmenu]
+program = "dmenu"
+
 # 单行模式设置
 # margin_v_bottom: 副歌词不存在时主歌词的底部边距
 [assprovider.default.single]

@@ -87,6 +87,13 @@ class LyricsConfig:
     secondary: list[str] = field(default_factory=lambda: ["ts"])
 
 
+@dataclass
+class DmenuConfig:
+    """layctl dmenu 使用的菜单程序（可带参数，如 "rofi -dmenu"）"""
+
+    program: str = "dmenu"
+
+
 class Config:
     def __init__(self):
         self.search = SearchConfig()
@@ -95,6 +102,7 @@ class Config:
         self.fonts = FontsConfig()
         self.style = StyleConfig()
         self.lyrics = LyricsConfig()
+        self.dmenu = DmenuConfig()
         self._provider_config: dict[str, dict[str, Any]] = {}
         self._include_patterns: list[re.Pattern] = []
         self._exclude_patterns: list[re.Pattern] = []
@@ -193,6 +201,13 @@ class Config:
             raw_sec = raw_lyrics.get("secondary")
             if isinstance(raw_sec, list) and all(isinstance(i, str) for i in raw_sec):
                 self.lyrics.secondary = raw_sec
+
+        # [dmenu]
+        raw_dmenu = data.get("dmenu", {})
+        if isinstance(raw_dmenu, dict):
+            raw_program = raw_dmenu.get("program")
+            if isinstance(raw_program, str) and raw_program.strip():
+                self.dmenu.program = raw_program.strip()
 
         # [assprovider.*]
         raw_assprovider = data.get("assprovider", {})

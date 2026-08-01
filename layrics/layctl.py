@@ -2,7 +2,7 @@ import json
 import os
 import socket
 import sys
-from typing import Any, Optional
+from typing import Any
 
 import click
 
@@ -41,7 +41,7 @@ def _send(socket_path: str, body: dict) -> dict:
     return json.loads(resp.decode())
 
 
-def _call(socket_path: str, method: str, params: Optional[dict] = None) -> dict:
+def _call(socket_path: str, method: str, params: dict | None = None) -> dict:
     return _send(socket_path, {"id": 1, "method": method, "params": params or {}})
 
 
@@ -183,42 +183,326 @@ def set_lrc(ctx, song_id: str):
     _pp(_call(ctx.obj["socket"], "cache_set", {"song_id": song_id}))
 
 
-@cli.command()
-@click.pass_context
-def dmenu(ctx):
-    """Search current playing song, output dmenu-compatible lines"""
-    status = _call(ctx.obj["socket"], "get_status")
+def _resolve_menu_program(override: str | None) -> str:
+    """菜单程序优先级：--program > LAYRICS_DMENU > [dmenu] program > "dmenu"""
+    if override:
+        return override
+    env = os.environ.get("LAYRICS_DMENU")
+    if env:
+        return env
+    try:
+        from .config import get_config
+
+        program = get_config().dmenu.program
+    except (ImportError, OSError, ValueError):
+        return "dmenu"
+    return program or "dmenu"
+
+
+def _run_menu(program: str, prompt: str, items: list[str]) -> str | None:
+    """调用菜单程序展示 items（每行一个），返回选中行；用户取消（ESC）返回 None。"""
+    if not items:
+        return None
+    import shlex
+    import subprocess
+
+    cmd = shlex.split(program)
+    if not cmd:
+        click.echo(f"Error: empty menu program: {program!r}", err=True)
+        sys.exit(1)
+    if os.path.basename(cmd[0]) in ("dmenu", "rofi"):
+        cmd += ["-p", prompt]
+    try:
+        proc = subprocess.run(
+            cmd,
+            input="\n".join(items) + "\n",
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except FileNotFoundError:
+        click.echo(
+            f"Error: menu program not found: {program!r} "
+            "(install it or set [dmenu] program / LAYRICS_DMENU)",
+            err=True,
+        )
+        sys.exit(1)
+    if proc.returncode != 0:
+        return None
+    picked = proc.stdout.strip()
+    return picked or None
+
+
+def _menu_select(
+    program: str, prompt: str, items: list[tuple[str, str]]
+) -> str | None:
+    """items: [(label, action)]，展示带序号菜单并返回选中项的 action；取消返回 None。
+
+    菜单行只含 label（`N) label`），action 通过行首序号反查，避免 action 显示在菜单中。
+    """
+    picked = _run_menu(
+        program,
+        prompt,
+        [f"{i}) {label}" for i, (label, _) in enumerate(items, 1)],
+    )
+    if picked is None:
+        return None
+    # 按行首序号定位 action（菜单程序返回完整选中行）
+    if ")" in picked:
+        head = picked.split(")", 1)[0].strip()
+        if head.isdigit():
+            idx = int(head)
+            if 1 <= idx <= len(items):
+                return items[idx - 1][1]
+    # 兜底：按 label 匹配（兼容菜单程序对选中行的裁剪）
+    for label, action in items:
+        if picked in label or label in picked:
+            return action
+    return None
+
+
+def _menu_song(sock: str, prog: str) -> None:
+    """子菜单：用当前曲目关键词搜索歌曲，选择后 cache_set。"""
+    status = _call(sock, "get_status")
     if status.get("type") == "error":
         _pp(status)
         return
     track = status.get("data", {}).get("mpris_player", {}).get("track")
     if not track:
-        click.echo("Error: no current track", err=True)
-        sys.exit(1)
+        click.echo("No current track", err=True)
+        return
     keyword = track.get("title", "") or ""
     artists = track.get("artists") or []
     if artists:
         keyword += " " + " ".join(artists)
     keyword = keyword.strip()
     if not keyword:
-        click.echo("Error: empty keyword from current track", err=True)
-        sys.exit(1)
-    results = _call(
-        ctx.obj["socket"], "search_songs", {"keyword": keyword, "limit": 20}
-    )
+        click.echo("Current track has no title", err=True)
+        return
+    results = _call(sock, "search_songs", {"keyword": keyword, "limit": 20})
     if results.get("type") == "error":
         _pp(results)
         return
-    for c in results.get("data", []):
+    cands = results.get("data", [])
+    if not cands:
+        click.echo("No search results", err=True)
+        return
+    items = []
+    for c in cands:
         name = c.get("name", "")
         artists_str = ", ".join(c.get("artists", []))
+        album = c.get("album", "")
         dur = c.get("duration")
         dur_str = ""
         if dur and dur > 0:
             m, s = divmod(dur // 1000, 60)
             dur_str = f"{m}:{s:02d}"
-        album = c.get("album", "")
-        click.echo(f"{c['id']}\t{dur_str}\t{name}\t{artists_str}\t{album}")
+        label = name
+        if artists_str:
+            label += f" - {artists_str}"
+        if album:
+            label += f" [{album}]"
+        if dur_str:
+            label += f" ({dur_str})"
+        items.append((label, f"song:{c['id']}"))
+    picked = _menu_select(prog, "Select lyrics", items)
+    if picked and picked.startswith("song:"):
+        song_id = picked[len("song:"):]
+        _call(sock, "cache_set", {"song_id": song_id})
+
+
+def _menu_fps(sock: str, prog: str) -> None:
+    """子菜单：选择目标帧率。"""
+    items = [
+        ("Follow display (vsync)", "fps:-1"),
+        ("30 FPS", "fps:30"),
+        ("60 FPS", "fps:60"),
+        ("120 FPS", "fps:120"),
+    ]
+    picked = _menu_select(prog, "Select FPS", items)
+    if picked and picked.startswith("fps:"):
+        _call(sock, "set_fps", {"fps": int(picked[len("fps:"):])})
+
+
+def _menu_player(sock: str, prog: str) -> None:
+    """子菜单：选择 MPRIS 播放器。"""
+    resp = _call(sock, "list_players")
+    if resp.get("type") == "error":
+        _pp(resp)
+        return
+    players = resp.get("data", [])
+    if not players:
+        click.echo("No MPRIS players available", err=True)
+        return
+    items = []
+    for p in players:
+        identity = p.get("identity") or p.get("bus_name") or "?"
+        items.append((f"{identity} ({p['bus_name']})", f"player:{p['bus_name']}"))
+    picked = _menu_select(prog, "Select player", items)
+    if picked and picked.startswith("player:"):
+        _call(sock, "select_player", {"name": picked[len("player:"):]})
+
+
+def _notify(body: str, title: str = "layrics") -> None:
+    """通过 notify-send 展示通知；notify-send 不可用时回退到终端输出。"""
+    import shutil
+    import subprocess
+
+    if not shutil.which("notify-send"):
+        click.echo(body)
+        return
+    try:
+        subprocess.run(
+            ["notify-send", "-a", "layrics", title, body],
+            check=False,
+            capture_output=True,
+        )
+    except OSError:
+        click.echo(body)
+
+
+def _menu_cache(sock: str, prog: str) -> None:
+    """子菜单：缓存列表 / 删除当前曲目缓存。"""
+    items = [
+        ("List cache", "cache:list"),
+        ("Remove current track cache", "cache:remove"),
+    ]
+    picked = _menu_select(prog, "Cache management", items)
+    if picked == "cache:list":
+        resp = _call(sock, "cache_list")
+        if resp.get("type") == "error":
+            _pp(resp)
+            return
+        entries = resp.get("data", [])
+        if not entries:
+            _notify("Cache is empty", "layrics cache")
+            return
+        lines = []
+        for e in entries[:5]:
+            title = e.get("lyrics_title") or ""
+            artists = e.get("lyrics_artists") or []
+            artist_str = (
+                ", ".join(artists) if isinstance(artists, list) else str(artists)
+            )
+            src = e.get("song_id", "")
+            lines.append(f"{e['key']} -> {src} {title} {artist_str}".rstrip())
+        if len(entries) > 5:
+            lines.append(f"... total {len(entries)} entries")
+        _notify("\n".join(lines), "layrics cache")
+    elif picked == "cache:remove":
+        resp = _call(sock, "cache_remove", {})
+        if resp.get("type") == "error":
+            _pp(resp)
+            return
+        _notify("Removed current track cache", "layrics cache")
+
+
+def _print_status(sock: str, status: dict | None = None) -> None:
+    """格式化 get_status 结果，通过 notify-send 展示。"""
+    if status is None:
+        status = _call(sock, "get_status")
+    if status.get("type") == "error":
+        _pp(status)
+        return
+    data = status.get("data", {})
+    player = data.get("mpris_player") or {}
+    overlay = data.get("overlay", {})
+    lines = []
+    if not player:
+        lines.append("Player: none")
+    else:
+        lines.append(
+            f"Player: {player.get('identity', '?')} ({player.get('bus_name', '?')})"
+        )
+        lines.append(f"Status: {player.get('playback_status', '?')}")
+        pos = player.get("position_ms")
+        if isinstance(pos, int):
+            lines.append(f"Position: {pos // 60000}:{(pos // 1000) % 60:02d}")
+        track = player.get("track") or {}
+        title = track.get("title")
+        if title:
+            artists = track.get("artists") or []
+            suffix = f" - {', '.join(artists)}" if artists else ""
+            lines.append(f"Track: {title}{suffix}")
+    lines.append("")
+    lines.append(f"Hidden: {'yes' if overlay.get('hidden') else 'no'}")
+    lines.append(f"Locked: {'yes' if overlay.get('locked') else 'no'}")
+    lines.append(f"Paused: {'yes' if overlay.get('paused') else 'no'}")
+    lines.append(f"FPS: {overlay.get('target_fps')}")
+    lines.append(f"Position: {overlay.get('position_ms')} ms")
+    _notify("\n".join(lines), "layrics status")
+
+
+@cli.command()
+@click.option(
+    "--program",
+    default=None,
+    help="menu program (overrides [dmenu] program / LAYRICS_DMENU)",
+)
+@click.pass_context
+def dmenu(ctx, program: str | None):
+    """Interactive menu: songs / visibility / lock / ASS config / FPS / player / cache / status"""
+    sock = ctx.obj["socket"]
+    prog = _resolve_menu_program(program)
+
+    while True:
+        status = _call(sock, "get_status")
+        if status.get("type") == "error":
+            _pp(status)
+            return
+        data = status.get("data", {})
+        overlay = data.get("overlay", {})
+        player = data.get("mpris_player") or {}
+
+        ass_cfg = _call(sock, "ass_get")
+        ass = ass_cfg.get("data", {}) if ass_cfg.get("type") == "result" else {}
+
+        hidden = bool(overlay.get("hidden"))
+        locked = bool(overlay.get("locked"))
+        karaoke = ass.get("karaoke")
+        karaoke = True if karaoke is None else bool(karaoke)
+        line_mode = ass.get("line_mode") or "single"
+        secondary = ass.get("secondary")
+        secondary = True if secondary is None else bool(secondary)
+        fps = overlay.get("target_fps", -1)
+        fps_str = "vsync" if fps == -1 else f"{fps} FPS"
+        player_name = player.get("identity") or player.get("bus_name") or "none"
+
+        items = [
+            ("Search & set lyrics", "song"),
+            (f"Toggle visibility ({'hidden' if hidden else 'shown'})", "hide"),
+            (f"Toggle lock ({'on' if locked else 'off'})", "lock"),
+            (f"Toggle karaoke ({'on' if karaoke else 'off'})", "karaoke"),
+            (
+                f"Toggle line mode ({'double' if line_mode == 'double' else 'single'})",
+                "line_mode",
+            ),
+            (f"Toggle translation ({'on' if secondary else 'off'})", "secondary"),
+            (f"Set FPS (current: {fps_str})", "fps"),
+            (f"Select player (current: {player_name})", "player"),
+            ("Cache management", "cache"),
+            ("Show status", "status"),
+            ("Quit", "quit"),
+        ]
+        action = _menu_select(prog, "layrics", items)
+        if action is None or action == "quit":
+            return
+        if action == "song":
+            _menu_song(sock, prog)
+        elif action == "hide":
+            _call(sock, "hide", {"value": "toggle"})
+        elif action == "lock":
+            _call(sock, "lock", {"value": "toggle"})
+        elif action in ("karaoke", "line_mode", "secondary"):
+            _call(sock, "ass_set", {"key": action, "value": "toggle"})
+        elif action == "fps":
+            _menu_fps(sock, prog)
+        elif action == "player":
+            _menu_player(sock, prog)
+        elif action == "cache":
+            _menu_cache(sock, prog)
+        elif action == "status":
+            _print_status(sock, status)
 
 
 @cli.group()
@@ -264,6 +548,13 @@ def cache_remove(ctx, key: str):
 def ass(ctx, key: str, value: str):
     """Set ASS renderer config (karaoke, line_mode, secondary)"""
     _pp(_call(ctx.obj["socket"], "ass_set", {"key": key, "value": value}))
+
+
+@cli.command(name="ass-get")
+@click.pass_context
+def ass_get(ctx):
+    """Show current ASS renderer config (karaoke, line_mode, secondary)"""
+    _pp(_call(ctx.obj["socket"], "ass_get"))
 
 
 if __name__ == "__main__":

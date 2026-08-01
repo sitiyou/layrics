@@ -143,8 +143,8 @@ layctl fetch
 # 设置当前曲目的歌词并更新缓存
 layctl set-lrc QM248672467
 
-# 使用 dmenu 选择当前曲目的歌词
-layctl dmenu | dmenu | cut -f1 | xargs layctl set-lrc
+# 交互式菜单：搜索歌曲 / 切换显示、锁定 / 修改 ASS 配置、帧率、播放器、缓存、状态
+layctl dmenu
 
 # 显示/隐藏覆盖层
 layctl hide              # 隐藏（默认）
@@ -180,15 +180,18 @@ layctl start
 layctl ass karaoke false
 layctl ass line_mode single
 layctl ass secondary toggle
+
+# 查看当前 ASS 渲染配置
+layctl ass-get
 ```
 
 ### 快捷键控制
 以Hyprland为例，示例快捷键如下：
 ```lua
--- 长按左ctrl控制锁定，长按左alt控制显示/隐藏，SUPER + SHIFT + M 选择歌词源
+-- 长按左ctrl控制锁定，长按左alt控制显示/隐藏，SUPER + SHIFT + M 打开操作菜单
 hl.bind("Control_L", hl.dsp.exec_cmd [[layctl lock toggle]], { long_press = true })
 hl.bind("Alt_L", hl.dsp.exec_cmd [[layctl hide toggle]], { long_press = true })
-hl.bind("SUPER + SHIFT + M", hl.dsp.exec_cmd[[layctl dmenu | rofi -dmenu | cut -f1 | xargs layctl set-lrc]])
+hl.bind("SUPER + SHIFT + M", hl.dsp.exec_cmd [[layctl dmenu]])
 ```
 
 ###
@@ -201,7 +204,7 @@ hl.bind("SUPER + SHIFT + M", hl.dsp.exec_cmd[[layctl dmenu | rofi -dmenu | cut -
 {"id": 1, "type": "result", "data": [{"bus_name": "...", "identity": "..."}]}
 ```
 
-可用方法：`list_players`、`select_player`、`search_songs`、`fetch_lyrics`、`load_ass`、`hide`、`unhide`、`lock`、`unlock`、`set_fps`、`stop`、`start`、`get_status`、`cache_list`、`cache_set`、`cache_remove`、`ass_set`。
+可用方法：`list_players`、`select_player`、`search_songs`、`fetch_lyrics`、`load_ass`、`hide`、`unhide`、`lock`、`unlock`、`set_fps`、`stop`、`start`、`get_status`、`cache_list`、`cache_set`、`cache_remove`、`ass_get`、`ass_set`。
 
 ## 配置
 
@@ -278,6 +281,11 @@ v_spacing = 64
 margin_l = 480
 margin_r = 480
 max_length = 1280
+
+# layctl dmenu 使用的菜单程序（可带参数，如 "rofi -dmenu"）
+# 也可通过环境变量 LAYRICS_DMENU 覆盖
+[dmenu]
+program = "dmenu"
 ```
 
 ## 环境变量
@@ -287,6 +295,7 @@ max_length = 1280
 | `LAYRICS_DEBUG` | 启用调试日志。逗号分隔模块名 (`lyrics`, `match`, `ruby`, `assprovider`)，或 `core` 启用 C++ 调试日志 | 空 |
 | `LAYRICS_CONFIG_DIR` | 配置文件目录 | `~/.config/layrics/` |
 | `LAYRICS_SOCK` | IPC socket 路径 | `$XDG_RUNTIME_DIR/layrics.sock` |
+| `LAYRICS_DMENU` | `layctl dmenu` 使用的菜单程序（覆盖 `[dmenu] program`） | `dmenu` |
 
 ## ASS 提供者系统
 
@@ -457,8 +466,8 @@ layctl fetch
 # Set lyrics for current track and update cache
 layctl set-lrc QM248672467
 
-# Use with dmenu to select lyrics interactively
-layctl dmenu | dmenu | cut -f1 | xargs layctl set-lrc
+# Interactive menu: search songs / toggle visibility, lock / change ASS config, FPS, player, cache, status
+layctl dmenu
 
 # Show/hide overlay
 layctl hide              # hide (default)
@@ -494,6 +503,9 @@ layctl start
 layctl ass karaoke false
 layctl ass line_mode single
 layctl ass secondary toggle
+
+# Show current ASS renderer config
+layctl ass-get
 ```
 
 ### Hotkeys
@@ -501,10 +513,10 @@ layctl ass secondary toggle
 Example Hyprland keybindings:
 
 ```lua
--- Long-press Left Ctrl to toggle lock, Left Alt to toggle hide/show, SUPER + SHIFT + M to pick lyrics source
+-- Long-press Left Ctrl to toggle lock, Left Alt to toggle hide/show, SUPER + SHIFT + M to open the action menu
 hl.bind("Control_L", hl.dsp.exec_cmd [[layctl lock toggle]], { long_press = true })
 hl.bind("Alt_L", hl.dsp.exec_cmd [[layctl hide toggle]], { long_press = true })
-hl.bind("SUPER + SHIFT + M", hl.dsp.exec_cmd[[layctl dmenu | rofi -dmenu | cut -f1 | xargs layctl set-lrc]])
+hl.bind("SUPER + SHIFT + M", hl.dsp.exec_cmd [[layctl dmenu]])
 ```
 
 ### IPC Protocol
@@ -516,7 +528,7 @@ The daemon listens on a Unix domain socket. Requests and responses are JSON line
 {"id": 1, "type": "result", "data": [{"bus_name": "...", "identity": "..."}]}
 ```
 
-Available methods: `list_players`, `select_player`, `search_songs`, `fetch_lyrics`, `load_ass`, `hide`, `unhide`, `lock`, `unlock`, `set_fps`, `stop`, `start`, `get_status`, `cache_list`, `cache_set`, `cache_remove`, `ass_set`.
+Available methods: `list_players`, `select_player`, `search_songs`, `fetch_lyrics`, `load_ass`, `hide`, `unhide`, `lock`, `unlock`, `set_fps`, `stop`, `start`, `get_status`, `cache_list`, `cache_set`, `cache_remove`, `ass_get`, `ass_set`.
 
 ## Configuration
 
@@ -593,6 +605,11 @@ v_spacing = 64
 margin_l = 480
 margin_r = 480
 max_length = 1280
+
+# Menu program used by layctl dmenu (can include args, e.g. "rofi -dmenu")
+# Can also be overridden via the LAYRICS_DMENU environment variable
+[dmenu]
+program = "dmenu"
 ```
 
 ## Environment Variables
@@ -602,6 +619,7 @@ max_length = 1280
 | `LAYRICS_DEBUG` | Enable debug logging. Comma-separated module names (`lyrics`, `match`, `ruby`, `assprovider`), or `core` for C++ debug | unset |
 | `LAYRICS_CONFIG_DIR` | Config directory | `~/.config/layrics/` |
 | `LAYRICS_SOCK` | IPC socket path | `$XDG_RUNTIME_DIR/layrics.sock` |
+| `LAYRICS_DMENU` | menu program used by `layctl dmenu` (overrides `[dmenu] program`) | `dmenu` |
 
 ## ASS Provider System
 
