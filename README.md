@@ -20,7 +20,8 @@ layrics 是一款运行在 wlr-layer-shell 上的 ASS 字幕叠加层。可以�
 
 - **Layer Shell 覆盖层**：基于wlr-layer-shell协议，自动悬浮，无需在窗口管理器额外设置规则。
 - **libass 渲染**：支持 ASS 字幕全部特性，包括卡拉 OK（`\k`）、样式、字体和特效
-- **多源歌词搜索**：跨 QQ 音乐、网易云音乐搜索，自动匹配歌曲
+- **Aegisub 卡拉 OK 模板**：可选用 aegisub-cli 的 kara-templater 处理逐字歌词，实现高级卡拉 OK 效果
+- **多源歌词搜索**：跨 QQ 音乐（QM）、网易云音乐（NE）、酷狗（KG）、LRCLIB 等多源搜索，自动匹配歌曲
 - **MPRIS 集成**：自动发现并同步 MPRIS 兼容播放器（spotify、mpv、mpd 等）
 - **歌曲-歌词缓存**：SQLite 匹配结果缓存
 - **拖拽支持**：点击拖拽覆盖层重新定位字幕位置
@@ -41,6 +42,7 @@ layrics (Python)
 ├── layctl.py       控制 CLI        
 ├── mpris.py        D-Bus 信号      
 ├── assprovider/    ASS 生成        
+├── karaoke/        Aegisub kara-templater 头部生成
 └── config.py       TOML 配置       
                                     
                                     
@@ -51,9 +53,11 @@ C++ overlay (core/)
 ├── AssRenderer      libass -> cairo surface   
 ├── LayerSurface     wlr-layer-shell surface   
 ├── ShmBuffer        SHM pool -> wl_buffer     
+├── FrameRateLimiter 目标帧率限制              
 ├── InputManager     wl_pointer 事件           
 ├── DragManager      拖拽状态机                
 ├── RegionManager    input region              
+├── DamageGrid       逐区域 damage 追踪         
 ├── CursorTracker    全局光标（Hyprland）      
 ├── CursorManager    悬停/拖拽光标切换          
 ├── WaylandContext   display、全局对象、事件循 
@@ -74,12 +78,13 @@ C++ overlay (core/)
 ### Python 依赖（pip 自动安装）
 
 - `meson-python`、`pybind11`（构建时）
-- `httpx`、`dbus-python`、`PyGObject`、`click`、`appdirs`（运行时）
+- `httpx[brotli,http2]`、`dbus-python`、`PyGObject`、`click`、`mutagen`、`diskcache`、`charset-normalizer`、`pyaes`、`appdirs`、`opencc`（运行时）
+- `tomli`（Python < 3.11）
 
 ### 安装
 
 ```bash
-git clone --recursive https://github.com/sitiyou/layrics
+git clone https://github.com/sitiyou/layrics
 cd layrics
 
 # uv
@@ -92,7 +97,7 @@ uv tool install git+https://github.com/sitiyou/layrics
 pipx install git+https://github.com/sitiyou/layrics
 ```
 
-`--recursive` 参数用于拉取歌词源所需的 vendored `LDDC` git 子模块。
+歌词源库 `LDDC` 已作为 vendored 副本包含在仓库中（`layrics/vendor/LDDC/`），无需 `--recursive` 子模块。
 
 ### 开发安装
 
@@ -167,7 +172,7 @@ layctl cache list
 layctl cache set QM248672467   # 为当前曲目绑定歌词
 layctl cache remove            # 删除当前曲目缓存
 
-# 启停 overlay 进程
+# 停止/重启 overlay 渲染（IPC 服务保持运行）
 layctl stop
 layctl start
 
@@ -226,18 +231,27 @@ default = "sans-serif"
 ja = "Noto Sans CJK JP"
 zh = "Noto Sans CJK SC"
 
-# 样式覆写（完整 ASS 样式字段）
+# 样式覆写（完整 ASS 样式字段见 examples/config.toml）
 [style.primary]
+font_name = "sans-serif"
 font_size = 48
-primary_colour = "&H00E6D8AD"
-secondary_colour = "&H00AAAAAA"
-outline = 2.0
-shadow = 2.0
+primary_colour = "&H00FCDD1C"
+secondary_colour = "&H00FFFFFF"
+outline_colour = "&H005C3317"
+back_colour = "&H4C000000"
+outline = 3
+shadow = 1
+margin_l = 480
+margin_r = 480
 margin_v = 64
+encoding = 1
 
 [style.secondary]
+font_name = "sans-serif"
 font_size = 32
-primary_colour = "&H00CCCCCC"
+primary_colour = "&H00D5D1CF"
+outline = 1.5
+shadow = 1
 margin_v = 24
 
 # 歌词轨道选择优先级（type 或语言代码）
@@ -250,18 +264,20 @@ secondary = ["ts"]
 karaoke = true
 line_mode = "single"
 secondary = true
+# 可选：aegisub-cli kara-templater 处理逐字歌词（需安装 aegisub-cli）
+# aegisub_karaoke = false
 
 [assprovider.default.single]
 # 副歌词不存在时主歌词的底部边距，0 表示使用 style.primary.margin_v
-margin_v_bottom = 0
+margin_v_bottom = 32
 
 [assprovider.default.double]
 advance_ms = 5000
 margin_v_right = 24
 v_spacing = 64
-margin_l = 20
-margin_r = 20
-max_length = 960
+margin_l = 480
+margin_r = 480
+max_length = 1280
 ```
 
 ## 环境变量
@@ -297,7 +313,7 @@ max_length = 960
 
 - [ ] **Python 输入事件接口** — 将 overlay 接收到的键盘/鼠标事件封装为 Python 接口，支持在 Python 层面处理输入事件
 - [ ] **延迟控制** — 字幕延迟偏移功能（offset）
-- [ ] **Aegisub CLI 集成** — 调用 aegisub-cli 处理 kara-templater 模板，实现高级卡拉 OK 效果
+- [x] **Aegisub CLI 集成** — 调用 aegisub-cli 处理 kara-templater 模板（`aegisub_karaoke` 配置，双行模式 + 逐字歌词时生效）
 
 ## 仅编译 C++ 部分
 
@@ -333,7 +349,8 @@ ASS subtitle overlay for wlr-layer-shell. Renders karaoke and plain-text subtitl
 
 - **Layer Shell overlay**: auto-floating layer based on `wlr-layer-shell`, no compositor-specific setup required
 - **libass rendering**: supports ASS subtitle features including karaoke (`\k`), styling, fonts, and effects
-- **Multi-source lyric fetching**: searches across QQ Music and NetEase with automatic song matching
+- **Aegisub karaoke templating**: optionally processes word-timed lyrics through aegisub-cli's kara-templater for advanced karaoke effects
+- **Multi-source lyric fetching**: searches across QQ Music (QM), NetEase (NE), Kugou (KG), LRCLIB and more with automatic song matching
 - **MPRIS integration**: auto-detects and syncs with MPRIS-compatible players (spotify, mpv, mpd, etc.)
 - **Song-to-lyrics cache**: SQLite song match cache
 - **Drag support**: click and drag the overlay to reposition subtitles
@@ -350,11 +367,14 @@ layrics (Python)                    C++ overlay (core/)
 │   └── IPC server  Unix socket    ├── AssRenderer       libass -> cairo surface
 ├── lyricsource.py  search/fetch   ├── LayerSurface      wlr-layer-shell surface
 ├── matching.py     song matching  ├── ShmBuffer         SHM pool -> wl_buffer
-├── cache.py        song cache     ├── InputManager      wl_pointer events
-├── layctl.py       control CLI    ├── DragManager       drag state machine
-├── mpris.py        D-Bus signals  ├── RegionManager     input region
-├── assprovider/    ASS generation ├── CursorTracker     global cursor (Hyprland)
-└── config.py       TOML config     ├── CursorManager     hover/drag cursor
+├── cache.py        song cache     ├── FrameRateLimiter  target FPS limiting
+├── layctl.py       control CLI    ├── DamageGrid        per-tile damage tracking
+├── mpris.py        D-Bus signals  ├── InputManager      wl_pointer events
+├── assprovider/    ASS generation ├── DragManager       drag state machine
+├── karaoke/        Aegisub kara-templater headers
+├── config.py       TOML config     ├── RegionManager     input region
+                                    ├── CursorTracker     global cursor (Hyprland)
+                                    ├── CursorManager     hover/drag cursor
                                     ├── WaylandContext   display, globals, event loop
                                     └── binding.cpp      pybind11 bindings
 ```
@@ -372,12 +392,13 @@ layrics (Python)                    C++ overlay (core/)
 ### Python dependencies (installed automatically via pip)
 
 - `meson-python`, `pybind11` (build)
-- `httpx`, `dbus-python`, `PyGObject`, `click`, `appdirs` (runtime)
+- `httpx[brotli,http2]`, `dbus-python`, `PyGObject`, `click`, `mutagen`, `diskcache`, `charset-normalizer`, `pyaes`, `appdirs`, `opencc` (runtime)
+- `tomli` (Python < 3.11)
 
 ### Install
 
 ```bash
-git clone --recursive https://github.com/sitiyou/layrics
+git clone https://github.com/sitiyou/layrics
 cd layrics
 
 # uv
@@ -390,7 +411,7 @@ uv tool install git+https://github.com/sitiyou/layrics
 pipx install git+https://github.com/sitiyou/layrics
 ```
 
-The `--recursive` flag is required to fetch the vendored `LDDC` git submodule for lyric sources.
+The `LDDC` lyric-source library is vendored in the repository (`layrics/vendor/LDDC/`), so no submodule checkout is needed.
 
 ### Development install
 
@@ -465,7 +486,7 @@ layctl cache list
 layctl cache set QM248672467   # bind lyrics for current track
 layctl cache remove            # remove current track's cache entry
 
-# Start/stop the overlay process
+# Stop/restart overlay rendering (IPC server keeps running)
 layctl stop
 layctl start
 
@@ -525,18 +546,27 @@ default = "sans-serif"
 ja = "Noto Sans CJK JP"
 zh = "Noto Sans CJK SC"
 
-# ASS style overrides
+# ASS style overrides (full field list in examples/config.toml)
 [style.primary]
+font_name = "sans-serif"
 font_size = 48
-primary_colour = "&H00E6D8AD"
-secondary_colour = "&H00AAAAAA"
-outline = 2.0
-shadow = 2.0
+primary_colour = "&H00FCDD1C"
+secondary_colour = "&H00FFFFFF"
+outline_colour = "&H005C3317"
+back_colour = "&H4C000000"
+outline = 3
+shadow = 1
+margin_l = 480
+margin_r = 480
 margin_v = 64
+encoding = 1
 
 [style.secondary]
+font_name = "sans-serif"
 font_size = 32
-primary_colour = "&H00CCCCCC"
+primary_colour = "&H00D5D1CF"
+outline = 1.5
+shadow = 1
 margin_v = 24
 
 # Lyric track selection priority (type key or language code)
@@ -549,18 +579,20 @@ secondary = ["ts"]
 karaoke = true
 line_mode = "single"
 secondary = true
+# Optional: process word-timed lyrics through aegisub-cli kara-templater (requires aegisub-cli)
+# aegisub_karaoke = false
 
 [assprovider.default.single]
 # Primary margin_v override when no secondary track exists; 0 = use style.primary.margin_v
-margin_v_bottom = 0
+margin_v_bottom = 32
 
 [assprovider.default.double]
 advance_ms = 5000
 margin_v_right = 24
 v_spacing = 64
-margin_l = 20
-margin_r = 20
-max_length = 960
+margin_l = 480
+margin_r = 480
+max_length = 1280
 ```
 
 ## Environment Variables
@@ -596,7 +628,7 @@ When fetching lyrics for the current track, the system:
 
 - [ ] **Python input event interface** — expose keyboard/mouse events from the overlay as Python interfaces for Python-level input handling
 - [ ] **Delay control** — subtitle delay offset
-- [ ] **Aegisub CLI integration** — invoke aegisub-cli for kara-templater processing, enabling advanced karaoke effects
+- [x] **Aegisub CLI integration** — invoke aegisub-cli for kara-templater processing (`aegisub_karaoke` config, active in double-line mode with word-timed lyrics)
 
 ## Building from source (C++ only)
 

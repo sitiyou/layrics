@@ -5,4 +5,5 @@ dist/
 .venv/
 /*_PLAN.md
 /AGENTS.md
+/memory.md
 /examples/demo.mp4
