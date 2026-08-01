@@ -140,6 +140,4 @@ if pybind11_dep.found()
 
 endif
 
-subdir('examples')
-
 

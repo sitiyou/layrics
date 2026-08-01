@@ -329,7 +329,6 @@ program = "dmenu"
 ```bash
 meson setup build
 meson compile -C build
-./build/examples/layrics test.ass
 ```
 
 ---
@@ -653,7 +652,6 @@ When fetching lyrics for the current track, the system:
 ```bash
 meson setup build
 meson compile -C build
-./build/examples/layrics test.ass
 ```
 
  ## License
