@@ -15,7 +15,6 @@ dependencies = [
     "click>=8.4.1",
     "mutagen",
     "diskcache",
-    "charset-normalizer",
     "pyaes",
     "appdirs",
 ]
@@ -30,5 +29,5 @@ setup = ["-Dbuildtype=release"]
 [tool.pyright]
 typeCheckingMode = "basic"
 
-[tool.ruff]
+[tool.ruff.lint]
 ignore = ["BLE001"]

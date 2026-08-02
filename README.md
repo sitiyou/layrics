@@ -1,3 +1,5 @@
+[English README](#layrics-english) · [中文 README](#layrics)
+
 > [!NOTE]
 > **免责声明／Disclaimer**
 >
@@ -21,7 +23,7 @@ layrics 是一款运行在 wlr-layer-shell 上的 ASS 字幕叠加层。可以�
 - **Layer Shell 覆盖层**：基于wlr-layer-shell协议，自动悬浮，无需在窗口管理器额外设置规则。
 - **libass 渲染**：支持 ASS 字幕全部特性，包括卡拉 OK（`\k`）、样式、字体和特效
 - **Aegisub 卡拉 OK 模板**：可选用 aegisub-cli 的 kara-templater 处理逐字歌词，实现高级卡拉 OK 效果
-- **多源歌词搜索**：跨 QQ 音乐（QM）、网易云音乐（NE）、酷狗（KG）、LRCLIB 等多源搜索，自动匹配歌曲
+- **多源歌词搜索**：跨 QQ 音乐（QM）、网易云音乐（NE）、酷狗（KG）、LRCLIB 多源并行搜索，自动匹配歌曲
 - **MPRIS 集成**：自动发现并同步 MPRIS 兼容播放器（spotify、mpv、mpd 等）
 - **歌曲-歌词缓存**：SQLite 匹配结果缓存
 - **拖拽支持**：点击拖拽覆盖层重新定位字幕位置
@@ -37,6 +39,7 @@ layrics (Python)
 │   ├── 歌词获取    LDDC 适配器     
 │   └── IPC 服务端  Unix socket     
 ├── lyricsource.py  搜索/获取       
+├── LDDC/           内置歌词源库（精简子包）
 ├── matching.py     歌曲匹配        
 ├── cache.py        歌曲-歌词缓存   
 ├── layctl.py       控制 CLI        
@@ -78,7 +81,7 @@ C++ overlay (core/)
 ### Python 依赖（pip 自动安装）
 
 - `meson-python`、`pybind11`（构建时）
-- `httpx[brotli,http2]`、`dbus-python`、`PyGObject`、`click`、`mutagen`、`diskcache`、`charset-normalizer`、`pyaes`、`appdirs`（运行时）
+- `httpx[brotli,http2]`、`dbus-python`、`PyGObject`、`click`、`mutagen`、`diskcache`、`pyaes`、`appdirs`（运行时）
 
 ### 安装
 
@@ -96,7 +99,7 @@ uv tool install git+https://github.com/sitiyou/layrics
 pipx install git+https://github.com/sitiyou/layrics
 ```
 
-歌词源库 `LDDC` 已作为精简后的子包内置在 `layrics/LDDC/`（原上游代码的 vendored 副本保留在 `layrics/vendor/LDDC/` 作参考），无需 `--recursive` 子模块。
+歌词源库 `LDDC` 已作为精简后的子包内置在 `layrics/LDDC/`（原上游 vendored 副本仅保留在本地 `layrics/vendor/LDDC/` 作参考，不随 git 分发），无需 `--recursive` 子模块。
 
 ### 开发安装
 
@@ -290,7 +293,7 @@ program = "dmenu"
 
 | 变量 | 说明 | 默认值 |
 |---|---|---|
-| `LAYRICS_DEBUG` | 启用调试日志。逗号分隔模块名 (`lyrics`, `match`, `ruby`, `assprovider`)，或 `core` 启用 C++ 调试日志 | 空 |
+| `LAYRICS_DEBUG` | 启用调试日志。逗号分隔模块名 (`lyrics`, `main`, `match`, `assprovider`)，或 `core` 启用 C++ 调试日志 | 空 |
 | `LAYRICS_CONFIG_DIR` | 配置文件目录 | `~/.config/layrics/` |
 | `LAYRICS_SOCK` | IPC socket 路径 | `$XDG_RUNTIME_DIR/layrics.sock` |
 | `LAYRICS_DMENU` | `layctl dmenu` 使用的菜单程序（覆盖 `[dmenu] program`） | `dmenu` |
@@ -307,7 +310,7 @@ program = "dmenu"
 
 ### 语言检测
 
-提供者通过字符集分析自动检测歌词语言（假名 -> 日语、谚文 -> 韩语、西里尔 -> 俄语、CJK -> 中文），并从配置中选择对应字体。
+提供者通过字符集分析自动检测歌词语言（假名 -> 日语、谚文 -> 韩语、CJK -> 中文、拉丁字母 -> 英语），并从配置中选择对应字体。
 
 ### 歌曲匹配
 
@@ -356,7 +359,7 @@ ASS subtitle overlay for wlr-layer-shell. Renders karaoke and plain-text subtitl
 - **Layer Shell overlay**: auto-floating layer based on `wlr-layer-shell`, no compositor-specific setup required
 - **libass rendering**: supports ASS subtitle features including karaoke (`\k`), styling, fonts, and effects
 - **Aegisub karaoke templating**: optionally processes word-timed lyrics through aegisub-cli's kara-templater for advanced karaoke effects
-- **Multi-source lyric fetching**: searches across QQ Music (QM), NetEase (NE), Kugou (KG), LRCLIB and more with automatic song matching
+- **Multi-source lyric fetching**: parallel search across QQ Music (QM), NetEase (NE), Kugou (KG), LRCLIB with automatic song matching
 - **MPRIS integration**: auto-detects and syncs with MPRIS-compatible players (spotify, mpv, mpd, etc.)
 - **Song-to-lyrics cache**: SQLite song match cache
 - **Drag support**: click and drag the overlay to reposition subtitles
@@ -372,6 +375,7 @@ layrics (Python)                    C++ overlay (core/)
 │   ├── lyric fetch LDDC adapter   ├── RenderManager     cairo composition + drag offset
 │   └── IPC server  Unix socket    ├── AssRenderer       libass -> cairo surface
 ├── lyricsource.py  search/fetch   ├── LayerSurface      wlr-layer-shell surface
+├── LDDC/           bundled slimmed lyric library
 ├── matching.py     song matching  ├── ShmBuffer         SHM pool -> wl_buffer
 ├── cache.py        song cache     ├── FrameRateLimiter  target FPS limiting
 ├── layctl.py       control CLI    ├── DamageGrid        per-tile damage tracking
@@ -398,7 +402,7 @@ layrics (Python)                    C++ overlay (core/)
 ### Python dependencies (installed automatically via pip)
 
 - `meson-python`, `pybind11` (build)
-- `httpx[brotli,http2]`, `dbus-python`, `PyGObject`, `click`, `mutagen`, `diskcache`, `charset-normalizer`, `pyaes`, `appdirs` (runtime)
+- `httpx[brotli,http2]`, `dbus-python`, `PyGObject`, `click`, `mutagen`, `diskcache`, `pyaes`, `appdirs` (runtime)
 
 ### Install
 
@@ -416,7 +420,7 @@ uv tool install git+https://github.com/sitiyou/layrics
 pipx install git+https://github.com/sitiyou/layrics
 ```
 
-The `LDDC` lyric-source library is embedded as a slimmed-down subpackage at `layrics/LDDC/` (the upstream vendored copy stays at `layrics/vendor/LDDC/` for reference), so no submodule checkout is needed.
+The `LDDC` lyric-source library is embedded as a slimmed-down subpackage at `layrics/LDDC/` (the upstream vendored copy is kept locally at `layrics/vendor/LDDC/` for reference only; it is not tracked by git), so no submodule checkout is needed.
 
 ### Development install
 
@@ -611,7 +615,7 @@ program = "dmenu"
 
 | Variable | Description | Default |
 |---|---|---|
-| `LAYRICS_DEBUG` | Enable debug logging. Comma-separated module names (`lyrics`, `match`, `ruby`, `assprovider`), or `core` for C++ debug | unset |
+| `LAYRICS_DEBUG` | Enable debug logging. Comma-separated module names (`lyrics`, `main`, `match`, `assprovider`), or `core` for C++ debug | unset |
 | `LAYRICS_CONFIG_DIR` | Config directory | `~/.config/layrics/` |
 | `LAYRICS_SOCK` | IPC socket path | `$XDG_RUNTIME_DIR/layrics.sock` |
 | `LAYRICS_DMENU` | menu program used by `layctl dmenu` (overrides `[dmenu] program`) | `dmenu` |
@@ -628,7 +632,7 @@ The `assprovider` package handles converting LRC lyrics to ASS subtitle format.
 
 ### Language detection
 
-The provider auto-detects lyrics language by character set analysis (kana -> Japanese, hangul -> Korean, Cyrillic -> Russian, CJK -> Chinese) and selects the appropriate font from the configuration.
+The provider auto-detects lyrics language by character set analysis (kana -> Japanese, hangul -> Korean, CJK -> Chinese, Latin -> English) and selects the appropriate font from the configuration.
 
 ### Song matching
 
