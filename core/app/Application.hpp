@@ -71,6 +71,8 @@ class Application {
     AssRenderer *m_assRenderer = nullptr;
     std::function<void()> m_processCommands;
 
+    // Frozen rendering timestamp (CLOCK_MONOTONIC ms) while paused; captured
+    // in mainLoop() when the pause command is processed.
     int64_t m_freezeTimestampMs = 0;
 
     AppState m_state{};
@@ -81,6 +83,7 @@ class Application {
     void initBuffers();
 
     void mainLoop();
+    void processState();
     void requestFrame();
 
     void onFrame(uint32_t time);

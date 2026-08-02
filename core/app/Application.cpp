@@ -16,6 +16,13 @@
 
 static const wl_callback_listener frameListener = {Application::frameDone};
 
+// CLOCK_MONOTONIC milliseconds, same clock source as wl_callback timestamps.
+static int64_t nowMs() {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return static_cast<int64_t>(ts.tv_sec) * 1000 + ts.tv_nsec / 1000000;
+}
+
 Application::Application() {
     if (!initWayland()) {
         throw std::runtime_error("Failed to initialize Wayland");
@@ -150,6 +157,8 @@ void Application::initBuffers() {
 
 void Application::mainLoop() {
     while (m_running && m_surface.configured()) {
+        processState();
+
         while (!m_waylandCtx.prepareRead()) {
             if (m_waylandCtx.dispatchPending() < 0) {
                 LAY_ERR("Wayland dispatch error");
@@ -180,10 +189,58 @@ void Application::mainLoop() {
                 m_running = false;
                 break;
             }
-            m_waylandCtx.dispatchPending();
+            if (m_waylandCtx.dispatchPending() < 0) {
+                LAY_ERR("Wayland dispatch error");
+                m_running = false;
+                break;
+            }
+        } else if (fd.revents) {
+            // POLLERR/POLLHUP/POLLNVAL: connection lost
+            LAY_ERR("Wayland connection lost (revents=0x%x)", fd.revents);
+            m_waylandCtx.cancelRead();
+            m_running = false;
+            break;
         } else {
             m_waylandCtx.cancelRead();
         }
+    }
+}
+
+void Application::processState() {
+    // Snapshot pre-command state so first-time transitions can fire their
+    // side-effects synchronously here (not tied to frame event timing).
+    bool prevPaused = m_state.paused;
+    bool prevHidden = m_state.hidden;
+    bool prevLocked = m_state.locked;
+
+    if (m_processCommands) {
+        m_processCommands();
+    }
+
+    if (m_state.hidden && !prevHidden) {
+        // Entering hidden: clear the display and commit once so the
+        // compositor shows an empty surface; the frame chain then stops.
+        hideDisplay();
+        m_surface.commitFrame(m_buffer.buffer(), true);
+    }
+    if (m_state.paused && !prevPaused) {
+        m_freezeTimestampMs = nowMs() - m_state.startTimeMs;
+    }
+    if (m_state.locked != prevLocked) {
+        updateCursor();
+        if (m_state.locked && m_surface.configured()) {
+            applyLockedInputRegion();
+        }
+    }
+
+    // Restart the frame chain when rendering is needed again (unhide,
+    // unpause, drag begins while paused) but no frame is in flight.
+    // m_buffer stays valid because hideDisplay() only memsets it.
+    bool needsFrame = !m_frameCallback && m_buffer && !m_state.hidden &&
+                      (!m_state.paused || m_dragMgr.dragging());
+    if (needsFrame) {
+        requestFrame();
+        m_surface.commitFrame(m_buffer.buffer(), true);
     }
 }
 
@@ -198,45 +255,22 @@ void Application::onFrame(uint32_t time) {
         return;
     }
 
-    bool prePaused = m_state.paused;
-    bool preHidden = m_state.hidden;
-    bool preLocked = m_state.locked;
-
-    if (m_processCommands) {
-        m_processCommands();
-    }
-
     auto dragState = m_dragMgr.state();
     m_state.dragOffsetX = dragState.offsetX;
     m_state.dragOffsetY = dragState.offsetY;
     m_renderMgr.setOffset(dragState.offsetX, dragState.offsetY);
 
-    if (m_state.hidden) {
-        if (!preHidden) {
-            hideDisplay();
-        }
-        requestFrame();
-        m_surface.commitFrame(m_buffer.buffer(), true);
-        m_frameRateLimiter.wait();
+    // No rendering while hidden (display already cleared by mainLoop); while
+    // paused the frozen frame stays on screen unless a drag moves the offset.
+    // Returning without requestFrame() stops the frame chain.
+    if (m_state.hidden || (m_state.paused && !m_dragMgr.dragging())) {
         return;
     }
 
-    int64_t timestampMs;
-    if (m_state.paused) {
-        if (!prePaused) {
-            m_freezeTimestampMs = (int64_t)time - m_state.startTimeMs;
-        }
-        timestampMs = m_freezeTimestampMs;
-    } else {
-        timestampMs = (int64_t)time - m_state.startTimeMs;
-    }
-
-    if (m_state.locked != preLocked) {
-        updateCursor();
-        if (m_state.locked && m_surface.configured()) {
-            applyLockedInputRegion();
-        }
-    }
+    int64_t timestampMs =
+        m_state.paused
+            ? m_freezeTimestampMs
+            : static_cast<int64_t>(time) - m_state.startTimeMs;
 
     uint8_t *bufData = static_cast<uint8_t *>(m_buffer.data());
     RenderResult result = m_renderMgr.render(bufData, timestampMs);
