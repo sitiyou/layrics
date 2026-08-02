@@ -215,7 +215,6 @@ hl.bind("SUPER + SHIFT + M", hl.dsp.exec_cmd [[layctl dmenu]])
 # 歌词搜索源
 [search]
 sources = ["QM", "NE"]
-result_count = 5
 
 # 渲染相关
 [overlay]
@@ -537,7 +536,6 @@ Configuration is loaded from `~/.config/layrics/config.toml` (or `$LAYRICS_CONFI
 # Lyric search sources
 [search]
 sources = ["QM", "NE"]
-result_count = 5
 
 # Overlay rendering
 [overlay]

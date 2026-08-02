@@ -289,8 +289,8 @@ def _menu_song(sock: str, prog: str) -> None:
         return
     items = []
     for c in cands:
-        name = c.get("name", "")
-        artists_str = ", ".join(c.get("artists", []))
+        name = c.get("title", "")
+        artists_str = ", ".join(c.get("artist") or [])
         album = c.get("album", "")
         dur = c.get("duration")
         dur_str = ""

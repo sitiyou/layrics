@@ -20,7 +20,6 @@ _CONFIG_PATH = os.path.join(_CONFIG_DIR, "config.toml")
 @dataclass
 class SearchConfig:
     sources: list[Source] = field(default_factory=lambda: [Source.QM, Source.NE])
-    result_count: int = 5
 
 
 @dataclass
@@ -150,9 +149,6 @@ class Config:
                 parsed = self._parse_sources(raw_sources)
                 if parsed:
                     self.search.sources = parsed
-            raw_count = raw_search.get("result_count")
-            if isinstance(raw_count, int) and raw_count > 0:
-                self.search.result_count = raw_count
 
         # [overlay]
         raw_overlay = data.get("overlay", {})

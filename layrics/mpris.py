@@ -9,7 +9,7 @@ import os
 import sys
 import threading
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import dbus
 import dbus.mainloop.glib
@@ -22,11 +22,11 @@ dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
 class TrackMeta:
     """歌曲元数据结构"""
 
-    unique_song_id: Optional[str] = None
-    title: Optional[str] = None
-    album: Optional[str] = None
-    artists: Optional[List[str]] = None
-    length: Optional[int] = None  # 微秒
+    unique_song_id: str | None = None
+    title: str | None = None
+    album: str | None = None
+    artists: list[str] | None = None
+    length: int | None = None  # 微秒
 
     def __repr__(self):
         return (
@@ -92,7 +92,7 @@ class MPRISPlayer:
             return self.bus_name
 
     @staticmethod
-    def _parse_metadata(metadata: Dict[str, Any]) -> TrackMeta:
+    def _parse_metadata(metadata: dict[str, Any]) -> TrackMeta:
         """解析 MPRIS 元数据字典
 
         MPRIS 元数据键值:
@@ -103,14 +103,14 @@ class MPRISPlayer:
         - mpris:length: 歌曲长度 (微秒)
         """
 
-        def get_str(key: str) -> Optional[str]:
+        def get_str(key: str) -> str | None:
             """安全获取字符串值"""
             val = metadata.get(key)
             if val is not None:
                 return str(val)
             return None
 
-        def get_list_str(key: str) -> Optional[List[str]]:
+        def get_list_str(key: str) -> list[str] | None:
             """安全获取字符串列表"""
             val = metadata.get(key)
             if val:
@@ -151,7 +151,7 @@ class MPRISPlayerFinder:
         """检查是否是 MPRIS 播放器"""
         return name.startswith(MPRISPlayer.MPRIS_PREFIX)
 
-    def find_all_players(self) -> List[MPRISPlayer]:
+    def find_all_players(self) -> list[MPRISPlayer]:
         """发现所有可用的 MPRIS 播放器"""
         players = []
 
@@ -179,7 +179,7 @@ class MPRISPlayerFinder:
 
         return players
 
-    def find_active_player(self) -> Optional[MPRISPlayer]:
+    def find_active_player(self) -> MPRISPlayer | None:
         """查找活跃的播放器 (正在播放的)"""
         players = self.find_all_players()
 
@@ -194,7 +194,7 @@ class MPRISPlayerFinder:
         # 如果没有正在播放的，返回第一个
         return players[0] if players else None
 
-    def list_player_names(self) -> List[tuple]:
+    def list_player_names(self) -> list[tuple]:
         """列出所有播放器的名称
 
         Returns:
@@ -225,8 +225,8 @@ class MprisSignalMonitor:
     def __init__(self, bus_name: str):
         self.bus_name = bus_name
         self._r_fd, self._w_fd = os.pipe()
-        self._loop: Optional[GLib.MainLoop] = None
-        self._thread: Optional[threading.Thread] = None
+        self._loop: GLib.MainLoop | None = None
+        self._thread: threading.Thread | None = None
 
     def start(self):
         self._thread = threading.Thread(target=self._run, daemon=True)

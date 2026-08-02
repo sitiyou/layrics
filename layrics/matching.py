@@ -187,8 +187,7 @@ def _artist_similarity(local: list[str], remote: list[str]) -> float:
     for la in local:
         for ra in remote:
             ratio = SequenceMatcher(None, la, ra).ratio()
-            if ratio > best:
-                best = ratio
+            best = max(best, ratio)
     return best
 
 
@@ -220,10 +219,10 @@ def match_song(
     scored: list[tuple[float, float, float, dict[str, Any]]] = []
 
     for c in candidates:
-        c_title = normalize_title(c.get("name", ""))
+        c_title = normalize_title(c.get("title") or "")
         c_title = _with_artist_stripped(c_title)
         c_duration_s = (c.get("duration") or 0) / 1000  # ms → s
-        c_artists = [normalize_title(a) for a in c.get("artists", [])]
+        c_artists = [normalize_title(a) for a in (c.get("artist") or [])]
 
         # Stage 1: title similarity
         title_score = _title_similarity(q_title, c_title)

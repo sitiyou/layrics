@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 layrics - ASS subtitle overlay on wlr-layer-shell
 Provides JSON-based IPC control over a Unix domain socket.
@@ -39,7 +38,7 @@ from dataclasses import asdict
 from typing import Any
 
 from layrics.LDDC.common.exceptions import LyricsNotFoundError
-from layrics.LDDC.common.models import Artist, SongInfo, Source
+from layrics.LDDC.common.models import SongInfo, Source
 
 from .cache import SongCache, make_cache_key
 from .config import get_config
@@ -189,7 +188,9 @@ class LayricsApp:
                     cache.remove(key)
                     si = None
                 else:
-                    si = SongInfo(source=src, id=cached.lyrics_song_id)
+                    si = SongInfo.from_dict(
+                        {"source": src.name, "id": cached.lyrics_song_id}
+                    )
             if si is not None:
                 try:
                     ass = await loop.run_in_executor(
@@ -217,14 +218,7 @@ class LayricsApp:
             raise RuntimeError(f"no match found for {keyword!r}")
 
         src, raw_id = parse_composite_id(matched["id"])
-        song_info = SongInfo(
-            source=src,
-            id=raw_id,
-            title=matched["name"],
-            artist=Artist(matched.get("artists", [])),
-            album=matched.get("album"),
-            duration=matched.get("duration"),
-        )
+        song_info = SongInfo.from_dict(matched)
         ass = await loop.run_in_executor(None, lambda: _fetch_lyrics(song_info))
         logger.info("fetch: %s -> %s (%d bytes)", keyword, matched["id"], len(ass))
 
@@ -246,14 +240,12 @@ class LayricsApp:
         if self._fetch_gen != gen:
             return
         now_ms = int(time.monotonic() * 1000)
-        kwargs = {"paused": self.ctrl.state.paused}
         if not self.ctrl.state.paused:
             try:
                 pos = self._mpris_player.get_position()
-                kwargs["start_time_ms"] = now_ms - pos // 1000
+                self.ctrl.set_status(start_time_ms=now_ms - pos // 1000)
             except Exception:
                 pass
-        self.ctrl.set_status(**kwargs)
 
     # ── MPRIS ─────────────────────────────────────────────────────
 
@@ -423,14 +415,7 @@ class LayricsApp:
         return await loop.run_in_executor(None, lambda: _search_songs(keyword, limit))
 
     async def fetch_lyrics(self, song_data: dict) -> str:
-        song_info = SongInfo(
-            source=Source[song_data["source"]],
-            id=song_data["id"],
-            title=song_data.get("name"),
-            artist=Artist(song_data.get("artists", [])),
-            album=song_data.get("album"),
-            duration=song_data.get("duration"),
-        )
+        song_info = SongInfo.from_dict(song_data)
         loop = asyncio.get_event_loop()
         ass_content = await loop.run_in_executor(None, lambda: _fetch_lyrics(song_info))
         logger.info("lyrics fetched (%d bytes)", len(ass_content))
@@ -471,6 +456,8 @@ class LayricsApp:
                 keyword = params.get("keyword", "")
                 limit = params.get("limit", 10)
                 data = await self.search_songs(keyword, limit)
+                # IPC 边界:复合 id(源名前缀) 供 layctl 回传
+                data = [{**d, "id": f"{d['source']}{d['id']}"} for d in data]
                 return {"id": req_id, "type": "result", "data": data}
 
             elif method == "fetch_lyrics":
@@ -480,8 +467,8 @@ class LayricsApp:
                     song_data = {
                         "id": raw_id,
                         "source": src.name,
-                        "name": params.get("name"),
-                        "artists": params.get("artists", []),
+                        "title": params.get("title"),
+                        "artist": params.get("artist", []),
                         "album": params.get("album"),
                         "duration": params.get("duration"),
                     }
@@ -674,7 +661,9 @@ class LayricsApp:
                 cache = SongCache()
                 src, raw_id = parse_composite_id(song_id)
                 si = cache.lookup_song_info(raw_id, src.name)
-                song_info = si or SongInfo(source=src, id=raw_id)
+                song_info = si or SongInfo.from_dict(
+                    {"source": src.name, "id": raw_id}
+                )
                 loop = asyncio.get_event_loop()
                 ass = await loop.run_in_executor(
                     None,
@@ -684,14 +673,12 @@ class LayricsApp:
 
                 self.ctrl.set_ass_input(ass)
                 now_ms = int(time.monotonic() * 1000)
-                kwargs = {"paused": self.ctrl.state.paused}
                 if not self.ctrl.state.paused:
                     try:
                         pos = self._mpris_player.get_position()
-                        kwargs["start_time_ms"] = now_ms - pos // 1000
+                        self.ctrl.set_status(start_time_ms=now_ms - pos // 1000)
                     except Exception:
                         pass
-                self.ctrl.set_status(**kwargs)
 
                 logger.info("cache set: %s -> %s%s", key, src.name, raw_id)
                 return {"id": req_id, "type": "result", "data": {"cached": True}}
@@ -778,14 +765,12 @@ class LayricsApp:
                         ass = await self._fetch_ass_for_track(self._last_track)
                         self.ctrl.set_ass_input(ass)
                         now_ms = int(time.monotonic() * 1000)
-                        kwargs = {"paused": self.ctrl.state.paused}
                         if not self.ctrl.state.paused:
                             try:
                                 pos = self._mpris_player.get_position()
-                                kwargs["start_time_ms"] = now_ms - pos // 1000
+                                self.ctrl.set_status(start_time_ms=now_ms - pos // 1000)
                             except Exception:
                                 pass
-                        self.ctrl.set_status(**kwargs)
                         logger.info(
                             "ass config: lyrics reloaded with new %s = %r", key, parsed
                         )

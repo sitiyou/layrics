@@ -7,7 +7,6 @@
 # 可选: QM, KG, NE, LRCLIB
 [search]
 sources = ["QM", "NE"]
-result_count = 5
 
 # 渲染相关
 # 目标帧率, -1 表示跟随显示器刷新率

@@ -8,7 +8,7 @@ from typing import Any
 
 import appdirs
 
-from layrics.LDDC.common.models import Artist, SongInfo, Source
+from layrics.LDDC.common.models import SongInfo
 
 from .mpris import TrackMeta
 
@@ -134,10 +134,10 @@ class SongCache:
             "VALUES (?, ?, ?, ?, ?, ?, ?)",
             [
                 (
-                    r["raw_id"],
+                    r["id"],
                     r["source"],
-                    r.get("name", ""),
-                    "|".join(r.get("artists", [])),
+                    r.get("title", ""),
+                    "|".join(r.get("artist", [])),
                     r.get("album", ""),
                     r.get("duration"),
                     now,
@@ -155,11 +155,13 @@ class SongCache:
         ).fetchone()
         if row is None:
             return None
-        return SongInfo(
-            source=Source[source],
-            id=song_id,
-            title=row[0] or None,
-            artist=Artist(row[1].split("|")) if row[1] else None,
-            album=row[2] or None,
-            duration=row[3],
+        return SongInfo.from_dict(
+            {
+                "source": source,
+                "id": song_id,
+                "title": row[0] or None,
+                "artist": row[1].split("|") if row[1] else None,
+                "album": row[2] or None,
+                "duration": row[3],
+            }
         )
