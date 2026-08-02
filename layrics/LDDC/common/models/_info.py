@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from itertools import zip_longest
 from pathlib import Path
 from types import MappingProxyType
-from typing import Self, TypeVar
+from typing import Any, Self, TypeVar
 
 from ._enums import Language, SearchType, Source
 
@@ -60,6 +60,35 @@ class SongInfo(InfoBase):
     @property
     def str_artist(self) -> str:
         return str(self.artist) if self.artist else ""
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize to a JSON-friendly dict: source as its name, artist as a list."""
+        return {
+            "source": self.source.name,
+            "id": self.id,
+            "title": self.title,
+            "artist": list(self.artist) if self.artist else None,
+            "album": self.album,
+            "duration": self.duration,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> Self:
+        """Rebuild a SongInfo from a :meth:`to_dict` dict; source accepts a name or enum."""
+        src = data.get("source")
+        source = src if isinstance(src, Source) else Source.parse(str(src))
+        if source is None:
+            msg = f"unknown source: {src!r}"
+            raise ValueError(msg)
+        artist = data.get("artist")
+        return cls(
+            source=source,
+            id=data.get("id"),
+            title=data.get("title"),
+            artist=Artist(artist) if artist else None,
+            album=data.get("album"),
+            duration=data.get("duration"),
+        )
 
 
 @dataclass(frozen=True, slots=True)

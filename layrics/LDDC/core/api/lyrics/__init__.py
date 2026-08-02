@@ -6,8 +6,10 @@
 """
 
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from threading import Lock
+from types import MappingProxyType
 from typing import TYPE_CHECKING
 
 from layrics.LDDC.common.data.cache import cached_call_with_status
@@ -18,6 +20,7 @@ from layrics.LDDC.common.models import (
     LyricInfo,
     Lyrics,
     P,
+    SearchInfo,
     SearchType,
     SongInfo,
     Source,
@@ -67,28 +70,72 @@ class LyricsAPI:
         msg = "Unknown error"
         raise LDDCError(msg)
 
-    def search(self, source: Source, keyword: str, search_type: SearchType, page: int = 1) -> APIResultList[SongInfo]:
-        """从指定歌词源搜索歌曲
+    def search(
+        self,
+        *,
+        title: str | None = None,
+        artist: str | None = None,
+        album: str | None = None,
+        sources: Source | list[Source] | None = None,
+        page: int = 1,
+    ) -> APIResultList[SongInfo]:
+        """Search songs by explicit keyword fields across the given sources.
+
+        At least one of ``title``/``artist``/``album`` must be provided. When
+        ``sources`` is None all cloud sources are searched. Results from each
+        source are interleaved in ``Source`` enum order.
 
         Args:
-            source (Source): 歌词源
-            keyword (str): 搜索关键词
-            search_type (SearchType): 搜索类型
-            page (int, optional): 页码. Defaults to 1.
+            title (str | None): song title keyword.
+            artist (str | None): artist keyword.
+            album (str | None): album keyword.
+            sources (Source | list[Source] | None): sources to search, default all.
+            page (int, optional): page number. Defaults to 1.
 
         Returns:
-            APIResultList[SongInfo]: 搜索结果
-
+            APIResultList[SongInfo]: interleaved search results.
         """
+        if not (title or artist or album):
+            msg = "at least one of title/artist/album is required"
+            raise ValueError(msg)
         if not self.inited:
             self.init()
-        if source not in self.cloud_apis:
-            msg = f"Unsupported source: {source}"
-            raise ValueError(msg)
-        if search_type not in self.cloud_apis[source].supported_search_types:
-            msg = f"Unsupported search type: {search_type}"
-            raise ValueError(msg)
-        return self.timeout_retry(self.cloud_apis[source].search, keyword, search_type, page)
+        if sources is None:
+            src_list = list(self.cloud_apis)
+        elif isinstance(sources, Source):
+            src_list = [sources]
+        else:
+            src_list = list(sources)
+
+        keyword = " ".join(p for p in (title, artist, album) if p)
+
+        def _search_one(src: Source) -> tuple[Source, APIResultList[SongInfo] | None]:
+            try:
+                result = self.timeout_retry(
+                    self.cloud_apis[src].search, keyword, SearchType.SONG, page
+                )
+                return src, result if len(result) > 0 else None
+            except Exception as e:  # noqa: BLE001 - isolate per-source failures
+                logger.error("search: source %s failed: %s", src, e)
+                return src, None
+
+        per_source: dict[Source, APIResultList[SongInfo]] = {}
+        with ThreadPoolExecutor(max_workers=len(src_list)) as executor:
+            for src, result in executor.map(_search_one, src_list):
+                if result is not None:
+                    per_source[src] = result
+
+        items = [item for r in per_source.values() for item in r]
+        ranges = MappingProxyType(
+            {src: r.source_ranges[src] for src, r in per_source.items()}
+        )
+        info = SearchInfo(
+            source=src_list,
+            keyword=keyword,
+            search_type=SearchType.SONG,
+            page=page,
+        )
+        return APIResultList(items, info, ranges)
 
     def get_lyrics(self, info: SongInfo | LyricInfo | None = None) -> Lyrics:
         """获取歌词
@@ -115,20 +162,28 @@ class LyricsAPI:
 lyrics_api = LyricsAPI()
 
 
-def search(source: Source, keyword: str, search_type: SearchType, page: int = 1) -> APIResultList[SongInfo]:
-    """从指定歌词源搜索歌曲
+def search(
+    *,
+    title: str | None = None,
+    artist: str | None = None,
+    album: str | None = None,
+    sources: Source | list[Source] | None = None,
+    page: int = 1,
+) -> APIResultList[SongInfo]:
+    """Search songs by explicit keyword fields across sources (cached 4h).
 
-    Args:
-        source (Source): 歌词源
-        keyword (str): 搜索关键词
-        search_type (SearchType): 搜索类型
-        page (int, optional): 页码. Defaults to 1.
-
-    Returns:
-        APIResultList[SongInfo]: 搜索结果
-
+    See :meth:`LyricsAPI.search` for parameter semantics.
     """
-    result, cached = cached_call_with_status(lyrics_api.search, {"expire": 14400}, source, keyword, search_type, page)
+    src_key = tuple(sources) if isinstance(sources, list) else sources
+    result, cached = cached_call_with_status(
+        lyrics_api.search,
+        {"expire": 14400},
+        title=title,
+        artist=artist,
+        album=album,
+        sources=src_key,
+        page=page,
+    )
     result.cached = cached
     return result
 

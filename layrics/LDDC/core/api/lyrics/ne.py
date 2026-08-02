@@ -11,7 +11,7 @@ from threading import Lock
 import httpx
 
 from layrics.LDDC.common.data.cache import cache
-from layrics.LDDC.common.exceptions import APIRequestError
+from layrics.LDDC.common.exceptions import APIRequestError, LyricsNotFoundError
 from layrics.LDDC.common.logger import logger
 from layrics.LDDC.common.models import (
     APIResultList,
@@ -306,4 +306,7 @@ class NEAPI(CloudAPI):
                 else:
                     lyrics[key] = plaintext2data(data[value]["lyric"])
                 lyrics.types[key] = judge_lyrics_type(lyrics[key])
+        if not lyrics:
+            msg = "没有找到歌词"
+            raise LyricsNotFoundError(msg, info)
         return lyrics

@@ -9,7 +9,11 @@ from threading import Lock
 
 import httpx
 
-from layrics.LDDC.common.exceptions import APIParamsError, APIRequestError
+from layrics.LDDC.common.exceptions import (
+    APIParamsError,
+    APIRequestError,
+    LyricsNotFoundError,
+)
 from layrics.LDDC.common.models import (
     APIResultList,
     Artist,
@@ -235,4 +239,7 @@ class QMAPI(CloudAPI):
 
                     lyrics[key] = lyric
                     lyrics.types[key] = judge_lyrics_type(lyric)
+        if not lyrics:
+            msg = "没有找到歌词"
+            raise LyricsNotFoundError(msg, info)
         return lyrics

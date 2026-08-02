@@ -5,7 +5,11 @@ import json
 
 import httpx
 
-from layrics.LDDC.common.exceptions import APIParamsError, APIRequestError
+from layrics.LDDC.common.exceptions import (
+    APIParamsError,
+    APIRequestError,
+    LyricsNotFoundError,
+)
 from layrics.LDDC.common.models import (
     APIResultList,
     Artist,
@@ -95,6 +99,9 @@ class LrclibAPI(CloudAPI):
             lyrics["orig"] = plaintext2data(data["plainLyrics"])
             lyrics.types["orig"] = judge_lyrics_type(lyrics["orig"])
 
+        if not lyrics:
+            msg = "没有找到歌词"
+            raise LyricsNotFoundError(msg, info)
         return lyrics
 
     def search(self, keyword: str, search_type: SearchType, page: int = 1) -> APIResultList[SongInfo]:
