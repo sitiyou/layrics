@@ -84,6 +84,7 @@ class Application {
 
     void mainLoop();
     void processState();
+    void renderAndCommit(int64_t timestampMs);
     void requestFrame();
 
     void onFrame(uint32_t time);

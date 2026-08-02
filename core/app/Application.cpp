@@ -223,6 +223,11 @@ void Application::processState() {
         hideDisplay();
         m_surface.commitFrame(m_buffer.buffer(), true);
     }
+    if (!m_state.hidden && prevHidden && m_state.paused) {
+        // Unhiding while paused: render the frozen frame once so the overlay
+        // shows it again, then the frame chain stops again.
+        renderAndCommit(m_freezeTimestampMs);
+    }
     if (m_state.paused && !prevPaused) {
         m_freezeTimestampMs = nowMs() - m_state.startTimeMs;
     }
@@ -272,6 +277,10 @@ void Application::onFrame(uint32_t time) {
             ? m_freezeTimestampMs
             : static_cast<int64_t>(time) - m_state.startTimeMs;
 
+    renderAndCommit(timestampMs);
+}
+
+void Application::renderAndCommit(int64_t timestampMs) {
     uint8_t *bufData = static_cast<uint8_t *>(m_buffer.data());
     RenderResult result = m_renderMgr.render(bufData, timestampMs);
 
