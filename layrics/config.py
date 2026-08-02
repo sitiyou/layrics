@@ -130,10 +130,9 @@ class Config:
     def _parse_sources(raw_sources: list[str]) -> list[Source]:
         parsed: list[Source] = []
         for name in raw_sources:
-            try:
-                parsed.append(Source[name.upper().strip()])
-            except KeyError:
-                pass
+            src = Source.parse(name)
+            if src is not None:
+                parsed.append(src)
         return parsed
 
     def _load(self):

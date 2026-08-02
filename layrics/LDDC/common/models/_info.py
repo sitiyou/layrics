@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: Copyright (C) 2024-2025 沉默の金 <cmzj@cmzj.org>
 # SPDX-License-Identifier: GPL-3.0-only
-"""信息模型(精简自 LDDC:去掉 SongListInfo/歌单相关,去掉 to_dict/from_dict 等未用接口)"""
+"""Info models (slimmed from LDDC: dropped SongListInfo/playlist, to_dict/from_dict and other unused APIs)"""
 
 from __future__ import annotations
 

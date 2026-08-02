@@ -16,43 +16,9 @@ from layrics.LDDC.common.models import (
     Lyrics as _LDCLyrics,
 )
 
-from . import _ruby
 from ._ass import DEFAULT_PRIMARY, DEFAULT_SECONDARY, AssStyle
 
 logger = logging.getLogger("layrics.assprovider")
-
-
-_TRACK_ORDER = ("orig", "ts", "roma")
-
-
-def select_track(lyrics_data: _LDCLyrics, priority: list[str]) -> str | None:
-    for item in priority:
-        if item in lyrics_data:
-            return item
-        for key in lyrics_data:
-            lang = _detect_lang(lyrics_data, key)
-            if lang == item:
-                return key
-    for key in _TRACK_ORDER:
-        if key in lyrics_data:
-            return key
-    return None
-
-
-def _detect_lang(lyrics_data: _LDCLyrics, key: str) -> str:
-    data = lyrics_data.get(key)
-    if not data:
-        return "default"
-    text = "".join(w.text for line in data for w in line.words)
-    if re.search(r"[\u3040-\u309f\u30a0-\u30ff]", text):
-        return "ja"
-    if re.search(r"[\uac00-\ud7af]", text):
-        return "ko"
-    if re.search(r"[\u0400-\u04ff]", text):
-        return "ru"
-    if re.search(r"[\u4e00-\u9fff]", text):
-        return "zh"
-    return "default"
 
 
 _ass_providers: list[type[AssProvider]] = []
@@ -113,7 +79,6 @@ class Lyrics(_LDCLyrics):
         self._init_tracks(
             primary_track, secondary_track, primary_priority, secondary_priority
         )
-        self._strip_ruby()
 
     def _init_tracks(
         self,
@@ -123,25 +88,19 @@ class Lyrics(_LDCLyrics):
         secondary_priority: list[str] | None,
     ) -> None:
         if primary_priority:
-            pt = select_track(self, primary_priority)
+            pt = self.select_track(primary_priority)
             self._primary_track = pt or "orig"
         elif primary_track:
             self._primary_track = primary_track
         else:
             self._primary_track = "orig"
         if secondary_priority:
-            st = select_track(self, secondary_priority)
+            st = self.select_track(secondary_priority)
             self._secondary_track = st
         elif secondary_track is not None:
             self._secondary_track = secondary_track
         else:
             self._secondary_track = "ts"
-
-    def _strip_ruby(self) -> None:
-        _ruby.strip_ruby(self, track=self._primary_track)
-
-    def _detect_ruby(self) -> bool:
-        return _ruby.detect_ruby(self, track=self._primary_track)
 
     @property
     def primary_track(self) -> str:
@@ -180,29 +139,6 @@ class Lyrics(_LDCLyrics):
         if f:
             base = replace(base, font_name=f)
         return base
-
-    def detect_lang(self, key: str = "orig") -> str:
-        """通过字符集检测指定 key 的歌词文本的语言。
-
-        Returns:
-            语言代码: ``"ja"`` ``"zh"`` ``"ko"`` ``"ru"`` 或 ``"default"``。
-        """
-        return _detect_lang(self, key)
-
-    def get_fslyrics(self, duration_ms: int | None = None) -> FSLyrics:
-        fslyrics = super().get_fslyrics(duration_ms)
-        for data in fslyrics.values():
-            for i in range(len(data) - 1):
-                if data[i].end > data[i + 1].start:
-                    data[i] = data[i]._replace(end=data[i + 1].start)
-            if not data:
-                continue
-            last = data[-1]
-            if last.end <= last.start:
-                data[-1] = last._replace(
-                    end=duration_ms if duration_ms else last.start + 5000
-                )
-        return fslyrics
 
     def active_tracks(
         self, fslyrics: FSLyrics, *, secondary_enabled: bool = True

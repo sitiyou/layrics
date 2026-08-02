@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: Copyright (C) 2024-2025 沉默の金 <cmzj@cmzj.org>
 # SPDX-License-Identifier: GPL-3.0-only
-"""磁盘缓存(精简自 LDDC:缓存目录改为 appdirs,不再依赖 common.paths)"""
+"""Disk cache (slimmed from LDDC: cache dir moved to appdirs, no longer depends on common.paths)"""
 
 import atexit
 from collections.abc import Callable

@@ -1,7 +1,8 @@
 # SPDX-FileCopyrightText: Copyright (C) 2024-2025 沉默の金 <cmzj@cmzj.org>
 # SPDX-License-Identifier: GPL-3.0-only
-"""歌词数据模型(精简自 LDDC:去掉 to()/add_offset()/is_inst() 等未用接口)"""
+"""Lyrics data models (slimmed from LDDC: dropped to()/add_offset()/is_inst() etc. unused APIs)"""
 
+import re
 from collections import UserDict
 from collections.abc import MutableMapping
 from dataclasses import replace
@@ -9,6 +10,7 @@ from typing import Literal, NamedTuple, NewType, TypeVar, overload
 
 from ._enums import LyricsType, Source
 from ._info import Artist, LyricInfo, SongInfo
+from ._ruby import detect_ruby, strip_ruby
 
 
 class LyricsWord(NamedTuple):
@@ -118,6 +120,8 @@ def get_full_timestamps_lyrics_data(data: LyricsData, duration: int | None, only
 
 VT = TypeVar("VT", LyricsData, FSLyricsData)
 
+_TRACK_ORDER = ("orig", "ts", "roma")
+
 
 class LyricsBase(UserDict[str, VT]):
     __slots__ = ("tags", "types")
@@ -162,6 +166,45 @@ class LyricsBase(UserDict[str, VT]):
     @property
     def cached(self) -> bool:
         return self.info.cached
+
+    def detect_lang(self, key: str = "orig") -> str:
+        """Detect the language of the lyric text for the given track key by charset.
+
+        Returns:
+            Language code: ``"ja"`` ``"zh"`` ``"ko"`` ``"en"`` or ``"default"``.
+        """
+        data = self.get(key)
+        if not data:
+            return "default"
+        text = "".join(w.text for line in data for w in line.words)
+        if re.search(r"[\u3040-\u309f\u30a0-\u30ff]", text):
+            return "ja"
+        if re.search(r"[\uac00-\ud7af]", text):
+            return "ko"
+        if re.search(r"[\u4e00-\u9fff]", text):
+            return "zh"
+        if re.search(r"[a-zA-Z]", text):
+            return "en"
+        return "default"
+
+    def select_track(self, priority: list[str]) -> str | None:
+        """Select a track by priority: match track keys first, then detected language, then fall back to the default order."""
+        for item in priority:
+            if item in self:
+                return item
+            for key in self:
+                if self.detect_lang(key) == item:
+                    return key
+        for key in _TRACK_ORDER:
+            if key in self:
+                return key
+        return None
+
+    def detect_ruby(self, track: str | None = None) -> bool:
+        return detect_ruby(self, track=track)
+
+    def strip_ruby(self, track: str | None = None) -> None:
+        strip_ruby(self, track=track)
 
     def __bool__(self) -> bool:
         return any(lyric for lyric in self.values())
@@ -217,6 +260,20 @@ class Lyrics(LyricsBase[LyricsData]):
         full_timestamps_lyrics.tags = self.tags
         for lang, lyrics_data in self.items():
             full_timestamps_lyrics[lang] = get_full_timestamps_lyrics_data(data=lyrics_data, duration=duration, only_line=False, skip_none=True)
+
+        # Fix overlapping lines: clamp end to the next line's start to avoid overlap when rendering
+        for data in full_timestamps_lyrics.values():
+            for i in range(len(data) - 1):
+                if data[i].end > data[i + 1].start:
+                    data[i] = data[i]._replace(end=data[i + 1].start)
+            if not data:
+                continue
+            # Last-line fallback: extend end when end <= start
+            last = data[-1]
+            if last.end <= last.start:
+                data[-1] = last._replace(
+                    end=duration_ms if duration_ms else last.start + 5000
+                )
         return full_timestamps_lyrics
 
 

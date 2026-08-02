@@ -234,6 +234,7 @@ def fetch_lyrics(
         primary_override=cfg.get_style_config("primary"),
         secondary_override=cfg.get_style_config("secondary"),
     )
+    lyrics.strip_ruby(track=lyrics.primary_track)
     provider: AssProvider = provider_cls(
         config=cfg.get_provider_config(getattr(provider_cls, "PROVIDER", "")),  # type: ignore[call-arg]
     )

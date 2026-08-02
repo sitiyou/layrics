@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: Copyright (C) 2024-2025 沉默の金 <cmzj@cmzj.org>
 # SPDX-License-Identifier: GPL-3.0-only
-"""歌词解密(精简自 LDDC:去掉本地 QRC 的 qmc1 解密,只保留云端 QRC 与 KRC)"""
+"""Lyrics decryption (slimmed from LDDC: dropped qmc1 for local QRC, only cloud QRC and KRC kept)"""
 
 from zlib import decompress
 

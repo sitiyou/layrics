@@ -31,6 +31,14 @@ class Source(Enum):
     def __str__(self) -> str:
         return self.name
 
+    @classmethod
+    def parse(cls, name: str) -> Source | None:
+        """Parse a source name case-insensitively; return None for unknown names."""
+        try:
+            return cls[name.upper().strip()]
+        except KeyError:
+            return None
+
     @property
     def supported_search_types(self) -> tuple[SearchType, ...]:
         match self:

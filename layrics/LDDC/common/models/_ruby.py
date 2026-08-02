@@ -1,29 +1,33 @@
+# SPDX-FileCopyrightText: Copyright (C) 2024-2025 沉默の金 <cmzj@cmzj.org>
+# SPDX-License-Identifier: GPL-3.0-only
+"""Bracket ruby (furigana) detection and stripping (moved in from layrics/assprovider/_ruby.py)"""
+
 from __future__ import annotations
 
 import logging
 import re
 
-logger = logging.getLogger("layrics.ruby")
+logger = logging.getLogger("LDDC")
 
 
-# 行级 detect：kanji + 可选空格 + 括号 ruby（跨 word 边界也能匹配）
+# Line-level detect: kanji + optional spaces + bracketed ruby (matches across word boundaries)
 _RUBY_RE = re.compile(
     r"[\u4e00-\u9fff]\s*"
     r"(?:（[^）]*）|\([^)]*\)|［[^］]*］|\[[^\]]*\]"
     r")"
 )
-# strip pass1：kanji + 括号 → 保留 kanji
+# strip pass1: kanji + brackets -> keep kanji
 _RUBY_STRIP_RE = re.compile(
     r"[\u4e00-\u9fff]\s*"
     r"(?:（[^）]*）|\([^)]*\)|［[^］]*］|\[[^\]]*\]"
     r")"
 )
-# strip pass2：独立括号（kanji 在别的 word 中）→ 整体删除
+# strip pass2: bare brackets (kanji in another word) -> delete entirely
 _RUBY_BARE_RE = re.compile(r"（[^）]*）|\([^)]*\)|［[^］]*］|\[[^\]]*\]")
-# strip pass3：零散括号字符（各字符独立成 word 的情形）
+# strip pass3: stray bracket chars (each char a separate word)
 _RUBY_CHARS_RE = re.compile(r"[（）()［］\[\]]")
 
-# 包含 ruby pattern 的 line 数占总 line 数的比例阈值
+# Ratio threshold of ruby-pattern lines to total lines
 _RUBY_LINE_RATIO = 0.5
 
 

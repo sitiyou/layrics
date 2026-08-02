@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: Copyright (C) 2024-2025 沉默の金 <cmzj@cmzj.org>
 # SPDX-License-Identifier: GPL-3.0-only
-"""eapi 加密解密(精简自 LDDC:去掉未使用的 eapi_params_decrypt/cache_key_decrypt)"""
+"""eapi encryption/decryption (slimmed from LDDC: dropped unused eapi_params_decrypt/cache_key_decrypt)"""
 
 import binascii
 import hashlib
