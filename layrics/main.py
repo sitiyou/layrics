@@ -217,7 +217,8 @@ class LayricsApp:
             )
             raise RuntimeError(f"no match found for {keyword!r}")
 
-        src, raw_id = parse_composite_id(matched["id"])
+        src = Source[matched["source"]]
+        raw_id = matched["id"]
         song_info = SongInfo.from_dict(matched)
         ass = await loop.run_in_executor(None, lambda: _fetch_lyrics(song_info))
         logger.info("fetch: %s -> %s (%d bytes)", keyword, matched["id"], len(ass))
