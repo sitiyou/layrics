@@ -29,5 +29,4 @@ layctl = "layrics.layctl:cli"
 setup = ["-Dbuildtype=release"]
 
 [tool.pyright]
-extraPaths = ["./layrics/vendor"]
 typeCheckingMode = "basic"

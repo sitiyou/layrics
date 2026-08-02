@@ -3,10 +3,11 @@ from __future__ import annotations
 import os
 import re
 from dataclasses import dataclass, field, fields
-from typing import Any, Optional
+from typing import Any
 
 import appdirs
-from LDDC.common.models import Source
+
+from layrics.LDDC.common.models import Source
 
 if os.environ.get("LAYRICS_CONFIG_DIR"):
     _CONFIG_DIR = os.environ["LAYRICS_CONFIG_DIR"]
@@ -241,7 +242,7 @@ class Config:
         self._exclude_patterns = list(patterns)
 
 
-_CONFIG: Optional[Config] = None
+_CONFIG: Config | None = None
 
 
 def get_config() -> Config:

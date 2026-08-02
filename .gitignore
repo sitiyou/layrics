@@ -1,4 +1,5 @@
 /refs
+layrics/vendor/
 __pycache__/
 dist/
 *.egg-info/

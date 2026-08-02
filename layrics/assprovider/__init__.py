@@ -17,17 +17,17 @@ from ._protocol import (
 from ._style import BottomStyle
 
 __all__ = [
-    "Lyrics",
-    "AssProvider",
-    "AssTrigger",
-    "register_ass_provider",
-    "match_provider",
-    "AssHeader",
-    "AssStyle",
-    "AssDialogueLine",
-    "build_ass",
     "DEFAULT_PRIMARY",
     "DEFAULT_SECONDARY",
+    "AssDialogueLine",
+    "AssHeader",
+    "AssProvider",
+    "AssStyle",
+    "AssTrigger",
     "BottomStyle",
     "DefaultProvider",
+    "Lyrics",
+    "build_ass",
+    "match_provider",
+    "register_ass_provider",
 ]

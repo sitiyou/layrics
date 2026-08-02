@@ -4,10 +4,11 @@ import os
 import sqlite3
 import time
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any
 
 import appdirs
-from LDDC.common.models import Artist, SongInfo, Source
+
+from layrics.LDDC.common.models import Artist, SongInfo, Source
 
 from .mpris import TrackMeta
 
@@ -62,7 +63,7 @@ class SongCache:
 
     # ── song_cache (TrackMeta → lyrics_song_id) ──────────────────
 
-    def get(self, key: str) -> Optional[CacheEntry]:
+    def get(self, key: str) -> CacheEntry | None:
         row = self._conn.execute(
             "SELECT cache_key, lyrics_song_id, lyrics_source, "
             "created_at, updated_at "
@@ -146,7 +147,7 @@ class SongCache:
         )
         self._conn.commit()
 
-    def lookup_song_info(self, song_id: str, source: str) -> Optional[SongInfo]:
+    def lookup_song_info(self, song_id: str, source: str) -> SongInfo | None:
         row = self._conn.execute(
             "SELECT title, artists, album, duration "
             "FROM song_info_cache WHERE song_id = ? AND source = ?",

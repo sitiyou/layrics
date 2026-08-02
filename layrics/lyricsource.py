@@ -9,10 +9,10 @@ from typing import Any
 
 from opencc import OpenCC
 
-from LDDC.common.models import (
+from layrics.LDDC.common.models import (
     Lyrics as _LDCLyrics,
 )
-from LDDC.common.models import (
+from layrics.LDDC.common.models import (
     LyricsLine,
     LyricsType,
     LyricsWord,
@@ -20,8 +20,8 @@ from LDDC.common.models import (
     SongInfo,
     Source,
 )
-from LDDC.core.api.lyrics import get_lyrics as _lddc_get_lyrics
-from LDDC.core.api.lyrics import search as _lddc_search
+from layrics.LDDC.core.api.lyrics import get_lyrics as _lddc_get_lyrics
+from layrics.LDDC.core.api.lyrics import search as _lddc_search
 
 from .assprovider import AssProvider, DefaultProvider, Lyrics, match_provider
 from .config import get_config
@@ -248,8 +248,7 @@ def fetch_lyrics(
                     "FONTNAME": primary_style.font_name,
                 }
                 pc = primary_style.primary_colour
-                if pc.startswith("&H"):
-                    pc = pc[2:]
+                pc = pc.removeprefix("&H")
                 overrides["OVERLAY_COLOR"] = pc[-6:]
 
                 ass = _postprocess_aegisub(

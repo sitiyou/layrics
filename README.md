@@ -96,7 +96,7 @@ uv tool install git+https://github.com/sitiyou/layrics
 pipx install git+https://github.com/sitiyou/layrics
 ```
 
-歌词源库 `LDDC` 已作为 vendored 副本包含在仓库中（`layrics/vendor/LDDC/`），无需 `--recursive` 子模块。
+歌词源库 `LDDC` 已作为精简后的子包内置在 `layrics/LDDC/`（原上游代码的 vendored 副本保留在 `layrics/vendor/LDDC/` 作参考），无需 `--recursive` 子模块。
 
 ### 开发安装
 
@@ -417,7 +417,7 @@ uv tool install git+https://github.com/sitiyou/layrics
 pipx install git+https://github.com/sitiyou/layrics
 ```
 
-The `LDDC` lyric-source library is vendored in the repository (`layrics/vendor/LDDC/`), so no submodule checkout is needed.
+The `LDDC` lyric-source library is embedded as a slimmed-down subpackage at `layrics/LDDC/` (the upstream vendored copy stays at `layrics/vendor/LDDC/` for reference), so no submodule checkout is needed.
 
 ### Development install
 

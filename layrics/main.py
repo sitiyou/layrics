@@ -36,19 +36,19 @@ import os
 import sys
 import time
 from dataclasses import asdict
-from typing import Any, Optional
+from typing import Any
 
-from LDDC.common.exceptions import LyricsNotFoundError
-from LDDC.common.models import Artist, SongInfo, Source
+from layrics.LDDC.common.exceptions import LyricsNotFoundError
+from layrics.LDDC.common.models import Artist, SongInfo, Source
 
-from .core import ApplicationController
 from .cache import SongCache, make_cache_key
 from .config import get_config
-from .lyricsource import (
-    parse_composite_id,
-)
+from .core import ApplicationController
 from .lyricsource import (
     fetch_lyrics as _fetch_lyrics,
+)
+from .lyricsource import (
+    parse_composite_id,
 )
 from .lyricsource import (
     search_songs as _search_songs,
@@ -126,7 +126,7 @@ class LayricsApp:
         self._config = get_config()
         self.mpris_finder = MPRISPlayerFinder()
         self._mpris_player: Any = None
-        self._last_track: Optional[TrackMeta] = None
+        self._last_track: TrackMeta | None = None
 
         self.socket_path = (
             socket_path
@@ -134,11 +134,11 @@ class LayricsApp:
             or os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "layrics.sock")
         )
 
-        self._server: Optional[asyncio.AbstractServer] = None
-        self._last_status: Optional[str] = None
+        self._server: asyncio.AbstractServer | None = None
+        self._last_status: str | None = None
         self._last_position_us: int = 0
-        self._signal_monitor: Optional[MprisSignalMonitor] = None
-        self._signal_reader: Optional[asyncio.AbstractEventLoop] = None
+        self._signal_monitor: MprisSignalMonitor | None = None
+        self._signal_reader: asyncio.AbstractEventLoop | None = None
         self._fetch_gen: int = 0
 
     # ── overlay control ───────────────────────────────────────────
@@ -279,7 +279,7 @@ class LayricsApp:
         def _match_name(p):
             bus = getattr(p, "bus_name", "")
             prefix = "org.mpris.MediaPlayer2."
-            return bus[len(prefix) :] if bus.startswith(prefix) else bus
+            return bus.removeprefix(prefix)
 
         if self._config.exclude_players:
             players = [
@@ -840,7 +840,7 @@ class LayricsApp:
             }
             writer.write((json.dumps(err) + "\n").encode())
             await writer.drain()
-        except asyncio.TimeoutError:
+        except TimeoutError:
             pass
         except Exception as e:
             req_id = req.get("id") if isinstance(req, dict) else None

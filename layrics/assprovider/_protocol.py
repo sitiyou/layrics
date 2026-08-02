@@ -2,18 +2,17 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Iterator
 from dataclasses import dataclass, replace
-from typing import Any, ClassVar, Iterator, Protocol, runtime_checkable
+from typing import Any, ClassVar, Protocol, runtime_checkable
 
-from LDDC.common.models import (
+from layrics.LDDC.common.models import (
     FSLyrics,
     FSLyricsLine,
-    LyricsLine,
     LyricsType,
-    LyricsWord,
     Source,
 )
-from LDDC.common.models import (
+from layrics.LDDC.common.models import (
     Lyrics as _LDCLyrics,
 )
 

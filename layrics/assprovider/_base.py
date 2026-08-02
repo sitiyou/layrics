@@ -4,8 +4,7 @@ import logging
 from dataclasses import replace
 from typing import Any
 
-from LDDC.common.models import (
-    FSLyrics,
+from layrics.LDDC.common.models import (
     FSLyricsLine,
     LyricsType,
 )
@@ -162,7 +161,7 @@ class DefaultProvider(AssProvider):
             if shift > 0 and use_karaoke:
                 text = f"{{\\k{shift // 10}}}{text}"
             if shift > 0 and not use_karaoke:
-                original_start = orig_data[i].start
+                original_start = oline.start
                 dim_style = left_dim if i % 2 == 0 else right_dim
                 bright_style = left_style if i % 2 == 0 else right_style
                 events.append(
