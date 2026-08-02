@@ -63,7 +63,7 @@ logging.basicConfig(
         logging.StreamHandler(),
     ],
 )
-logger = logging.getLogger("layrics")
+logger = logging.getLogger("layrics.main")
 
 # LAYRICS_DEBUG=lyrics,match  → 模块级 DEBUG；=core  → C++ DEBUG
 for name in os.environ.get("LAYRICS_DEBUG", "").split(","):
@@ -244,7 +244,7 @@ class LayricsApp:
             try:
                 pos = self._mpris_player.get_position()
                 self.ctrl.set_status(start_time_ms=now_ms - pos // 1000)
-            except Exception:
+            except Exception:  # noqa: S110 - position unavailable, keep default
                 pass
 
     # ── MPRIS ─────────────────────────────────────────────────────
@@ -301,7 +301,7 @@ class LayricsApp:
                     logger.info("auto-selected player: %s", p.get_identity())
                     self._start_signal_monitor()
                     return True
-            except Exception:
+            except Exception:  # noqa: S112 - unresponsive player, try next
                 continue
         p = players[0]
         self._mpris_player = p
@@ -335,7 +335,7 @@ class LayricsApp:
                     try:
                         pos = self._mpris_player.get_position()
                         kwargs["start_time_ms"] = now_ms - pos // 1000
-                    except Exception:
+                    except Exception:  # noqa: S110 - position unavailable, keep default
                         pass
                     self.ctrl.set_status(**kwargs)
                 elif val in ("Paused", "Stopped"):
@@ -677,7 +677,7 @@ class LayricsApp:
                     try:
                         pos = self._mpris_player.get_position()
                         self.ctrl.set_status(start_time_ms=now_ms - pos // 1000)
-                    except Exception:
+                    except Exception:  # noqa: S110 - position unavailable, keep default
                         pass
 
                 logger.info("cache set: %s -> %s%s", key, src.name, raw_id)
@@ -769,7 +769,7 @@ class LayricsApp:
                             try:
                                 pos = self._mpris_player.get_position()
                                 self.ctrl.set_status(start_time_ms=now_ms - pos // 1000)
-                            except Exception:
+                            except Exception:  # noqa: S110 - position unavailable, keep default
                                 pass
                         logger.info(
                             "ass config: lyrics reloaded with new %s = %r", key, parsed
@@ -840,7 +840,7 @@ class LayricsApp:
             writer.close()
             try:
                 await writer.wait_closed()
-            except Exception:
+            except Exception:  # noqa: S110 - ignore close failure
                 pass
 
     # ── MPRIS poller ──────────────────────────────────────────────

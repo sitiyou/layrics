@@ -22,7 +22,7 @@ P = ParamSpec("P")
 T = TypeVar("T")
 
 
-def cached_call(
+def cached_call[**P, T](
     func: Callable[P, T],
     cache_settings: dict | None = None,
     *args: P.args,
@@ -58,7 +58,7 @@ def cached_call(
     return result
 
 
-def cached_call_with_status(
+def cached_call_with_status[**P, T](
     func: Callable[P, T],
     cache_settings: dict | None = None,
     *args: P.args,

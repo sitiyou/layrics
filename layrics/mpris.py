@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 MPRIS (Media Player Remote Interfacing Specification) 实现
 用于从 Linux 音乐播放器获取歌曲元数据
@@ -204,7 +203,7 @@ class MPRISPlayerFinder:
         for player in self.find_all_players():
             try:
                 result.append((player.bus_name, player.get_identity()))
-            except Exception:
+            except Exception:  # noqa: S110 - unresponsive player, skip
                 pass
         return result
 

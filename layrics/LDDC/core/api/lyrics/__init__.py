@@ -115,7 +115,7 @@ class LyricsAPI:
                     self.cloud_apis[src].search, keyword, SearchType.SONG, page
                 )
                 return src, result if len(result) > 0 else None
-            except Exception as e:  # noqa: BLE001 - isolate per-source failures
+            except Exception as e:
                 logger.error("search: source %s failed: %s", src, e)
                 return src, None
 

@@ -24,7 +24,7 @@ include_players = []
 exclude_players = []
 
 # 字体映射: 检测到的语言 → 字体名
-# 语言: ja (日语), zh (中文), ko (韩语), ru (俄语), default
+# 语言: ja (日语), zh (中文), ko (韩语), en (英语), default
 [fonts]
 default = "sans-serif"
 ja = "Noto Sans CJK JP"
@@ -81,7 +81,7 @@ margin_v = 24
 encoding = 1
 
 # 主/副歌词选择优先级
-# 每项可以是 track 类型 (orig, ts, roma) 或语言代码 (zh, ja, ko, ru)
+# 每项可以是 track 类型 (orig, ts, roma) 或语言代码 (zh, ja, ko, en)
 # 从左到右优先级依次降低
 [lyrics]
 primary = ["orig"]

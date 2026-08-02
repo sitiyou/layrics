@@ -176,8 +176,8 @@ class NEAPI(CloudAPI):
             ("origin", "orpheus://orpheus"),
             (
                 "user-agent",
-                "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Safari/537.36 Chrome/91.0.4472.164 NeteaseMusicDesktop/3.1.3.203419",
+                ("Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) "
+                 "Safari/537.36 Chrome/91.0.4472.164 NeteaseMusicDesktop/3.1.3.203419"),
             ),
             ("sec-ch-ua", '"Chromium";v="91"'),
             ("sec-ch-ua-mobile", "?0"),

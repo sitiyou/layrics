@@ -33,9 +33,8 @@ class AssTrigger:
     source: Source | list[Source] | None = None
 
     def matches(self, player_name: str, lyrics: _LDCLyrics) -> bool:
-        if self.player_regex is not None:
-            if not re.search(self.player_regex, player_name):
-                return False
+        if self.player_regex is not None and not re.search(self.player_regex, player_name):
+            return False
         if self.lyric_types is not None:
             t = lyrics.types.get("orig")
             if t is None or t not in self.lyric_types:
@@ -60,7 +59,7 @@ class Lyrics(_LDCLyrics):
     def __init__(
         self,
         lyrics: _LDCLyrics,
-        fonts: dict[str, str] = {},
+        fonts: dict[str, str] | None = None,
         *,
         primary_track: str | None = None,
         secondary_track: str | None = None,
@@ -73,7 +72,7 @@ class Lyrics(_LDCLyrics):
         self.update(lyrics)
         self.types = dict(lyrics.types)
         self.tags = dict(lyrics.tags)
-        self._fonts = dict(fonts)
+        self._fonts = dict(fonts or {})
         self._primary_override = primary_override or {}
         self._secondary_override = secondary_override or {}
         self._init_tracks(

@@ -108,7 +108,7 @@ class DefaultProvider(AssProvider):
 
             if secondary is None:
                 continue
-            for _lang, lline in aligned.items():
+            for lline in aligned.values():
                 stext = self._plain_text(lline)
                 if stext == text:
                     continue
