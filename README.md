@@ -107,6 +107,16 @@ pipx install git+https://github.com/sitiyou/layrics
 pip install -e .
 ```
 
+### 测试
+
+集成测试需要真实的 Wayland 会话（支持 wlr-layer-shell）：
+
+```bash
+uv run python -m unittest tests.test_wayland_state
+```
+
+`ZeroCommitTest` 通过 strace 验证 paused/hidden 状态下零 Wayland 提交（需安装 strace，无则自动跳过）。
+
 ## 使用
 
 ### 启动叠加层守护进程
@@ -427,6 +437,17 @@ The `LDDC` lyric-source library is embedded as a slimmed-down subpackage at `lay
 ```bash
 pip install -e .
 ```
+
+### Tests
+
+Integration tests require a real Wayland session (wlr-layer-shell):
+
+```bash
+uv run python -m unittest tests.test_wayland_state
+```
+
+`ZeroCommitTest` uses strace to verify zero Wayland commits while
+paused/hidden (skipped if strace is missing).
 
 ## Usage
 
