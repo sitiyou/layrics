@@ -29,3 +29,6 @@ setup = ["-Dbuildtype=release"]
 
 [tool.pyright]
 typeCheckingMode = "basic"
+
+[tool.ruff]
+ignore = ["BLE001"]
