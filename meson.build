@@ -125,6 +125,8 @@ if pybind11_dep.found()
     [binding_sources, all_core_sources],
     include_directories : inc,
     dependencies : [py_dep, pybind11_dep, dependencies],
+    # PYBIND11_MODULE uses an empty variadic-macro arg (legal only from C++20)
+    cpp_args : ['-Wno-c++20-extensions'],
     install : true,
     subdir : 'layrics',
   )

@@ -149,7 +149,6 @@ cairo_surface_t *AssRenderer::render(int64_t timestampMs) {
 
     lastRegions.clear();
 
-    int numImages = 0;
     for (ASS_Image *cur = img; cur != nullptr; cur = cur->next) {
         if (cur->w == 0 || cur->h == 0) {
             continue;
@@ -187,11 +186,8 @@ cairo_surface_t *AssRenderer::render(int64_t timestampMs) {
         }
 
         lastRegions.push_back({cur->dst_x, cur->dst_y, cur->w, cur->h});
-        numImages++;
     }
 
     cairo_surface_mark_dirty(m_surface);
-    // LAY_DEBUG("rendered %d images ts=%lld %dx%d", numImages,
-    //           (long long)timestampMs, m_width, m_height);
     return cairo_surface_reference(m_surface);
 }
