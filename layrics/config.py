@@ -138,10 +138,7 @@ class Config:
     def _load(self):
         if not os.path.exists(_CONFIG_PATH):
             return
-        try:
-            import tomllib
-        except ImportError:
-            import tomli as tomllib  # type: ignore[import-unresolved]
+        import tomllib
         with open(_CONFIG_PATH, "rb") as f:
             data = tomllib.load(f)
 

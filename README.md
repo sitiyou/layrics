@@ -79,7 +79,6 @@ C++ overlay (core/)
 
 - `meson-python`、`pybind11`（构建时）
 - `httpx[brotli,http2]`、`dbus-python`、`PyGObject`、`click`、`mutagen`、`diskcache`、`charset-normalizer`、`pyaes`、`appdirs`、`opencc`（运行时）
-- `tomli`（Python < 3.11）
 
 ### 安装
 
@@ -401,7 +400,6 @@ layrics (Python)                    C++ overlay (core/)
 
 - `meson-python`, `pybind11` (build)
 - `httpx[brotli,http2]`, `dbus-python`, `PyGObject`, `click`, `mutagen`, `diskcache`, `charset-normalizer`, `pyaes`, `appdirs`, `opencc` (runtime)
-- `tomli` (Python < 3.11)
 
 ### Install
 
