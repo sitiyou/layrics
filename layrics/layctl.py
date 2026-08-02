@@ -445,64 +445,63 @@ def dmenu(ctx, program: str | None):
     sock = ctx.obj["socket"]
     prog = _resolve_menu_program(program)
 
-    while True:
-        status = _call(sock, "get_status")
-        if status.get("type") == "error":
-            _pp(status)
-            return
-        data = status.get("data", {})
-        overlay = data.get("overlay", {})
-        player = data.get("mpris_player") or {}
+    status = _call(sock, "get_status")
+    if status.get("type") == "error":
+        _pp(status)
+        return
+    data = status.get("data", {})
+    overlay = data.get("overlay", {})
+    player = data.get("mpris_player") or {}
 
-        ass_cfg = _call(sock, "ass_get")
-        ass = ass_cfg.get("data", {}) if ass_cfg.get("type") == "result" else {}
+    ass_cfg = _call(sock, "ass_get")
+    ass = ass_cfg.get("data", {}) if ass_cfg.get("type") == "result" else {}
 
-        hidden = bool(overlay.get("hidden"))
-        locked = bool(overlay.get("locked"))
-        karaoke = ass.get("karaoke")
-        karaoke = True if karaoke is None else bool(karaoke)
-        line_mode = ass.get("line_mode") or "single"
-        secondary = ass.get("secondary")
-        secondary = True if secondary is None else bool(secondary)
-        fps = overlay.get("target_fps", -1)
-        fps_str = "vsync" if fps == -1 else f"{fps} FPS"
-        player_name = player.get("identity") or player.get("bus_name") or "none"
+    hidden = bool(overlay.get("hidden"))
+    locked = bool(overlay.get("locked"))
+    karaoke = ass.get("karaoke")
+    karaoke = True if karaoke is None else bool(karaoke)
+    line_mode = ass.get("line_mode") or "single"
+    secondary = ass.get("secondary")
+    secondary = True if secondary is None else bool(secondary)
+    fps = overlay.get("target_fps", -1)
+    fps_str = "vsync" if fps == -1 else f"{fps} FPS"
+    player_name = player.get("identity") or player.get("bus_name") or "none"
 
-        items = [
-            ("Search & set lyrics", "song"),
-            (f"Toggle visibility ({'hidden' if hidden else 'shown'})", "hide"),
-            (f"Toggle lock ({'on' if locked else 'off'})", "lock"),
-            (f"Toggle karaoke ({'on' if karaoke else 'off'})", "karaoke"),
-            (
-                f"Toggle line mode ({'double' if line_mode == 'double' else 'single'})",
-                "line_mode",
-            ),
-            (f"Toggle translation ({'on' if secondary else 'off'})", "secondary"),
-            (f"Set FPS (current: {fps_str})", "fps"),
-            (f"Select player (current: {player_name})", "player"),
-            ("Cache management", "cache"),
-            ("Show status", "status"),
-            ("Quit", "quit"),
-        ]
-        action = _menu_select(prog, "layrics", items)
-        if action is None or action == "quit":
-            return
-        if action == "song":
-            _menu_song(sock, prog)
-        elif action == "hide":
-            _call(sock, "hide", {"value": "toggle"})
-        elif action == "lock":
-            _call(sock, "lock", {"value": "toggle"})
-        elif action in ("karaoke", "line_mode", "secondary"):
-            _call(sock, "ass_set", {"key": action, "value": "toggle"})
-        elif action == "fps":
-            _menu_fps(sock, prog)
-        elif action == "player":
-            _menu_player(sock, prog)
-        elif action == "cache":
-            _menu_cache(sock, prog)
-        elif action == "status":
-            _print_status(sock, status)
+    items = [
+        ("Search & set lyrics", "song"),
+        (f"Toggle visibility ({'hidden' if hidden else 'shown'})", "hide"),
+        (f"Toggle lock ({'on' if locked else 'off'})", "lock"),
+        (f"Toggle karaoke ({'on' if karaoke else 'off'})", "karaoke"),
+        (
+            f"Toggle line mode ({'double' if line_mode == 'double' else 'single'})",
+            "line_mode",
+        ),
+        (f"Toggle translation ({'on' if secondary else 'off'})", "secondary"),
+        (f"Set FPS (current: {fps_str})", "fps"),
+        (f"Select player (current: {player_name})", "player"),
+        ("Cache management", "cache"),
+        ("Show status", "status"),
+        ("Quit", "quit"),
+    ]
+    action = _menu_select(prog, "layrics", items)
+    if action is None or action == "quit":
+        return
+    if action == "song":
+        _menu_song(sock, prog)
+    elif action == "hide":
+        _call(sock, "hide", {"value": "toggle"})
+    elif action == "lock":
+        _call(sock, "lock", {"value": "toggle"})
+    elif action in ("karaoke", "line_mode", "secondary"):
+        _call(sock, "ass_set", {"key": action, "value": "toggle"})
+    elif action == "fps":
+        _menu_fps(sock, prog)
+    elif action == "player":
+        _menu_player(sock, prog)
+    elif action == "cache":
+        _menu_cache(sock, prog)
+    elif action == "status":
+        _print_status(sock, status)
 
 
 @cli.group()
