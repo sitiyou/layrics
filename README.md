@@ -78,7 +78,7 @@ C++ overlay (core/)
 ### Python 依赖（pip 自动安装）
 
 - `meson-python`、`pybind11`（构建时）
-- `httpx[brotli,http2]`、`dbus-python`、`PyGObject`、`click`、`mutagen`、`diskcache`、`charset-normalizer`、`pyaes`、`appdirs`、`opencc`（运行时）
+- `httpx[brotli,http2]`、`dbus-python`、`PyGObject`、`click`、`mutagen`、`diskcache`、`charset-normalizer`、`pyaes`、`appdirs`（运行时）
 
 ### 安装
 
@@ -399,7 +399,7 @@ layrics (Python)                    C++ overlay (core/)
 ### Python dependencies (installed automatically via pip)
 
 - `meson-python`, `pybind11` (build)
-- `httpx[brotli,http2]`, `dbus-python`, `PyGObject`, `click`, `mutagen`, `diskcache`, `charset-normalizer`, `pyaes`, `appdirs`, `opencc` (runtime)
+- `httpx[brotli,http2]`, `dbus-python`, `PyGObject`, `click`, `mutagen`, `diskcache`, `charset-normalizer`, `pyaes`, `appdirs` (runtime)
 
 ### Install
 

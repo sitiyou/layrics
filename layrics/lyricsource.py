@@ -1,13 +1,13 @@
 from __future__ import annotations
 
+import json
 import logging
 import os
 import re
 import subprocess
 import tempfile
+from pathlib import Path
 from typing import Any
-
-from opencc import OpenCC
 
 from layrics.LDDC.common.models import (
     Lyrics as _LDCLyrics,
@@ -167,20 +167,30 @@ def _postprocess_aegisub(
 
 _KANA_RE = re.compile(r"[\u3040-\u309f\u30a0-\u30ff]")
 
+_S2S_JSON = Path(__file__).resolve().parent / "data" / "simplified_to_shinjitai.json"
+_S2S_MAP: dict[str, str] | None = None
+
+
+def _load_s2s_map() -> dict[str, str]:
+    global _S2S_MAP
+    if _S2S_MAP is None:
+        with open(_S2S_JSON, encoding="utf-8") as f:
+            _S2S_MAP = json.load(f)
+    return _S2S_MAP
+
 
 def _convert_japanese(lyrics_data: _LDCLyrics) -> None:
+    s2s = _load_s2s_map()
     for data in lyrics_data.values():
         text = "".join(w.text for line in data for w in line.words)
         if not _KANA_RE.search(text):
             continue
-        cc_s2t = OpenCC("s2t.json")
-        cc_t2jp = OpenCC("t2jp.json")
         for i, line in enumerate(data):
             new_words = [
                 LyricsWord(
                     w.start,
                     w.end,
-                    cc_t2jp.convert(cc_s2t.convert(w.text)),
+                    "".join(s2s.get(ch, ch) for ch in w.text),
                 )
                 for w in line.words
             ]

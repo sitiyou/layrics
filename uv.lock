@@ -279,7 +279,6 @@ dependencies = [
     { name = "diskcache" },
     { name = "httpx", extra = ["brotli", "http2"] },
     { name = "mutagen" },
-    { name = "opencc" },
     { name = "pyaes" },
     { name = "pygobject" },
 ]
@@ -293,7 +292,6 @@ requires-dist = [
     { name = "diskcache" },
     { name = "httpx", extras = ["brotli", "http2"] },
     { name = "mutagen" },
-    { name = "opencc" },
     { name = "pyaes" },
     { name = "pygobject" },
 ]
@@ -305,19 +303,6 @@ source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple" }
 sdist = { url = "https://pypi.tuna.tsinghua.edu.cn/packages/81/e6/64bc71b74eef4b68e61eb921dcf72dabd9e4ec4af1e11891bbd312ccbb77/mutagen-1.47.0.tar.gz", hash = "sha256:719fadef0a978c31b4cf3c956261b3c58b6948b32023078a2117b1de09f0fc99", size = 1274186, upload-time = "2023-09-03T16:33:33.411Z" }
 wheels = [
     { url = "https://pypi.tuna.tsinghua.edu.cn/packages/b0/7a/620f945b96be1f6ee357d211d5bf74ab1b7fe72a9f1525aafbfe3aee6875/mutagen-1.47.0-py3-none-any.whl", hash = "sha256:edd96f50c5907a9539d8e5bba7245f62c9f520aef333d13392a79a4f70aca719", size = 194391, upload-time = "2023-09-03T16:33:29.955Z" },
-]
-
-[[package]]
-name = "opencc"
-version = "1.4.1"
-source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple" }
-sdist = { url = "https://pypi.tuna.tsinghua.edu.cn/packages/de/4a/9fdb46f75751712f5c2ea76fdffe3d08f2b833301263644e1267ef82c1cd/opencc-1.4.1.tar.gz", hash = "sha256:a2c58215626ac5131c5db277766678d552fc296e9e0299ef183cb67c1a7f30e7", size = 11592892, upload-time = "2026-07-12T14:59:55.166Z" }
-wheels = [
-    { url = "https://pypi.tuna.tsinghua.edu.cn/packages/5d/1d/e91cd67bc21149d43cdfe1fee09ca2953b8367d69c5fbc6dca1d3c5040b0/opencc-1.4.1-cp314-cp314-macosx_10_15_x86_64.whl", hash = "sha256:f3bf198aae95e21fe46bb2f86e2fc3e005cca02208d958ae5738aa2f1788fe07", size = 2096702, upload-time = "2026-07-12T15:04:01.506Z" },
-    { url = "https://pypi.tuna.tsinghua.edu.cn/packages/f4/bc/aeee89c1b685de276fe452880287f3afd489e8fd4393e07d52df9aed48c6/opencc-1.4.1-cp314-cp314-macosx_11_0_arm64.whl", hash = "sha256:f148144f8710c9b436f9f6019d3448c14a0328074f354a789d0703d45288dff5", size = 2000753, upload-time = "2026-07-12T14:57:51.069Z" },
-    { url = "https://pypi.tuna.tsinghua.edu.cn/packages/1b/0d/c747e9e0c5718f968b31e079061974bad579dc5c5d4ada1237d96bcccd92/opencc-1.4.1-cp314-cp314-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:4088ad78f22d8d93c6ce5939ca009807a54fbe9af93a97ff53a501438a5b00a0", size = 2343499, upload-time = "2026-07-12T14:59:46.148Z" },
-    { url = "https://pypi.tuna.tsinghua.edu.cn/packages/83/97/e8d9a4f08156089e285c61728a8897bc603fd295a23fd70cf5d019899c2d/opencc-1.4.1-cp314-cp314-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:5052ed968c2b12c3e95d4208ce3b45dd8349bf6ee6fbc54852e0512e01e7a213", size = 2380713, upload-time = "2026-07-12T14:59:53.599Z" },
-    { url = "https://pypi.tuna.tsinghua.edu.cn/packages/3f/ff/c09d908220f43a68161ae24e7283ff67b5a07824ff5f5b3b9addc0ce3120/opencc-1.4.1-cp314-cp314-win_amd64.whl", hash = "sha256:b9fbff4538682ed04cdaa12f7df84f8ac2cf23d011bd0eae5aaf5d7ae183fe42", size = 2856942, upload-time = "2026-07-12T15:03:01.213Z" },
 ]
 
 [[package]]
