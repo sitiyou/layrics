@@ -99,23 +99,11 @@ uv tool install git+https://github.com/sitiyou/layrics
 pipx install git+https://github.com/sitiyou/layrics
 ```
 
-歌词源库 `LDDC` 已作为精简后的子包内置在 `layrics/LDDC/`（原上游 vendored 副本仅保留在本地 `layrics/vendor/LDDC/` 作参考，不随 git 分发），无需 `--recursive` 子模块。
-
 ### 开发安装
 
 ```bash
 pip install -e .
 ```
-
-### 测试
-
-集成测试需要真实的 Wayland 会话（支持 wlr-layer-shell）：
-
-```bash
-uv run python -m unittest tests.test_wayland_state
-```
-
-`ZeroCommitTest` 通过 strace 验证 paused/hidden 状态下零 Wayland 提交（需安装 strace，无则自动跳过）。
 
 ## 使用
 
@@ -132,7 +120,6 @@ layrics
 
 可选参数：
 - `--socket, -s PATH`  — 自定义 IPC socket 路径（默认：`$XDG_RUNTIME_DIR/layrics.sock`）
-- `ass_file`           — 启动时加载 ASS 文件(用于debug)
 
 ### 使用 layctl 控制
 
@@ -222,82 +209,7 @@ hl.bind("SUPER + SHIFT + M", hl.dsp.exec_cmd [[layctl dmenu]])
 
 配置文件路径：`~/.config/layrics/config.toml`（或 `$LAYRICS_CONFIG_DIR/config.toml`）。
 
-> 以下为配置文件示例，详细配置信息请参考 [examples/config.toml](https://github.com/sitiyou/layrics/blob/main/examples/config.toml)。
-
-```toml
-# 歌词搜索源
-[search]
-sources = ["QM", "NE"]
-
-# 渲染相关
-[overlay]
-target_fps = -1
-
-# MPRIS 播放器控制
-# include_players / exclude_players 互斥，同时设置时 exclude 优先
-[mpris]
-include_players = []
-exclude_players = []
-
-# 字体映射（按语言）
-[fonts]
-default = "sans-serif"
-ja = "Noto Sans CJK JP"
-zh = "Noto Sans CJK SC"
-
-# 样式覆写（完整 ASS 样式字段见 examples/config.toml）
-[style.primary]
-font_name = "sans-serif"
-font_size = 48
-primary_colour = "&H00FCDD1C"
-secondary_colour = "&H00FFFFFF"
-outline_colour = "&H005C3317"
-back_colour = "&H4C000000"
-outline = 3
-shadow = 1
-margin_l = 480
-margin_r = 480
-margin_v = 64
-encoding = 1
-
-[style.secondary]
-font_name = "sans-serif"
-font_size = 32
-primary_colour = "&H00D5D1CF"
-outline = 1.5
-shadow = 1
-margin_v = 24
-
-# 歌词轨道选择优先级（type 或语言代码）
-[lyrics]
-primary = ["orig"]
-secondary = ["ts"]
-
-# ASS 生成器配置
-[assprovider.default]
-karaoke = true
-line_mode = "single"
-secondary = true
-# 可选：aegisub-cli kara-templater 处理逐字歌词（需安装 aegisub-cli）
-# aegisub_karaoke = false
-
-[assprovider.default.single]
-# 副歌词不存在时主歌词的底部边距，0 表示使用 style.primary.margin_v
-margin_v_bottom = 32
-
-[assprovider.default.double]
-advance_ms = 5000
-margin_v_right = 24
-v_spacing = 64
-margin_l = 480
-margin_r = 480
-max_length = 1280
-
-# layctl dmenu 使用的菜单程序（可带参数，如 "rofi -dmenu"）
-# 也可通过环境变量 LAYRICS_DMENU 覆盖
-[dmenu]
-program = "dmenu"
-```
+> 详细配置请参考 [examples/config.toml](https://github.com/sitiyou/layrics/blob/main/examples/config.toml)。
 
 ## 环境变量
 
@@ -430,24 +342,11 @@ uv tool install git+https://github.com/sitiyou/layrics
 pipx install git+https://github.com/sitiyou/layrics
 ```
 
-The `LDDC` lyric-source library is embedded as a slimmed-down subpackage at `layrics/LDDC/` (the upstream vendored copy is kept locally at `layrics/vendor/LDDC/` for reference only; it is not tracked by git), so no submodule checkout is needed.
-
 ### Development install
 
 ```bash
 pip install -e .
 ```
-
-### Tests
-
-Integration tests require a real Wayland session (wlr-layer-shell):
-
-```bash
-uv run python -m unittest tests.test_wayland_state
-```
-
-`ZeroCommitTest` uses strace to verify zero Wayland commits while
-paused/hidden (skipped if strace is missing).
 
 ## Usage
 
@@ -464,7 +363,6 @@ The daemon:
 
 Optional arguments:
 - `--socket, -s PATH`  — custom IPC socket path (default: `$XDG_RUNTIME_DIR/layrics.sock`)
-- `ass_file`           — load an ASS file on startup
 
 ### Control with layctl
 
@@ -555,82 +453,7 @@ Available methods: `list_players`, `select_player`, `search_songs`, `fetch_lyric
 
 Configuration is loaded from `~/.config/layrics/config.toml` (or `$LAYRICS_CONFIG_DIR/config.toml`).
 
-> This is a config file example. See [examples/config.toml](https://github.com/sitiyou/layrics/blob/main/examples/config.toml) for full details.
-
-```toml
-# Lyric search sources
-[search]
-sources = ["QM", "NE"]
-
-# Overlay rendering
-[overlay]
-target_fps = -1
-
-# MPRIS player control
-# include_players / exclude_players are mutually exclusive (exclude wins)
-[mpris]
-include_players = []
-exclude_players = []
-
-# Font mapping by language
-[fonts]
-default = "sans-serif"
-ja = "Noto Sans CJK JP"
-zh = "Noto Sans CJK SC"
-
-# ASS style overrides (full field list in examples/config.toml)
-[style.primary]
-font_name = "sans-serif"
-font_size = 48
-primary_colour = "&H00FCDD1C"
-secondary_colour = "&H00FFFFFF"
-outline_colour = "&H005C3317"
-back_colour = "&H4C000000"
-outline = 3
-shadow = 1
-margin_l = 480
-margin_r = 480
-margin_v = 64
-encoding = 1
-
-[style.secondary]
-font_name = "sans-serif"
-font_size = 32
-primary_colour = "&H00D5D1CF"
-outline = 1.5
-shadow = 1
-margin_v = 24
-
-# Lyric track selection priority (type key or language code)
-[lyrics]
-primary = ["orig"]
-secondary = ["ts"]
-
-# ASS provider configuration
-[assprovider.default]
-karaoke = true
-line_mode = "single"
-secondary = true
-# Optional: process word-timed lyrics through aegisub-cli kara-templater (requires aegisub-cli)
-# aegisub_karaoke = false
-
-[assprovider.default.single]
-# Primary margin_v override when no secondary track exists; 0 = use style.primary.margin_v
-margin_v_bottom = 32
-
-[assprovider.default.double]
-advance_ms = 5000
-margin_v_right = 24
-v_spacing = 64
-margin_l = 480
-margin_r = 480
-max_length = 1280
-
-# Menu program used by layctl dmenu (can include args, e.g. "rofi -dmenu")
-# Can also be overridden via the LAYRICS_DMENU environment variable
-[dmenu]
-program = "dmenu"
-```
+> See [examples/config.toml](https://github.com/sitiyou/layrics/blob/main/examples/config.toml) for the full configuration reference.
 
 ## Environment Variables
 

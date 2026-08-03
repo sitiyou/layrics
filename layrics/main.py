@@ -914,9 +914,6 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(description="layrics - ASS subtitle overlay")
-    parser.add_argument(
-        "ass_file", nargs="?", help="ASS subtitle file to load on startup"
-    )
     parser.add_argument("--socket", "-s", help="IPC socket path")
     args = parser.parse_args()
 
@@ -925,8 +922,6 @@ def main():
     app = LayricsApp(socket_path=args.socket or "")
 
     try:
-        if args.ass_file:
-            app.load_ass(args.ass_file)
         asyncio.run(app.run())
     except KeyboardInterrupt:
         logger.info("shutting down...")
