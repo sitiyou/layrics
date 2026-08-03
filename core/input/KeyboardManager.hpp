@@ -9,7 +9,8 @@ struct wl_surface;
 
 class KeyboardManager {
   public:
-    using KeyCallback = std::function<void(uint32_t key, uint32_t state)>;
+    using KeyCallback = std::function<void(uint32_t key, uint32_t state,
+                                           uint32_t mods)>;
     using FocusCallback = std::function<void(bool focused)>;
 
     KeyboardManager() = default;

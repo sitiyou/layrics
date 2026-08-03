@@ -59,5 +59,15 @@ PYBIND11_MODULE(core, m) {
             [](ApplicationController &ctrl) -> const AppState & {
                 return ctrl.state();
             },
-            py::return_value_policy::reference_internal);
+            py::return_value_policy::reference_internal)
+        .def(
+            "poll_key_events",
+            [](ApplicationController &ctrl) {
+                std::vector<KeyEvent> events = ctrl.pollKeyEvents();
+                py::list out;
+                for (const auto &e : events) {
+                    out.append(py::make_tuple(e.key, e.state, e.mods));
+                }
+                return out;
+            });
 }

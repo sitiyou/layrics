@@ -83,7 +83,7 @@ void KeyboardManager::handleKey(void *data, wl_keyboard * /*keyboard*/,
                                                       : "released",
               self->m_mods);
     if (self->m_keyCb) {
-        self->m_keyCb(key, state);
+        self->m_keyCb(key, state, self->m_mods);
     }
 }
 

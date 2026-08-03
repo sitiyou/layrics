@@ -859,6 +859,18 @@ class LayricsApp:
                 logger.debug("mpris poll error: %s", e)
             await asyncio.sleep(1)
 
+    # ── Keyboard poller ───────────────────────────────────────────
+
+    async def _key_poller(self):
+        while True:
+            events = self.ctrl.poll_key_events()
+            for key, state, mods in events:
+                self._on_key_event(key, state, mods)
+            await asyncio.sleep(0.01)
+
+    def _on_key_event(self, key: int, state: int, mods: int) -> None:
+        logger.debug("key: keycode=%d state=%d mods=0x%x", key, state, mods)
+
     # ── Run ───────────────────────────────────────────────────────
 
     async def run(self):
@@ -884,6 +896,7 @@ class LayricsApp:
 
         self._auto_select_player()
         poller_task = asyncio.create_task(self._mpris_poller())
+        key_poller_task = asyncio.create_task(self._key_poller())
 
         try:
             await self._server.serve_forever()
@@ -891,6 +904,7 @@ class LayricsApp:
             pass
         finally:
             poller_task.cancel()
+            key_poller_task.cancel()
             self._server.close()
             await self._server.wait_closed()
 

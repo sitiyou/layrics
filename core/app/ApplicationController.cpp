@@ -14,6 +14,9 @@ void ApplicationController::start() {
     }
 
     m_app.m_processCommands = [this]() { processPendingCommands(); };
+    m_app.m_keyEventSink = [this](const KeyEvent &event) {
+        pushKeyEvent(event);
+    };
 
     m_thread = std::thread([this]() {
         LAY_LOG("ApplicationController: thread started");
@@ -77,4 +80,23 @@ void ApplicationController::processPendingCommands() {
         m_app.setTargetFps(pending.targetFps);
     if (!assContent.empty())
         m_app.loadAssContent(std::move(assContent));
+}
+
+void ApplicationController::pushKeyEvent(const KeyEvent &event) {
+    std::lock_guard<std::mutex> lock(m_mutex);
+    if (m_keyEvents.size() >= kMaxKeyEvents) {
+        m_keyEvents.pop_front();
+    }
+    m_keyEvents.push_back(event);
+}
+
+std::vector<KeyEvent> ApplicationController::pollKeyEvents() {
+    std::lock_guard<std::mutex> lock(m_mutex);
+    std::vector<KeyEvent> events;
+    events.reserve(m_keyEvents.size());
+    while (!m_keyEvents.empty()) {
+        events.push_back(m_keyEvents.front());
+        m_keyEvents.pop_front();
+    }
+    return events;
 }

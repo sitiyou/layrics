@@ -21,3 +21,9 @@ struct AppState {
     double dragOffsetY = 0.0;
     int targetFps = -1;
 };
+
+struct KeyEvent {
+    uint32_t key;    // raw evdev keycode
+    uint32_t state;  // WL_KEYBOARD_KEY_STATE_PRESSED / _RELEASED
+    uint32_t mods;   // wl_keyboard modifier mask
+};

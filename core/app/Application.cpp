@@ -150,8 +150,10 @@ bool Application::initInput() {
     m_inputMgr.setLeaveCallback([this]() { setKeyboardInteractive(false); });
 
     m_keyboardMgr.initialize(m_waylandCtx.keyboard);
-    m_keyboardMgr.setKeyCallback(
-        [this](uint32_t key, uint32_t state) { onKey(key, state); });
+    m_keyboardMgr.setKeyCallback([this](uint32_t key, uint32_t state,
+                                        uint32_t mods) {
+        onKey(key, state, mods);
+    });
 
     LAY_LOG("input initialized");
     return true;
@@ -333,9 +335,13 @@ void Application::onPointerButton(uint32_t button, uint32_t state, double x,
     updateCursor();
 }
 
-void Application::onKey(uint32_t key, uint32_t state) {
-    LAY_LOG("key: keycode=%u state=%s", key,
-            state == WL_KEYBOARD_KEY_STATE_PRESSED ? "pressed" : "released");
+void Application::onKey(uint32_t key, uint32_t state, uint32_t mods) {
+    LAY_LOG("key: keycode=%u state=%s mods=0x%x", key,
+            state == WL_KEYBOARD_KEY_STATE_PRESSED ? "pressed" : "released",
+            mods);
+    if (m_keyEventSink) {
+        m_keyEventSink(KeyEvent{key, state, mods});
+    }
 }
 
 void Application::setKeyboardInteractive(bool on) {

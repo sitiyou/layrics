@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <cstdint>
+#include <deque>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -41,6 +42,10 @@ class ApplicationController {
     void setStatus(const PendingUpdate &update);
     const AppState &state() const { return m_app.state(); }
 
+    // Keyboard events captured on the render thread, drained from Python.
+    void pushKeyEvent(const KeyEvent &event);
+    std::vector<KeyEvent> pollKeyEvents();
+
   private:
     void processPendingCommands();
 
@@ -50,4 +55,7 @@ class ApplicationController {
     std::mutex m_mutex;
     PendingUpdate m_pending;
     std::string m_pendingAssContent;
+
+    std::deque<KeyEvent> m_keyEvents;
+    static constexpr size_t kMaxKeyEvents = 128;
 };

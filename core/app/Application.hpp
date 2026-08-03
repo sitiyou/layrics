@@ -76,6 +76,7 @@ class Application {
     wl_callback *m_frameCallback = nullptr;
     AssRenderer *m_assRenderer = nullptr;
     std::function<void()> m_processCommands;
+    std::function<void(const KeyEvent &)> m_keyEventSink;
 
     // Frozen rendering timestamp (CLOCK_MONOTONIC ms) while paused; captured
     // in mainLoop() when the pause command is processed.
@@ -96,7 +97,7 @@ class Application {
     void onFrame(uint32_t time);
     void onPointerMotion(double x, double y);
     void onPointerButton(uint32_t button, uint32_t state, double x, double y);
-    void onKey(uint32_t key, uint32_t state);
+    void onKey(uint32_t key, uint32_t state, uint32_t mods);
     void setKeyboardInteractive(bool on);
     void onSurfaceConfigure(int width, int height);
 };
