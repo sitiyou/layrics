@@ -3,7 +3,7 @@
 """Disk cache (slimmed from LDDC: cache dir moved to appdirs, no longer depends on common.paths)"""
 
 import atexit
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Any, ParamSpec, TypeVar
 
@@ -90,6 +90,32 @@ def cached_call_with_status[**P, T](
         return cached, True  # type: ignore[reportReturnType]
 
     result = func(*args, **kwargs)
+    cache.set(key, result, expire=expire)
+    return result, False
+
+
+async def async_cached_call_with_status[**P, T](
+    func: Callable[P, Awaitable[T]],
+    cache_settings: dict | None = None,
+    *args: P.args,
+    **kwargs: P.kwargs,
+) -> tuple[T, bool]:
+    """Like :func:`cached_call_with_status` for async functions.
+
+    diskcache stays synchronous; lookups/sets are fast enough to run directly
+    on the event loop.
+    """
+    typed, ignore, expire = True, set(), None
+    if cache_settings is not None:
+        typed = cache_settings.get("typed", typed)
+        ignore = cache_settings.get("ignore", ignore)
+        expire = cache_settings.get("expire", expire)
+
+    key = _buildcache_key(func, args, kwargs, typed, ignore)
+    if (cached := cache.get(key)) is not None:
+        return cached, True  # type: ignore[reportReturnType]
+
+    result = await func(*args, **kwargs)
     cache.set(key, result, expire=expire)
     return result, False
 

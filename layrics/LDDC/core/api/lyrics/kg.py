@@ -1,12 +1,12 @@
 # SPDX-FileCopyrightText: Copyright (C) 2024-2025 沉默の金 <cmzj@cmzj.org>
 # SPDX-License-Identifier: GPL-3.0-only
 
+import asyncio
 import hashlib
 import json
 import random
 import time
 from base64 import b64decode, b64encode
-from threading import Lock
 from typing import Literal
 
 import httpx
@@ -53,13 +53,12 @@ class KGAPI(CloudAPI):
     supported_search_types = (SearchType.SONG,)
 
     def __init__(self) -> None:
-        self.client = httpx.Client()
+        self.client = httpx.AsyncClient()
         self.dfid = None
-        self.init_lock = Lock()
-        self.init()
+        self.init_lock = asyncio.Lock()
 
-    def init(self) -> None:
-        with self.init_lock:
+    async def init(self) -> None:
+        async with self.init_lock:
             if self.dfid is not None:
                 return
             dfid = cache.get(("KG dfid", __version__))
@@ -73,7 +72,7 @@ class KGAPI(CloudAPI):
                 data = b64encode(b'{"uuid":""}').decode()
 
                 # send the request
-                response = httpx.post("https://userservice.kugou.com/risk/v1/r_register_dev", content=data, params=params)
+                response = await self.client.post("https://userservice.kugou.com/risk/v1/r_register_dev", content=data, params=params)
                 dfid = response.json().get("data", {}).get("dfid")
                 if isinstance(dfid, str):
                     cache.set(("KG dfid", __version__), dfid, expire=1800)
@@ -82,7 +81,7 @@ class KGAPI(CloudAPI):
                     dfid = "-"
             self.dfid = dfid
 
-    def request(
+    async def request(
         self,
         url: str,
         params: dict,
@@ -134,7 +133,7 @@ class KGAPI(CloudAPI):
         ).hexdigest()
 
         response = (
-            self.client.get(url, params=params, headers=headers) if method == "GET" else self.client.post(url, params=params, headers=headers, content=data)
+            await self.client.get(url, params=params, headers=headers) if method == "GET" else await self.client.post(url, params=params, headers=headers, content=data)
         )
         response.raise_for_status()
         response_data = response.json()
@@ -142,7 +141,7 @@ class KGAPI(CloudAPI):
             raise APIRequestError("kg API request error, code: " + str(response_data.get("error_code")) + f", message: {response_data.get('error_msg')}")
         return response_data
 
-    def search(self, keyword: str, search_type: SearchType, page: int = 1) -> APIResultList[SongInfo]:
+    async def search(self, keyword: str, search_type: SearchType, page: int = 1) -> APIResultList[SongInfo]:
         pagesize = 20
         params = {
             "sorttype": "0",
@@ -152,10 +151,10 @@ class KGAPI(CloudAPI):
         }
         url, module = SEARCH_TYPE_MAPPING[search_type]
         try:
-            data = self.request(url, params, module, headers={"x-router": "complexsearch.kugou.com"})
+            data = await self.request(url, params, module, headers={"x-router": "complexsearch.kugou.com"})
         except APIRequestError:
             logger.exception("kg API request error, falling back to the old interface")
-            return self._old_search(keyword, search_type, page)
+            return await self._old_search(keyword, search_type, page)
 
         if not data["data"]["lists"]:
             return APIResultList(
@@ -198,7 +197,7 @@ class KGAPI(CloudAPI):
             ),
         )
 
-    def _old_search(self, keyword: str, search_type: SearchType, page: int = 1) -> APIResultList[SongInfo]:
+    async def _old_search(self, keyword: str, search_type: SearchType, page: int = 1) -> APIResultList[SongInfo]:
         """Fallback search API."""
         domain = random.choice(["mobiles.kugou.com", "msearchcdn.kugou.com", "mobilecdnbj.kugou.com", "msearch.kugou.com"])
         pagesize = 20
@@ -218,7 +217,7 @@ class KGAPI(CloudAPI):
             "page": page,
         }
 
-        response = self.client.get(url, params=params, timeout=3)
+        response = await self.client.get(url, params=params, timeout=3)
         response.raise_for_status()
         data = response.json()
         start_index = (page - 1) * pagesize
@@ -250,7 +249,7 @@ class KGAPI(CloudAPI):
             ),
         )
 
-    def get_lyrics(self, info: SongInfo | LyricInfo) -> Lyrics:
+    async def get_lyrics(self, info: SongInfo | LyricInfo) -> Lyrics:
         if isinstance(info, SongInfo):
             infos = self.get_lyricslist(info)
             if not infos:
@@ -267,7 +266,7 @@ class KGAPI(CloudAPI):
             "ver": "1",
         }
         url = "http://lyrics.kugou.com/download"
-        data = self.request(url, params, "Lyric")
+        data = await self.request(url, params, "Lyric")
         lyrics = Lyrics(info.songinfo)
         if data["contenttype"] == 2:  # base64-encoded plaintext lyrics
             lyric = MultiLyricsData({"orig": plaintext2data(b64decode(data["content"]).decode("utf-8"))})
@@ -278,7 +277,7 @@ class KGAPI(CloudAPI):
             lyrics.types[key] = judge_lyrics_type(lyric)
         return lyrics
 
-    def get_lyricslist(self, song_info: SongInfo) -> APIResultList[LyricInfo]:
+    async def get_lyricslist(self, song_info: SongInfo) -> APIResultList[LyricInfo]:
         params = {
             "album_audio_id": song_info.id,
             "duration": song_info.duration,  # in milliseconds
@@ -288,7 +287,7 @@ class KGAPI(CloudAPI):
             "man": "no",
         }
         url = "https://lyrics.kugou.com/v1/search"
-        data = self.request(url, params, "Lyric")
+        data = await self.request(url, params, "Lyric")
         lyrics = data["candidates"]
         return APIResultList(
             [

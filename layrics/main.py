@@ -166,7 +166,6 @@ class LayricsApp:
         if not keyword:
             raise RuntimeError(f"empty keyword for track {meta.unique_song_id}")
 
-        loop = asyncio.get_event_loop()
         cache = SongCache()
         key = make_cache_key(meta)
         cached = cache.get(key)
@@ -193,9 +192,7 @@ class LayricsApp:
                     )
             if si is not None:
                 try:
-                    ass = await loop.run_in_executor(
-                        None, lambda: _fetch_lyrics(si)
-                    )
+                    ass = await _fetch_lyrics(si)
                     logger.info("fetch: cache hit %s (%d bytes)", keyword, len(ass))
                     return ass
                 except Exception as e:
@@ -204,7 +201,7 @@ class LayricsApp:
                     cache.remove(key)
 
         logger.info("fetch: searching %s", keyword)
-        results = await loop.run_in_executor(None, lambda: _search_songs(keyword, 20))
+        results = await _search_songs(keyword, 20)
         if not results:
             raise RuntimeError(f"no search results for {keyword!r}")
 
@@ -220,7 +217,7 @@ class LayricsApp:
         src = Source[matched["source"]]
         raw_id = matched["id"]
         song_info = SongInfo.from_dict(matched)
-        ass = await loop.run_in_executor(None, lambda: _fetch_lyrics(song_info))
+        ass = await _fetch_lyrics(song_info)
         logger.info("fetch: %s -> %s (%d bytes)", keyword, matched["id"], len(ass))
 
         cache.set_if_missing(key, raw_id, src.name)
@@ -412,13 +409,11 @@ class LayricsApp:
     # ── Lyric search (LDDC) ──────────────────────────────────────
 
     async def search_songs(self, keyword: str, limit: int = 10):
-        loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(None, lambda: _search_songs(keyword, limit))
+        return await _search_songs(keyword, limit)
 
     async def fetch_lyrics(self, song_data: dict) -> str:
         song_info = SongInfo.from_dict(song_data)
-        loop = asyncio.get_event_loop()
-        ass_content = await loop.run_in_executor(None, lambda: _fetch_lyrics(song_info))
+        ass_content = await _fetch_lyrics(song_info)
         logger.info("lyrics fetched (%d bytes)", len(ass_content))
         return ass_content
 
@@ -665,11 +660,7 @@ class LayricsApp:
                 song_info = si or SongInfo.from_dict(
                     {"source": src.name, "id": raw_id}
                 )
-                loop = asyncio.get_event_loop()
-                ass = await loop.run_in_executor(
-                    None,
-                    lambda: _fetch_lyrics(song_info),
-                )
+                ass = await _fetch_lyrics(song_info)
                 cache.set(key, raw_id, src.name)
 
                 self.ctrl.set_ass_input(ass)

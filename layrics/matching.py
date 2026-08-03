@@ -194,6 +194,11 @@ def _artist_similarity(local: list[str], remote: list[str]) -> float:
 # ── matching ─────────────────────────────────────────────────────────
 
 
+def _composite_id(c: dict[str, Any]) -> str:
+    """Render a candidate as ``SourceID`` (e.g. ``QM213837399``) for logs."""
+    return f"{c.get('source', '?')}{c.get('id', '?')}"
+
+
 def match_song(
     meta: TrackMeta,
     candidates: list[dict[str, Any]],
@@ -241,7 +246,7 @@ def match_song(
             if dur_diff > _DURATION_MAX_DIFF_SEC:
                 logger.info(
                     "  skip %s: title=%.3f OK but duration diff=%.1fs > %ds",
-                    c.get("id", "?"),
+                    _composite_id(c),
                     title_score,
                     dur_diff,
                     _DURATION_MAX_DIFF_SEC,
@@ -253,7 +258,7 @@ def match_song(
 
         logger.debug(
             "  candidate %s: title=%.3f dur_diff=%.1fs artist=%.2f",
-            c.get("id", "?"),
+            _composite_id(c),
             title_score,
             dur_diff,
             artist_score,
@@ -269,7 +274,7 @@ def match_song(
 
     logger.info(
         "match: pick %s (title=%.3f dur_diff=%.1fs artist=%.2f)",
-        best_c.get("id", "?"),
+        _composite_id(best_c),
         best[0],
         best[1],
         best[2],

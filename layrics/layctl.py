@@ -304,6 +304,7 @@ def _menu_song(sock: str, prog: str) -> None:
             label += f" [{album}]"
         if dur_str:
             label += f" ({dur_str})"
+        label += f" [{c['id']}]"
         items.append((label, f"song:{c['id']}"))
     picked = _menu_select(prog, "Select lyrics", items)
     if picked and picked.startswith("song:"):

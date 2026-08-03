@@ -1,11 +1,11 @@
 # SPDX-FileCopyrightText: Copyright (C) 2024-2025 沉默の金 <cmzj@cmzj.org>
 # SPDX-License-Identifier: GPL-3.0-only
 
+import asyncio
 import json
 import random
 import time
 from base64 import b64encode
-from threading import Lock
 
 import httpx
 
@@ -49,7 +49,7 @@ class QMAPI(CloudAPI):
     supported_search_types = (SearchType.SONG,)
 
     def __init__(self) -> None:
-        self.client = httpx.Client(
+        self.client = httpx.AsyncClient(
             headers={
                 "cookie": "tmeLoginType=-1;",
                 "content-type": "application/json",
@@ -70,15 +70,15 @@ class QMAPI(CloudAPI):
             "udid": "0",
         }
         self.inited = False
-        self.init_lock = Lock()
-        self.init()
+        self.init_lock = asyncio.Lock()
 
-    def init(self) -> None:
-        with self.init_lock:
+    async def init(self) -> None:
+        async with self.init_lock:
             if self.inited:
                 return
             param = {"caller": 0, "uid": "0", "vkey": 0}
-            data = self.request("GetSession", "music.getSession.session", param)
+            data = await self.request("GetSession", "music.getSession.session",
+                                      param)
             self.comm = {
                 **self.comm,
                 "uid": data["session"]["uid"],
@@ -86,7 +86,7 @@ class QMAPI(CloudAPI):
                 "userip": data["session"]["userip"],
             }
 
-    def request(self, method: str, module: str, param: dict) -> dict:
+    async def request(self, method: str, module: str, param: dict) -> dict:
         """Send an API request.
 
         Args:
@@ -99,7 +99,7 @@ class QMAPI(CloudAPI):
 
         """
         if not self.inited and method != "GetSession":
-            self.init()
+            await self.init()
         data = json.dumps(
             {
                 "comm": self.comm,
@@ -115,7 +115,7 @@ class QMAPI(CloudAPI):
         domains = [
             "u.y.qq.com",
         ]
-        response = self.client.post(
+        response = await self.client.post(
             f"https://{random.choice(domains)}/cgi-bin/musicu.fcg",
             content=data,
         )
@@ -141,7 +141,7 @@ class QMAPI(CloudAPI):
             for info in songinfos
         ]
 
-    def search(self, keyword: str, search_type: SearchType, page: int = 1) -> APIResultList[SongInfo]:
+    async def search(self, keyword: str, search_type: SearchType, page: int = 1) -> APIResultList[SongInfo]:
         """Search for songs.
 
         Args:
@@ -166,7 +166,7 @@ class QMAPI(CloudAPI):
             "page_id": 1,
             "grp": 1,
         }
-        data = self.request(
+        data = await self.request(
             "DoSearchForQQMusicLite",
             "music.search.SearchCgiService",
             param,
@@ -188,7 +188,7 @@ class QMAPI(CloudAPI):
             ),
         )
 
-    def get_lyrics(self, info: SongInfo) -> Lyrics:
+    async def get_lyrics(self, info: SongInfo) -> Lyrics:
         """Get lyrics.
 
         Args:
@@ -221,7 +221,7 @@ class QMAPI(CloudAPI):
             "type": 0,
         }
 
-        response = self.request("GetPlayLyricInfo", "music.musichallSong.PlayLyricInfo", param)
+        response = await self.request("GetPlayLyricInfo", "music.musichallSong.PlayLyricInfo", param)
         lyrics = Lyrics(info)
         for key, value in [("orig", "lyric"), ("ts", "trans"), ("roma", "roma")]:
             lrc = response[value]

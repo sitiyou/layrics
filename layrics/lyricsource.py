@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -50,7 +51,7 @@ def parse_composite_id(song_id: str) -> tuple[Source, str]:
     raise ValueError(f"cannot parse composite song id: {song_id!r}")
 
 
-def search_songs(keyword: str, limit: int = 10) -> list[dict[str, Any]]:
+async def search_songs(keyword: str, limit: int = 10) -> list[dict[str, Any]]:
     cfg = get_config()
     search_sources = cfg.search.sources
     logger.debug(
@@ -60,7 +61,9 @@ def search_songs(keyword: str, limit: int = 10) -> list[dict[str, Any]]:
     )
 
     try:
-        results = _lddc_search(title=keyword, sources=search_sources, page=1)
+        results = await _lddc_search(
+            title=keyword, sources=search_sources, page=1
+        )
     except Exception as e:
         logger.error("search: error %s", e)
         return []
@@ -176,7 +179,7 @@ def _convert_japanese(lyrics_data: _LDCLyrics) -> None:
             data[i] = LyricsLine(line.start, line.end, new_words)
 
 
-def fetch_lyrics(
+async def fetch_lyrics(
     song_info: SongInfo,
     player_name: str = "",
 ) -> str:
@@ -188,7 +191,7 @@ def fetch_lyrics(
         song_info.artist,
         song_info.duration,
     )
-    lddc_lyrics = _lddc_get_lyrics(song_info)
+    lddc_lyrics = await _lddc_get_lyrics(song_info)
 
     _convert_japanese(lddc_lyrics)
 
@@ -237,8 +240,12 @@ def fetch_lyrics(
                 pc = pc.removeprefix("&H")
                 overrides["OVERLAY_COLOR"] = pc[-6:]
 
-                ass = _postprocess_aegisub(
-                    ass, cli, automation, header_overrides=overrides
+                ass = await asyncio.to_thread(
+                    _postprocess_aegisub,
+                    ass,
+                    cli,
+                    automation,
+                    header_overrides=overrides,
                 )
             else:
                 logger.info(

@@ -32,7 +32,7 @@ class LrclibAPI(CloudAPI):
     supported_search_types = (SearchType.SONG,)
 
     def __init__(self) -> None:
-        self.client = httpx.Client(
+        self.client = httpx.AsyncClient(
             headers={
                 "User-Agent": f"LDDC/{__version__}",
                 "Accept": "application/json",
@@ -40,10 +40,10 @@ class LrclibAPI(CloudAPI):
             timeout=30,
         )
 
-    def _make_request(self, endpoint: str, params: dict | None = None) -> dict:
+    async def _make_request(self, endpoint: str, params: dict | None = None) -> dict:
         """Send an API request."""
         url = f"https://lrclib.net/api{endpoint}"
-        response = self.client.get(url, params=params)
+        response = await self.client.get(url, params=params)
         try:
             response.raise_for_status()
         except httpx.HTTPStatusError as e:
@@ -68,14 +68,14 @@ class LrclibAPI(CloudAPI):
             language=Language.INSTRUMENTAL if data["instrumental"] else Language.OTHER,
         )
 
-    def get_lyrics(self, info: SongInfo) -> Lyrics:
+    async def get_lyrics(self, info: SongInfo) -> Lyrics:
         """Get lyrics."""
         if not info.title or not info.artist or not info.album or not info.duration:
             msg = "missing required parameters"
             raise APIParamsError(msg)
 
         params = {"track_name": info.title, "artist_name": info.artist.str(), "album_name": info.album, "duration": info.duration / 1000}
-        data = self._make_request("/get", params)
+        data = await self._make_request("/get", params)
 
         if "error" in data:
             msg = f"lrclib API error: {data['error']}"
@@ -104,14 +104,14 @@ class LrclibAPI(CloudAPI):
             raise LyricsNotFoundError(msg, info)
         return lyrics
 
-    def search(self, keyword: str, search_type: SearchType, page: int = 1) -> APIResultList[SongInfo]:
+    async def search(self, keyword: str, search_type: SearchType, page: int = 1) -> APIResultList[SongInfo]:
         """Search for songs."""
         if search_type not in self.supported_search_types:
             msg = f"unsupported search type: {search_type}"
             raise NotImplementedError(msg)
 
         params = {"q": keyword}
-        response = self._make_request("/search", params)
+        response = await self._make_request("/search", params)
 
         if "error" in response:
             msg = f"lrclib API error: {response['error']}"

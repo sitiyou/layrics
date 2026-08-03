@@ -24,6 +24,10 @@ class BaseAPI(ABC):
 class CloudAPI(BaseAPI):
     supported_search_types: tuple[Literal[SearchType.SONG], ...]
 
+    async def init(self) -> None:
+        """One-time setup; default no-op for providers without session setup."""
+        return
+
     @abstractmethod
     def search(
         self,

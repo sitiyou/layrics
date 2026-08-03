@@ -1,12 +1,12 @@
 # SPDX-FileCopyrightText: Copyright (C) 2024-2025 沉默の金 <cmzj@cmzj.org>
 # SPDX-License-Identifier: GPL-3.0-only
 
+import asyncio
 import json
 import random
 import secrets
 import string
 import time
-from threading import Lock
 
 import httpx
 
@@ -41,11 +41,10 @@ class NEAPI(CloudAPI):
 
     def __init__(self) -> None:
         self.inited = False
-        self.init_lock = Lock()
-        self.init()
+        self.init_lock = asyncio.Lock()
 
-    def init(self) -> None:
-        with self.init_lock:
+    async def init(self) -> None:
+        async with self.init_lock:
             if self.inited and self.expire > int(time.time()):
                 return
 
@@ -74,8 +73,8 @@ class NEAPI(CloudAPI):
                 params = {"username": get_anonimous_username(pre_cookies["deviceId"]), "e_r": True, "header": self._get_params_header(pre_cookies)}
                 encrypted_params = eapi_params_encrypt(path.replace("eapi", "api").encode(), params)
                 logger.info("ne attempting guest login")
-                with httpx.Client(http2=True) as client:
-                    response = client.post(
+                async with httpx.AsyncClient(http2=True) as client:
+                    response = await client.post(
                         "https://interface.music.163.com" + path,
                         headers=self._get_header(pre_cookies),
                         content=encrypted_params,
@@ -113,7 +112,7 @@ class NEAPI(CloudAPI):
                 self.expire = anonimous["expire"]
                 logger.info("ne using cached guest login")
 
-            self.session = httpx.Client(http2=True)  # create session
+            self.session = httpx.AsyncClient(http2=True)  # create session
             self.inited = True
 
             def _atexit() -> None:
@@ -122,7 +121,7 @@ class NEAPI(CloudAPI):
             import atexit
             atexit.register(_atexit)
 
-    def request(self, path: str, params: dict) -> dict:
+    async def request(self, path: str, params: dict) -> dict:
         """Make an eapi request.
 
         :param path: request path
@@ -130,12 +129,12 @@ class NEAPI(CloudAPI):
         :return dict: request result
         """
         params["e_r"] = True  # enable encryption
-        params["header"] = self.get_params_header()
+        params["header"] = await self.get_params_header()
         encrypted_params = eapi_params_encrypt(path.replace("eapi", "api").encode(), params)
         url = "https://interface.music.163.com" + path
         if not self.inited or self.expire < int(time.time()):
-            self.init()
-        response = self.session.post(
+            await self.init()
+        response = await self.session.post(
             url,
             params={"cache_key": params["cache_key"]} if "cache_key" in params else None,
             headers=self._get_header(self.cookies),
@@ -162,9 +161,9 @@ class NEAPI(CloudAPI):
             separators=(",", ":"),
         )
 
-    def get_params_header(self) -> str:
+    async def get_params_header(self) -> str:
         if not self.inited or self.expire < int(time.time()):
-            self.init()
+            await self.init()
         return self._get_params_header(self.cookies)
 
     def _get_header(self, cookies: dict) -> list[tuple[str, str]]:
@@ -202,7 +201,7 @@ class NEAPI(CloudAPI):
             for info in songinfos
         ]
 
-    def search(self, keyword: str, search_type: SearchType, page: int = 1) -> APIResultList[SongInfo]:
+    async def search(self, keyword: str, search_type: SearchType, page: int = 1) -> APIResultList[SongInfo]:
         """Search NetEase Cloud Music.
 
         Args:
@@ -222,7 +221,7 @@ class NEAPI(CloudAPI):
             "scene": "NORMAL",
             "needCorrect": "true",
         }
-        data = self.request("/eapi/search/song/list/page", params)
+        data = await self.request("/eapi/search/song/list/page", params)
         if ("result" not in data and "data" not in data) or ("data" in data and data["data"]["resources"] is None):
             return APIResultList(
                 [],
@@ -252,7 +251,7 @@ class NEAPI(CloudAPI):
             ),
         )
 
-    def get_lyrics(self, info: SongInfo) -> Lyrics:
+    async def get_lyrics(self, info: SongInfo) -> Lyrics:
         """Get lyrics.
 
         Args:
@@ -272,7 +271,7 @@ class NEAPI(CloudAPI):
             "rv": "-1",
             "yv": "-1",
         }
-        data = self.request("/eapi/song/lyric/v1", params)
+        data = await self.request("/eapi/song/lyric/v1", params)
 
         lyrics = Lyrics(info)
         tags = {}
