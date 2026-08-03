@@ -44,6 +44,11 @@ class LayerSurface {
     void commitFrame(wl_buffer *buffer,
                      const std::vector<RenderRect> &damageRects);
 
+    // Runtime keyboard focus capture: toggle interactivity between ON_DEMAND
+    // (pointer inside input region) and NONE (double-buffered, applied on
+    // commit).
+    void setKeyboardInteractivity(uint32_t value);
+
     wl_surface *surface() const { return m_surface; }
     int width() const { return m_width; }
     int height() const { return m_height; }

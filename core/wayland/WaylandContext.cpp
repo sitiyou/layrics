@@ -55,6 +55,19 @@ static void seatHandleCapabilities(void *data, wl_seat *seat, uint32_t caps) {
             LAY_DEBUG("wl_pointer released");
         }
     }
+
+    if (caps & WL_SEAT_CAPABILITY_KEYBOARD) {
+        if (!ctx->keyboard) {
+            ctx->keyboard = wl_seat_get_keyboard(seat);
+            LAY_DEBUG("wl_keyboard obtained");
+        }
+    } else {
+        if (ctx->keyboard) {
+            wl_keyboard_release(ctx->keyboard);
+            ctx->keyboard = nullptr;
+            LAY_DEBUG("wl_keyboard released");
+        }
+    }
 }
 
 static void seatHandleName(void *data, wl_seat *seat, const char *name) {

@@ -83,6 +83,7 @@ input_sources = files(
   'core/input/CursorManager.cpp',
   'core/input/RegionManager.cpp',
   'core/input/DamageGrid.cpp',
+  'core/input/KeyboardManager.cpp',
 )
 
 renderer_sources = files(

@@ -125,6 +125,14 @@ void LayerSurface::damageFull() {
 
 void LayerSurface::commit() { wl_surface_commit(m_surface); }
 
+void LayerSurface::setKeyboardInteractivity(uint32_t value) {
+    if (!m_layerSurface) {
+        return;
+    }
+    zwlr_layer_surface_v1_set_keyboard_interactivity(m_layerSurface, value);
+    wl_surface_commit(m_surface);
+}
+
 void LayerSurface::commitFrame(wl_buffer *buffer, bool fullDamage) {
     wl_surface_attach(m_surface, buffer, 0, 0);
     if (fullDamage) {

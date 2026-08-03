@@ -142,7 +142,16 @@ bool Application::initInput() {
             onPointerButton(button, state, x, y);
         });
 
-    m_inputMgr.setEnterCallback([this](uint32_t) { updateCursor(); });
+    m_inputMgr.setEnterCallback([this](uint32_t) {
+        updateCursor();
+        setKeyboardInteractive(true);
+    });
+
+    m_inputMgr.setLeaveCallback([this]() { setKeyboardInteractive(false); });
+
+    m_keyboardMgr.initialize(m_waylandCtx.keyboard);
+    m_keyboardMgr.setKeyCallback(
+        [this](uint32_t key, uint32_t state) { onKey(key, state); });
 
     LAY_LOG("input initialized");
     return true;
@@ -221,6 +230,7 @@ void Application::processState() {
         // Entering hidden: clear the display and commit once so the
         // compositor shows an empty surface; the frame chain then stops.
         hideDisplay();
+        setKeyboardInteractive(false);
         m_surface.commitFrame(m_buffer.buffer(), true);
     }
     if (!m_state.hidden && prevHidden && m_state.paused) {
@@ -235,6 +245,7 @@ void Application::processState() {
         updateCursor();
         if (m_state.locked && m_surface.configured()) {
             applyLockedInputRegion();
+            setKeyboardInteractive(false);
         }
     }
 
@@ -320,6 +331,27 @@ void Application::onPointerButton(uint32_t button, uint32_t state, double x,
                                   double y) {
     m_dragMgr.onButton(button, state, x, y);
     updateCursor();
+}
+
+void Application::onKey(uint32_t key, uint32_t state) {
+    LAY_LOG("key: keycode=%u state=%s", key,
+            state == WL_KEYBOARD_KEY_STATE_PRESSED ? "pressed" : "released");
+}
+
+void Application::setKeyboardInteractive(bool on) {
+    if (m_keyboardInteractive == on) {
+        return;
+    }
+    m_keyboardInteractive = on;
+    // ON_DEMAND instead of EXCLUSIVE: Hyprland forces full-screen pointer
+    // focus onto EXCLUSIVE layer surfaces (m_exclusiveLSes fallback), which
+    // would bypass the input region and never release the pointer. ON_DEMAND
+    // keeps pointer focus region-bound while still granting keyboard focus on
+    // hover (Hyprland allowKeyboardRefocus path) or click (sway).
+    m_surface.setKeyboardInteractivity(
+        on ? ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_ON_DEMAND
+           : ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_NONE);
+    LAY_DEBUG("keyboard interactivity -> %s", on ? "ON_DEMAND" : "NONE");
 }
 
 void Application::loadAssContent(const std::string &content) {

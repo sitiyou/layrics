@@ -10,6 +10,7 @@ struct wl_compositor;
 struct wl_shm;
 struct wl_seat;
 struct wl_pointer;
+struct wl_keyboard;
 struct wl_output;
 struct wl_callback;
 struct zwlr_layer_shell_v1;
@@ -24,6 +25,7 @@ struct WaylandContext {
     wl_shm *shm = nullptr;
     wl_seat *seat = nullptr;
     wl_pointer *pointer = nullptr;
+    wl_keyboard *keyboard = nullptr;
     zwlr_layer_shell_v1 *layerShell = nullptr;
 
     struct OutputInfo {

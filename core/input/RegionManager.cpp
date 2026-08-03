@@ -45,9 +45,6 @@ void RegionManager::update(wl_compositor *compositor, wl_surface *surface,
 
     wl_surface_set_input_region(surface, region);
     wl_region_destroy(region);
-
-    // LAY_DEBUG("input region updated: %zu rects (clamped to %dx%d)",
-    // rects.size(), surfaceWidth, surfaceHeight);
 }
 
 void RegionManager::clear(wl_compositor *compositor, wl_surface *surface) {

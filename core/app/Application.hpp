@@ -10,6 +10,7 @@
 #include "core/input/DamageGrid.hpp"
 #include "core/input/DragManager.hpp"
 #include "core/input/InputManager.hpp"
+#include "core/input/KeyboardManager.hpp"
 #include "core/input/RegionManager.hpp"
 #include "core/renderer/IRenderer.hpp"
 #include "core/renderer/RenderManager.hpp"
@@ -65,6 +66,11 @@ class Application {
     DragManager m_dragMgr;
     RegionManager m_regionMgr;
     CursorManager m_cursorMgr;
+    KeyboardManager m_keyboardMgr;
+
+    // Current layer-surface keyboard interactivity: ON_DEMAND while the
+    // pointer is inside the input region, NONE otherwise.
+    bool m_keyboardInteractive = false;
 
     std::atomic<bool> m_running{true};
     wl_callback *m_frameCallback = nullptr;
@@ -90,5 +96,7 @@ class Application {
     void onFrame(uint32_t time);
     void onPointerMotion(double x, double y);
     void onPointerButton(uint32_t button, uint32_t state, double x, double y);
+    void onKey(uint32_t key, uint32_t state);
+    void setKeyboardInteractive(bool on);
     void onSurfaceConfigure(int width, int height);
 };
