@@ -17,35 +17,35 @@ KRC_KEY = b"@Gaw^2tGQ61-\xce\xd2ni"
 
 
 def qrc_decrypt(encrypted_qrc: str | bytearray | bytes) -> str:
-    """解密云端QRC歌词"""
+    """Decrypt cloud QRC lyrics."""
     if encrypted_qrc is None or encrypted_qrc.strip() == "":
-        logger.error("没有可解密的数据")
-        msg = "没有可解密的数据"
+        logger.error("no data to decrypt")
+        msg = "no data to decrypt"
         raise LyricsDecryptError(msg)
 
     if isinstance(encrypted_qrc, str):
-        encrypted_text_byte = bytearray.fromhex(encrypted_qrc)  # 将文本解析为字节数组
+        encrypted_text_byte = bytearray.fromhex(encrypted_qrc)  # parse the text into a byte array
     elif isinstance(encrypted_qrc, bytearray):
         encrypted_text_byte = encrypted_qrc
     elif isinstance(encrypted_qrc, bytes):
         encrypted_text_byte = bytearray(encrypted_qrc)
     else:
-        logger.error("无效的加密数据类型")
-        msg = "无效的加密数据类型"
+        logger.error("invalid encrypted data type")
+        msg = "invalid encrypted data type"
         raise LyricsDecryptError(msg)
 
     try:
         data = bytearray()
         schedule = tripledes_key_setup(QRC_KEY, DECRYPT)
 
-        # 以 8 字节为单位迭代 encrypted_text_byte
+        # iterate over encrypted_text_byte in 8-byte blocks
         for i in range(0, len(encrypted_text_byte), 8):
             data += tripledes_crypt(encrypted_text_byte[i:], schedule)
 
         decrypted_qrc = decompress(data).decode("utf-8")
     except Exception as e:
-        logger.exception("QRC解密失败")
-        msg = "QRC解密失败"
+        logger.exception("QRC decryption failed")
+        msg = "QRC decryption failed"
         raise LyricsDecryptError(msg) from e
     return decrypted_qrc
 
@@ -56,8 +56,8 @@ def krc_decrypt(encrypted_lyrics: bytearray | bytes) -> str:
     elif isinstance(encrypted_lyrics, bytearray):
         encrypted_data = encrypted_lyrics[4:]
     else:
-        logger.error("无效的加密数据类型")
-        msg = "无效的加密数据类型"
+        logger.error("invalid encrypted data type")
+        msg = "invalid encrypted data type"
         raise LyricsDecryptError(msg)
 
     try:
@@ -67,6 +67,6 @@ def krc_decrypt(encrypted_lyrics: bytearray | bytes) -> str:
 
         return decompress(decrypted_data).decode('utf-8')
     except Exception as e:
-        logger.exception("KRC解密失败")
-        msg = "KRC解密失败"
+        logger.exception("KRC decryption failed")
+        msg = "KRC decryption failed"
         raise LyricsDecryptError(msg) from e

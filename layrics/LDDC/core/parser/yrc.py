@@ -4,12 +4,12 @@ import re
 
 from layrics.LDDC.common.models import LyricsData, LyricsLine, LyricsWord
 
-_LINE_SPLIT_PATTERN = re.compile(r"^\[(\d+),(\d+)\](.*)$")  # 逐行匹配
-_WORD_SPLIT_PATTERN = re.compile(r"(?:\[\d+,\d+\])?\((?P<start>\d+),(?P<duration>\d+),\d+\)(?P<content>(?:.(?!\d+,\d+,\d+\)))*)")  # 逐字匹配
+_LINE_SPLIT_PATTERN = re.compile(r"^\[(\d+),(\d+)\](.*)$")  # match per line
+_WORD_SPLIT_PATTERN = re.compile(r"(?:\[\d+,\d+\])?\((?P<start>\d+),(?P<duration>\d+),\d+\)(?P<content>(?:.(?!\d+,\d+,\d+\)))*)")  # match per word
 
 
 def yrc2data(yrc: str) -> LyricsData:
-    """将yrc转换为列表[(行起始时间, 行结束时间, [(字起始时间, 字结束时间, 字内容)])]"""
+    """Convert yrc into a list of [(line start, line end, [(word start, word end, word text)])]."""
     lrc_list = LyricsData([])
 
     for raw_line in yrc.splitlines():

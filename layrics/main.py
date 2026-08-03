@@ -65,7 +65,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger("layrics.main")
 
-# LAYRICS_DEBUG=lyrics,match  → 模块级 DEBUG；=core  → C++ DEBUG
+# LAYRICS_DEBUG=lyrics,match  → module-level DEBUG; =core  → C++ DEBUG
 for name in os.environ.get("LAYRICS_DEBUG", "").split(","):
     name = name.strip()
     if name and name != "core":
@@ -231,7 +231,7 @@ class LayricsApp:
         try:
             ass_content = await self._fetch_ass_for_track(meta)
         except (RuntimeError, LyricsNotFoundError, json.JSONDecodeError) as e:
-            logger.info("auto-fetch: %s", e)
+            logger.error("auto-fetch: %s", e)
             return
         else:
             if self._fetch_gen != gen:
@@ -457,7 +457,7 @@ class LayricsApp:
                 keyword = params.get("keyword", "")
                 limit = params.get("limit", 10)
                 data = await self.search_songs(keyword, limit)
-                # IPC 边界:复合 id(源名前缀) 供 layctl 回传
+                # IPC boundary: composite id (source-name prefix) for layctl to echo back
                 data = [{**d, "id": f"{d['source']}{d['id']}"} for d in data]
                 return {"id": req_id, "type": "result", "data": data}
 

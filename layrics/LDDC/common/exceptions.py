@@ -7,35 +7,35 @@ from .models import LyricInfo, SongInfo
 
 
 class LDDCError(Exception):
-    """LDDC 基础错误"""
+    """Base LDDC error."""
 
 
 class LyricsProcessingError(LDDCError):
-    """歌词处理错误"""
+    """Lyrics processing error."""
 
 
 class LyricsDecryptError(LyricsProcessingError):
-    """歌词解密错误"""
+    """Lyrics decryption error."""
 
 
 class LyricsFormatError(LyricsProcessingError):
-    """歌词格式错误"""
+    """Lyrics format error."""
 
 
 class APIError(LDDCError):
-    """API调用错误"""
+    """API call error."""
 
 
 class APIParamsError(APIError):
-    """API参数错误"""
+    """Invalid API parameters."""
 
 
 class APIRequestError(APIError):
-    """API请求错误"""
+    """API request error."""
 
 
 class LyricsNotFoundError(APIError):
-    """没有歌词错误"""
+    """No lyrics found for the given song."""
 
     def __init__(self, msg: str, info: SongInfo | LyricInfo | None = None) -> None:
         super().__init__(msg)

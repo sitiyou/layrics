@@ -67,18 +67,18 @@ class KGAPI(CloudAPI):
                 mid = hashlib.md5(str(int(time.time() * 1000)).encode("utf-8")).hexdigest()
                 params = {"appid": "1014", "platid": "4", "mid": mid}
 
-                # 生成签名
+                # generate the signature
                 sorted_values = sorted([str(v) for v in params.values() if v != ""])
                 params["signature"] = hashlib.md5(f"1014{''.join(sorted_values)}1014".encode()).hexdigest()
                 data = b64encode(b'{"uuid":""}').decode()
 
-                # 发送请求
+                # send the request
                 response = httpx.post("https://userservice.kugou.com/risk/v1/r_register_dev", content=data, params=params)
                 dfid = response.json().get("data", {}).get("dfid")
                 if isinstance(dfid, str):
                     cache.set(("KG dfid", __version__), dfid, expire=1800)
                 else:
-                    logger.error("获取KG dfid 失败")
+                    logger.error("failed to get KG dfid")
                     dfid = "-"
             self.dfid = dfid
 
@@ -139,7 +139,7 @@ class KGAPI(CloudAPI):
         response.raise_for_status()
         response_data = response.json()
         if response_data.get("error_code", 0) not in (0, 200):
-            raise APIRequestError("kg API请求错误,错误码:" + str(response_data.get("error_code")) + f"错误信息: {response_data.get('error_msg')}")
+            raise APIRequestError("kg API request error, code: " + str(response_data.get("error_code")) + f", message: {response_data.get('error_msg')}")
         return response_data
 
     def search(self, keyword: str, search_type: SearchType, page: int = 1) -> APIResultList[SongInfo]:
@@ -154,7 +154,7 @@ class KGAPI(CloudAPI):
         try:
             data = self.request(url, params, module, headers={"x-router": "complexsearch.kugou.com"})
         except APIRequestError:
-            logger.exception("kg API请求错误,尝试使用旧接口")
+            logger.exception("kg API request error, falling back to the old interface")
             return self._old_search(keyword, search_type, page)
 
         if not data["data"]["lists"]:
@@ -199,7 +199,7 @@ class KGAPI(CloudAPI):
         )
 
     def _old_search(self, keyword: str, search_type: SearchType, page: int = 1) -> APIResultList[SongInfo]:
-        """备用搜索API"""
+        """Fallback search API."""
         domain = random.choice(["mobiles.kugou.com", "msearchcdn.kugou.com", "mobilecdnbj.kugou.com", "msearch.kugou.com"])
         pagesize = 20
 
@@ -254,7 +254,7 @@ class KGAPI(CloudAPI):
         if isinstance(info, SongInfo):
             infos = self.get_lyricslist(info)
             if not infos:
-                msg = "没有找到歌词"
+                msg = "no lyrics found"
                 raise LyricsNotFoundError(msg, info)
             info = infos[0]
 
@@ -269,7 +269,7 @@ class KGAPI(CloudAPI):
         url = "http://lyrics.kugou.com/download"
         data = self.request(url, params, "Lyric")
         lyrics = Lyrics(info.songinfo)
-        if data["contenttype"] == 2:  # 基于base64编码的纯文本歌词
+        if data["contenttype"] == 2:  # base64-encoded plaintext lyrics
             lyric = MultiLyricsData({"orig": plaintext2data(b64decode(data["content"]).decode("utf-8"))})
         else:
             lyrics.tags, lyric = krc2mdata(krc_decrypt(b64decode(data["content"])))
@@ -281,7 +281,7 @@ class KGAPI(CloudAPI):
     def get_lyricslist(self, song_info: SongInfo) -> APIResultList[LyricInfo]:
         params = {
             "album_audio_id": song_info.id,
-            "duration": song_info.duration,  # 毫秒
+            "duration": song_info.duration,  # in milliseconds
             "hash": song_info.hash,
             "keyword": f"{'、'.join(song_info.artist) if isinstance(song_info.artist, list) else (song_info.artist or '')} - {song_info.title}",
             "lrctxt": "1",

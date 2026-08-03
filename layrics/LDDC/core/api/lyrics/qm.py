@@ -39,8 +39,8 @@ LANGUAGE_MAPPING = {
     5: Language.ENGLISH,
     4: Language.KOREAN,
     3: Language.JAPANESE,
-    1: Language.CHINESE,  # 粤语
-    0: Language.CHINESE,  # 汉语
+    1: Language.CHINESE,  # Cantonese
+    0: Language.CHINESE,  # Mandarin
 }
 
 
@@ -87,15 +87,15 @@ class QMAPI(CloudAPI):
             }
 
     def request(self, method: str, module: str, param: dict) -> dict:
-        """请求API
+        """Send an API request.
 
         Args:
-            method (str): 请求方法
-            module (str): 请求模块
-            param (dict): 请求参数
+            method (str): request method
+            module (str): request module
+            param (dict): request parameters
 
         Returns:
-            dict: 响应数据
+            dict: response data
 
         """
         if not self.inited and method != "GetSession":
@@ -122,7 +122,7 @@ class QMAPI(CloudAPI):
         response.raise_for_status()
         response_data = response.json()
         if response_data["code"] != 0 or response_data["request"]["code"] != 0:
-            raise APIRequestError("qm API请求错误,错误码:" + str(response_data["code"] if response_data["code"] != 0 else response_data["request"]["code"]))
+            raise APIRequestError("qm API request error, code: " + str(response_data["code"] if response_data["code"] != 0 else response_data["request"]["code"]))
         return response_data["request"]["data"]
 
     def format_songinfos(self, songinfos: list) -> list[SongInfo]:
@@ -142,15 +142,15 @@ class QMAPI(CloudAPI):
         ]
 
     def search(self, keyword: str, search_type: SearchType, page: int = 1) -> APIResultList[SongInfo]:
-        """搜索歌曲
+        """Search for songs.
 
         Args:
-            keyword (str): 搜索关键词
-            search_type (SearchType): 搜索类型
-            page (int, optional): 页码. Defaults to 1.
+            keyword (str): search keyword
+            search_type (SearchType): search type
+            page (int, optional): page number. Defaults to 1.
 
         Returns:
-            APIResultList[SongInfo]: 搜索结果
+            APIResultList[SongInfo]: search results
 
         """
         pagesize = 20
@@ -189,17 +189,17 @@ class QMAPI(CloudAPI):
         )
 
     def get_lyrics(self, info: SongInfo) -> Lyrics:
-        """获取歌词
+        """Get lyrics.
 
         Args:
-            info (SongInfo): 歌曲信息
+            info (SongInfo): song info
 
         Returns:
-            Lyrics: 歌词
+            Lyrics: the lyrics
 
         """
         if info.title is None or info.album is None or not info.id or info.duration is None:
-            msg = "缺少必要参数"
+            msg = "missing required parameters"
             raise APIParamsError(msg)
 
         param = {
@@ -207,7 +207,7 @@ class QMAPI(CloudAPI):
             "crypt": 1,
             "ct": 19,
             "cv": 2111,
-            "interval": info.duration // 1000,  # 单位为秒
+            "interval": info.duration // 1000,  # in seconds
             "lrc_t": 0,
             "qrc": 1,
             "qrc_t": 0,
@@ -240,6 +240,6 @@ class QMAPI(CloudAPI):
                     lyrics[key] = lyric
                     lyrics.types[key] = judge_lyrics_type(lyric)
         if not lyrics:
-            msg = "没有找到歌词"
+            msg = "no lyrics found"
             raise LyricsNotFoundError(msg, info)
         return lyrics

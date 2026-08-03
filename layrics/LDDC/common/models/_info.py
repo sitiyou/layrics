@@ -45,7 +45,7 @@ class SongInfo(InfoBase):
     subtitle: str | None = None
     artist: Artist | None = None
     album: str | None = None
-    duration: int | None = None  # 单位毫秒
+    duration: int | None = None  # in milliseconds
 
     id: str | None = None
     mid: str | None = None
@@ -134,7 +134,7 @@ class APIResultList(Sequence[A]):
             self.cached = cached if cached is not None else result.cached
         else:
             self._source_ranges = self._process_ranges(ranges, {item.source for item in result})
-            self._items = self._create_ordered_items(result)  # 始终按source_ranges顺序交叉合并元素
+            self._items = self._create_ordered_items(result)  # always interleave items in source_ranges order
             self.info = info
             self.cached = cached if cached is not None else False
 
@@ -152,12 +152,12 @@ class APIResultList(Sequence[A]):
             return dict(ranges)
 
         if len(sources) > 1:
-            msg = "有多个数据源,但只提供了一个范围元组"
+            msg = "multiple sources provided but only one range tuple given"
             raise ValueError(msg)
         return {next(iter(sources)): ranges} if sources else {}
 
     def _create_ordered_items(self, items: Iterable[A]) -> tuple[A, ...]:
-        """预先生成交叉排序的元组"""
+        """Pre-build the cross-interleaved item tuple."""
         if not self._source_ranges:
             return ()
 
@@ -177,7 +177,7 @@ class APIResultList(Sequence[A]):
     def _validate_ranges(self) -> None:
         total_in_ranges = sum(end - start + 1 for start, end, _ in self._source_ranges.values())
         if len(self._items) != total_in_ranges:
-            msg = "ranges 的总数不等于结果的长度"
+            msg = "total of ranges does not equal the result length"
             raise ValueError(msg)
 
     @property

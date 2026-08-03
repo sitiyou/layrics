@@ -29,7 +29,7 @@ LyricsData = NewType("LyricsData", list[LyricsLine])
 MultiLyricsData = NewType("MultiLyricsData", MutableMapping[str, LyricsData])
 
 
-# FS 是 full_timestamps 的缩写
+# FS is short for full_timestamps
 class FSLyricsWord(NamedTuple):
     start: int
     end: int
@@ -59,26 +59,26 @@ def get_full_timestamps_lyrics_data(data: LyricsData, duration: int | None, only
 
 
 def get_full_timestamps_lyrics_data(data: LyricsData, duration: int | None, only_line: bool = False, skip_none: bool = False) -> LyricsData | FSLyricsData:
-    """获取完整时间戳的歌词数据
+    """Get lyrics data with complete timestamps.
 
-    :param data: 歌词数据
-    :param duration: 歌曲结束时间
-    :param only_line: 是否只推算行时间戳
-    :param skip_none: 是否跳过无法推算时间戳的行
+    :param data: lyrics data
+    :param duration: song end time
+    :param only_line: whether to only infer line timestamps
+    :param skip_none: whether to skip lines whose timestamps cannot be inferred
     """
     result = LyricsData([])
     fsresult = FSLyricsData([])
 
     for i, line in enumerate(data):
-        # 处理行级时间戳
+        # handle line-level timestamps
         line_start_time = line.start or (line.words[0].start if line.words else None)
         line_end_time = line.end or (line.words[-1].end if line.words else None)
 
-        # 推算行开始时间
+        # infer the line start time
         if line_start_time is None:
             line_start_time = 0 if i == 0 else data[i - 1].end
 
-        # 推算行结束时间
+        # infer the line end time
         if line_end_time is None:
             line_end_time = (
                 (duration if duration is not None and line_start_time is not None and duration >= line_start_time else None)
@@ -86,30 +86,30 @@ def get_full_timestamps_lyrics_data(data: LyricsData, duration: int | None, only
                 else data[i + 1].start
             )
 
-        # 处理仅行时间戳模式
+        # handle line-only timestamp mode
         if only_line:
             if not skip_none or (line_start_time is not None and line_end_time is not None):
                 result.append(LyricsLine(line_start_time, line_end_time, line[2]))
             continue
 
-        # 处理单词级时间戳
+        # handle word-level timestamps
         words: list[LyricsWord] = []
         fswords: list[FSLyricsWord] = []
         for j, word in enumerate(line.words):
-            # 推算单词开始时间
+            # infer the word start time
             word_start_time = (line_start_time if j == 0 else line.words[j - 1].end) if word.start is None else word.start
 
-            # 推算单词结束时间
+            # infer the word end time
             word_end_time = (line_end_time if j == len(line.words) - 1 else line.words[j + 1].start) if word.end is None else word.end
 
             if skip_none:
-                if word_start_time is None or word_end_time is None:  # 跳过无效时间戳
+                if word_start_time is None or word_end_time is None:  # skip invalid timestamps
                     continue
                 fswords.append(FSLyricsWord(word_start_time, word_end_time, word.text))
             else:
                 words.append(LyricsWord(word_start_time, word_end_time, word.text))
 
-        # 添加有效歌词行
+        # add valid lyric lines
         if not skip_none:
             result.append(LyricsLine(line_start_time, line_end_time, words))
         elif line_start_time is not None and line_end_time is not None:
@@ -245,13 +245,13 @@ class LyricsBase(UserDict[str, VT]):
 
 
 class Lyrics(LyricsBase[LyricsData]):
-    """普通歌词类型(允许空时间戳)"""
+    """Normal lyrics type (empty timestamps allowed)."""
 
     def get_fslyrics(self, duration_ms: int | None = None) -> FSLyrics:
-        """获取完整时间戳的歌词
+        """Get lyrics with complete timestamps.
 
-        :param duration_ms: 歌曲时长
-        :return: 完整时间戳的歌词
+        :param duration_ms: song duration
+        :return: lyrics with complete timestamps
         """
         full_timestamps_lyrics = FSLyrics(self.info)
 
@@ -278,4 +278,4 @@ class Lyrics(LyricsBase[LyricsData]):
 
 
 class FSLyrics(LyricsBase[FSLyricsData]):
-    """完整时间戳歌词类型"""
+    """Lyrics type with complete timestamps."""

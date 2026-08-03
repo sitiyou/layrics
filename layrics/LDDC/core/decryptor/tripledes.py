@@ -1,4 +1,4 @@
-# 参考原C#代码:
+# Reference implementation from the original C# code:
 # https://github.com/WXRIW/QQMusicDecoder/blob/0837a3a1281e58f6db3e3e1dcb1d5441fb0ac268/QQMusicDecoder/DESHelper.cs
 # https://github.com/WXRIW/QQMusicDecoder/blob/0837a3a1281e58f6db3e3e1dcb1d5441fb0ac268/QQMusicDecoder/Decrypter.cs
 
@@ -61,43 +61,43 @@ sbox = (
 
 
 def bitnum(a: bytearray | bytes, b: int, c: int) -> int:
-    """从字节串中提取指定位置的位,并左移指定偏移量。
+    """Extract the bit at the given position from a byte string and left-shift it by the given offset.
 
-    :param a: 字节串
-    :param b: 要提取的位索引
-    :param c: 位提取后的偏移量
-    :return: 提取后的位
+    :param a: byte string
+    :param b: bit index to extract
+    :param c: offset to shift after extraction
+    :return: the extracted bit
     """
     return ((a[(b // 32) * 4 + 3 - (b % 32) // 8] >> (7 - b % 8)) & 1) << c
 
 
 def bitnum_intr(a: int, b: int, c: int) -> int:
-    """从整数中提取指定位置的位,并左移指定偏移量。
+    """Extract the bit at the given position from an integer and left-shift it by the given offset.
 
-    :param a: 整数
-    :param b: 要提取的位索引
-    :param c: 位提取后的偏移量
-    :return: 提取后的位
+    :param a: integer
+    :param b: bit index to extract
+    :param c: offset to shift after extraction
+    :return: the extracted bit
     """
     return ((a >> (31 - b)) & 1) << c
 
 
 def bitnum_intl(a: int, b: int, c: int) -> int:
-    """从整数中提取指定位置的位,并右移指定偏移量。
+    """Extract the bit at the given position from an integer and right-shift it by the given offset.
 
-    :param a: 整数
-    :param b: 要提取的位索引
-    :param c: 位提取后的偏移量
-    :return: 提取后的位
+    :param a: integer
+    :param b: bit index to extract
+    :param c: offset to shift after extraction
+    :return: the extracted bit
     """
     return ((a << b) & 0x80000000) >> c
 
 
 def sbox_bit(a: int) -> int:
-    """对输入整数进行位运算,重新组合位。
+    """Apply bit operations to the input integer, recombining its bits.
 
-    :param a: 整数
-    :return: 重新组合后的位
+    :param a: integer
+    :return: the recombined bits
     """
     return (a & 32) | ((a & 31) >> 1) | ((a & 1) << 4)
 
@@ -158,7 +158,7 @@ def inverse_permutation(s0: int, s1: int) -> bytearray:
 
 
 def f(state: int, key: list[int]) -> int:
-    # 提取位并左移
+    # extract bits and left-shift
     t1 = (bitnum_intl(state, 31, 0) | ((state & 0xf0000000) >> 1) | bitnum_intl(state, 4, 5) |
           bitnum_intl(state, 3, 6) | ((state & 0x0f000000) >> 3) | bitnum_intl(state, 8, 11) |
           bitnum_intl(state, 7, 12) | ((state & 0x00f00000) >> 5) | bitnum_intl(state, 12, 17) |
@@ -169,16 +169,16 @@ def f(state: int, key: list[int]) -> int:
           bitnum_intl(state, 23, 12) | ((state & 0x000000f0) << 11) | bitnum_intl(state, 28, 17) |
           bitnum_intl(state, 27, 18) | ((state & 0x0000000f) << 9) | bitnum_intl(state, 0, 23))
 
-    # 将 t1 和 t2 的位组合到 lrgstate 中
+    # combine the bits of t1 and t2 into lrgstate
     lrgstate = (
         (t1 >> 24) & 0x000000ff, (t1 >> 16) & 0x000000ff, (t1 >> 8) & 0x000000ff,
         (t2 >> 24) & 0x000000ff, (t2 >> 16) & 0x000000ff, (t2 >> 8) & 0x000000ff,
     )
 
-    # 与密钥进行异或运算
+    # xor with the key
     lrgstate = [lrgstate[i] ^ key[i] for i in range(6)]
 
-    # S盒操作
+    # S-box operation
     state = ((sbox[0][sbox_bit(lrgstate[0] >> 2)] << 28) |
              (sbox[1][sbox_bit(((lrgstate[0] & 0x03) << 4) | (lrgstate[1] >> 4))] << 24) |
              (sbox[2][sbox_bit(((lrgstate[1] & 0x0f) << 2) | (lrgstate[2] >> 6))] << 20) |
@@ -188,7 +188,7 @@ def f(state: int, key: list[int]) -> int:
              (sbox[6][sbox_bit(((lrgstate[4] & 0x0f) << 2) | (lrgstate[5] >> 6))] << 4) |
              sbox[7][sbox_bit(lrgstate[5] & 0x3f)])
 
-    # 位运算
+    # bit operations
     return (bitnum_intl(state, 15, 0) | bitnum_intl(state, 6, 1) | bitnum_intl(state, 19, 2) |
             bitnum_intl(state, 20, 3) | bitnum_intl(state, 28, 4) | bitnum_intl(state, 11, 5) |
             bitnum_intl(state, 27, 6) | bitnum_intl(state, 16, 7) | bitnum_intl(state, 0, 8) |
@@ -203,15 +203,15 @@ def f(state: int, key: list[int]) -> int:
 
 
 def crypt(input_data: bytearray, key: list) -> bytearray:
-    s0, s1 = initial_permutation(input_data)  # 初始置换
+    s0, s1 = initial_permutation(input_data)  # initial permutation
 
-    for idx in range(15):  # 15轮迭代
+    for idx in range(15):  # 15 rounds
         previous_s1 = s1
         s1 = f(s1, key[idx]) ^ s0
         s0 = previous_s1
-    s0 = f(s1, key[15]) ^ s0  # 第15轮
+    s0 = f(s1, key[15]) ^ s0  # round 15
 
-    return inverse_permutation(s0, s1)  # 逆置换
+    return inverse_permutation(s0, s1)  # inverse permutation
 
 
 def key_schedule(key: bytes, mode: int) -> list[list[int]]:

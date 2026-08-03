@@ -49,14 +49,14 @@ class NEAPI(CloudAPI):
             if self.inited and self.expire > int(time.time()):
                 return
 
-            # 游客登录
+            # guest login
             anonimous = cache.get(("NE_anonimous", __version__), None)  # user_id, cookies, expire_time
             if not isinstance(anonimous, dict) or time.time() > anonimous["expire"]:
-                # 生成部分cookies
+                # generate some cookies
                 # clientSign
-                mac = ":".join([f"{secrets.randbelow(255):02X}" for _ in range(6)])  # MAC地址部分
-                random_str = "".join(secrets.choice(string.ascii_uppercase) for _ in range(8))  # 随机大写字母部分
-                hash_part = secrets.token_hex(32)  # 32字节生成64字符
+                mac = ":".join([f"{secrets.randbelow(255):02X}" for _ in range(6)])  # MAC address part
+                random_str = "".join(secrets.choice(string.ascii_uppercase) for _ in range(8))  # random uppercase letters part
+                hash_part = secrets.token_hex(32)  # 32 bytes produce 64 chars
                 client_sign = f"{mac}@@@{random_str}@@@@@@{hash_part}"
                 from layrics.LDDC.res.ne_deviceids import get_device_id
 
@@ -66,14 +66,14 @@ class NEAPI(CloudAPI):
                     "osver": f"Microsoft-Windows-10--build-{random.randint(200, 300)}00-64bit",
                     "clientSign": client_sign,
                     "channel": "netease",
-                    "mode": random.choice(["MS-iCraft B760M WIFI", "ASUS ROG STRIX Z790", "MSI MAG B550 TOMAHAWK", "ASRock X670E Taichi"]),  # 随机生成设备型号
+                    "mode": random.choice(["MS-iCraft B760M WIFI", "ASUS ROG STRIX Z790", "MSI MAG B550 TOMAHAWK", "ASRock X670E Taichi"]),  # random device model
                     "appver": "3.1.3.203419",
                 }
 
                 path = "/eapi/register/anonimous"
                 params = {"username": get_anonimous_username(pre_cookies["deviceId"]), "e_r": True, "header": self._get_params_header(pre_cookies)}
                 encrypted_params = eapi_params_encrypt(path.replace("eapi", "api").encode(), params)
-                logger.info("ne 尝试游客登录")
+                logger.info("ne attempting guest login")
                 with httpx.Client(http2=True) as client:
                     response = client.post(
                         "https://interface.music.163.com" + path,
@@ -83,8 +83,8 @@ class NEAPI(CloudAPI):
                     )
                 response.raise_for_status()
                 data = json.loads(eapi_response_decrypt(response.content))
-                logger.info(f"ne 游客登录code: {data['code']}")
-                response_cookies = response.cookies  # 获取响应的cookies
+                logger.info(f"ne guest login code: {data['code']}")
+                response_cookies = response.cookies  # get the response cookies
                 self.cookies = {
                     "WEVNSM": "1.0.0",
                     "os": pre_cookies["os"],
@@ -99,21 +99,21 @@ class NEAPI(CloudAPI):
                     "appver": pre_cookies["appver"],
                     "WNMCID": f"{''.join(random.choice(string.ascii_lowercase) for _ in range(6))}."
                     f"{int(time.time() * 1000) - random.randint(1000, 10000)}.01.0",
-                }  # 合并cookies(保持顺序)
+                }  # merge cookies (keep order)
                 self.user_id = data["userId"]
                 self.expire = int(time.time()) + 864000
                 for k in [k for k, v in self.cookies.items() if not v]:
-                    logger.warning(f"ne 游客登录未获取到cookie: {k}")
+                    logger.warning(f"ne guest login did not obtain cookie: {k}")
                     self.cookies.pop(k)
                 cache.set(("NE_anonimous", __version__), {"user_id": self.user_id, "cookies": self.cookies, "expire": self.expire})
-                # csrf 15天过期 所以10天过期
+                # csrf expires after 15 days, so expire after 10 days
             else:
                 self.cookies = anonimous["cookies"]
                 self.user_id = anonimous["user_id"]
                 self.expire = anonimous["expire"]
-                logger.info("ne 使用缓存游客登录")
+                logger.info("ne using cached guest login")
 
-            self.session = httpx.Client(http2=True)  # 创建session
+            self.session = httpx.Client(http2=True)  # create session
             self.inited = True
 
             def _atexit() -> None:
@@ -123,13 +123,13 @@ class NEAPI(CloudAPI):
             atexit.register(_atexit)
 
     def request(self, path: str, params: dict) -> dict:
-        """eapi接口请求
+        """Make an eapi request.
 
-        :param path: 请求的路径
-        :param params: 请求参数
-        :return dict: 请求结果
+        :param path: request path
+        :param params: request parameters
+        :return dict: request result
         """
-        params["e_r"] = True  # 开启加密
+        params["e_r"] = True  # enable encryption
         params["header"] = self.get_params_header()
         encrypted_params = eapi_params_encrypt(path.replace("eapi", "api").encode(), params)
         url = "https://interface.music.163.com" + path
@@ -145,7 +145,7 @@ class NEAPI(CloudAPI):
         response.raise_for_status()
         data = json.loads(eapi_response_decrypt(response.content))
         if data["code"] != 200:
-            raise APIRequestError("ne API请求错误,错误码:" + str(data["code"]) + ",错误信息:" + data["message"])
+            raise APIRequestError("ne API request error, code: " + str(data["code"]) + ", message: " + data["message"])
         return data
 
     def _get_params_header(self, cookies: dict) -> str:
@@ -203,20 +203,20 @@ class NEAPI(CloudAPI):
         ]
 
     def search(self, keyword: str, search_type: SearchType, page: int = 1) -> APIResultList[SongInfo]:
-        """网易云音乐搜索
+        """Search NetEase Cloud Music.
 
         Args:
-            keyword (str): 关键字
-            search_type (SearchType): 搜索类型
-            page (int, optional): 页码. Defaults to 1.
+            keyword (str): search keyword
+            search_type (SearchType): search type
+            page (int, optional): page number. Defaults to 1.
 
         Returns:
-            APIResultList[SongInfo]: 搜索结果
+            APIResultList[SongInfo]: search results
 
         """
         pagesize = 20
         params = {
-            "limit": str(pagesize),  # 网易云默认是10
+            "limit": str(pagesize),  # NetEase defaults to 10
             "offset": str((page - 1) * pagesize),
             "keyword": keyword,
             "scene": "NORMAL",
@@ -253,17 +253,17 @@ class NEAPI(CloudAPI):
         )
 
     def get_lyrics(self, info: SongInfo) -> Lyrics:
-        """获取歌词
+        """Get lyrics.
 
         Args:
-            info (SongInfo): 歌曲信息
+            info (SongInfo): song info
 
         Returns:
-            Lyrics: 歌词
+            Lyrics: the lyrics
 
         """
         if not info.id:
-            msg = "歌曲id为空"
+            msg = "song id is empty"
             raise ValueError(msg)
         params = {
             "id": int(info.id),
@@ -307,6 +307,6 @@ class NEAPI(CloudAPI):
                     lyrics[key] = plaintext2data(data[value]["lyric"])
                 lyrics.types[key] = judge_lyrics_type(lyrics[key])
         if not lyrics:
-            msg = "没有找到歌词"
+            msg = "no lyrics found"
             raise LyricsNotFoundError(msg, info)
         return lyrics

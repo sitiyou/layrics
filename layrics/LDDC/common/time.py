@@ -5,7 +5,7 @@
 
 
 def time2ms(m: int | str, s: int | str, ms: int | str) -> int:
-    """时间转毫秒"""
-    if isinstance(ms, str) and len(ms) == 2:  # 同时支持两位和三位毫秒
+    """Convert m:s.ms to milliseconds."""
+    if isinstance(ms, str) and len(ms) == 2:  # accept both 2- and 3-digit milliseconds
         ms += "0"
     return (int(m) * 60 + int(s)) * 1000 + int(ms)

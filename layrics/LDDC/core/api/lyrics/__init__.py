@@ -1,8 +1,8 @@
 # SPDX-FileCopyrightText: Copyright (C) 2024-2025 沉默の金 <cmzj@cmzj.org>
 # SPDX-License-Identifier: GPL-3.0-only
-"""LDDC 的歌词提供 api
+"""LDDC lyrics provider API
 
-模块中的函数都是被缓存的,而 LyricsAPI 中的函数则不是
+Functions in this module are cached, while those in ``LyricsAPI`` are not.
 """
 
 from collections.abc import Callable
@@ -54,7 +54,7 @@ class LyricsAPI:
             self.inited = True
 
     def timeout_retry(self, func: Callable[P, T], *args: P.args, **kwargs: P.kwargs) -> T:
-        from httpx import TimeoutException  # 加快启动速度
+        from httpx import TimeoutException  # import here to speed up startup
 
         for i in range(3):
             try:
@@ -63,8 +63,11 @@ class LyricsAPI:
                 if i == 2:
                     raise
                 continue
+            except LyricsNotFoundError:
+                # Expected outcome (no lyrics available); no retry, handled by the caller.
+                raise
             except Exception:
-                logger.exception("请求歌词Api时遇到错误")
+                logger.exception("lyrics API request failed")
                 raise
 
         msg = "Unknown error"
@@ -138,13 +141,13 @@ class LyricsAPI:
         return APIResultList(items, info, ranges)
 
     def get_lyrics(self, info: SongInfo | LyricInfo | None = None) -> Lyrics:
-        """获取歌词
+        """Get lyrics for the given song info.
 
         Args:
-            info (SongInfo | LyricInfo): 歌曲信息或歌词信息
+            info (SongInfo | LyricInfo): song info or lyric info
 
         Returns:
-            Lyrics: 歌词
+            Lyrics: the lyrics
 
         """
         if not self.inited:
@@ -154,7 +157,7 @@ class LyricsAPI:
             raise ValueError(msg)
         lyrics = self.timeout_retry(self.cloud_apis[info.source].get_lyrics, info)
         if not lyrics:
-            msg = "没有找到歌词"
+            msg = "no lyrics found"
             raise LyricsNotFoundError(msg, info)
         return lyrics
 
@@ -189,13 +192,13 @@ def search(
 
 
 def get_lyrics(info: SongInfo | LyricInfo | None = None) -> Lyrics:
-    """获取歌词
+    """Get lyrics for the given song info (cached 4h).
 
     Args:
-        info (SongInfo | LyricInfo): 歌曲信息或歌词信息
+        info (SongInfo | LyricInfo): song info or lyric info
 
     Returns:
-        Lyrics: 歌词
+        Lyrics: the lyrics
 
     """
     result, cached = cached_call_with_status(lyrics_api.get_lyrics, {"expire": 14400}, info)

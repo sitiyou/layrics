@@ -14,16 +14,16 @@ from layrics.LDDC.common.models import (
 KRC_MAGICHEADER = b"krc18"
 
 _TAG_SPLIT_PATTERN = re.compile(r"^\[(\w+):([^\]]*)\]$")
-_LINE_SPLIT_PATTERN = re.compile(r"^\[(\d+),(\d+)\](.*)$")  # 逐行匹配
-_WORD_SPLIT_PATTERN = re.compile(r"(?:\[\d+,\d+\])?<(?P<start>\d+),(?P<duration>\d+),\d+>(?P<content>(?:.(?!\d+,\d+,\d+>))*)")  # 逐字匹配
+_LINE_SPLIT_PATTERN = re.compile(r"^\[(\d+),(\d+)\](.*)$")  # match per line
+_WORD_SPLIT_PATTERN = re.compile(r"(?:\[\d+,\d+\])?<(?P<start>\d+),(?P<duration>\d+),\d+>(?P<content>(?:.(?!\d+,\d+,\d+>))*)")  # match per word
 
 
 def krc2mdata(krc: str) -> tuple[dict, MultiLyricsData]:
-    """将明文krc转换为字典{歌词类型: [(行起始时间, 行结束时间, [(字起始时间, 字结束时间, 字内容)])]}."""
+    """Convert plaintext krc into a dict {lyrics type: [(line start, line end, [(word start, word end, word text)])]}."""
     lrc_dict = MultiLyricsData({})
     tags: dict[str, str] = {}
 
-    orig_list = LyricsData([])  # 原文歌词
+    orig_list = LyricsData([])  # original lyrics
     roma_list = LyricsData([])
     ts_list = LyricsData([])
 
@@ -57,11 +57,11 @@ def krc2mdata(krc: str) -> tuple[dict, MultiLyricsData]:
     if "language" in tags and tags["language"].strip() != "":
         languages = json.loads(b64decode(tags["language"].strip()))
         for language in languages["content"]:
-            if language["type"] == 0:  # 逐字(罗马音)
-                offset = 0  # 用于跳过一些没有内容的行,它们不会存在与罗马音的字典中
+            if language["type"] == 0:  # per-word (romaji)
+                offset = 0  # skip lines without content; they do not exist in the romaji dict
                 for i, line in enumerate(orig_list):
                     if all(not w.text for w in line.words):
-                        # 如果该行没有内容,则跳过
+                        # skip lines without content
                         offset += 1
                         continue
 
@@ -72,7 +72,7 @@ def krc2mdata(krc: str) -> tuple[dict, MultiLyricsData]:
                             [LyricsWord(word.start, word.end, language["lyricContent"][i - offset][j]) for j, word in enumerate(line.words)],
                         ),
                     )
-            elif language["type"] == 1:  # 逐行(翻译)
+            elif language["type"] == 1:  # per-line (translation)
                 for i, line in enumerate(orig_list):
                     ts_list.append(LyricsLine(line.start, line.end, [LyricsWord(line.start, line.end, language["lyricContent"][i][0])]))
 

@@ -28,19 +28,19 @@ def cached_call[**P, T](
     *args: P.args,
     **kwargs: P.kwargs,
 ) -> T:
-    """高性能缓存调用函数,支持参数过滤和类型感知
+    """High-performance cached call with parameter filtering and type awareness.
 
     Args:
-        func (Callable): 要缓存的函数
-        cache_settings (dict): 缓存设置,包括:
-            typed (bool): 是否启用类型感知
-            ignore (set): 忽略的参数索引或关键字
-            expire (int): 缓存过期时间,单位为秒
-        *args (P.args): 位置参数
-        **kwargs (P.kwargs): 关键字参数
+        func (Callable): the function to cache
+        cache_settings (dict): cache settings, including:
+            typed (bool): whether to enable type awareness
+            ignore (set): parameter indices or keywords to ignore
+            expire (int): cache expiry in seconds
+        *args (P.args): positional arguments
+        **kwargs (P.kwargs): keyword arguments
 
     Returns:
-        T: 函数返回值
+        T: the function return value
 
     """
     typed, ignore, expire = True, set(), None
@@ -64,19 +64,19 @@ def cached_call_with_status[**P, T](
     *args: P.args,
     **kwargs: P.kwargs,
 ) -> tuple[T, bool]:
-    """高性能缓存调用函数,支持参数过滤和类型感知
+    """High-performance cached call with parameter filtering and type awareness.
 
     Args:
-        func (Callable): 要缓存的函数
-        cache_settings (dict): 缓存设置,包括:
-            typed (bool): 是否启用类型感知
-            ignore (set): 忽略的参数索引或关键字
-            expire (int): 缓存过期时间,单位为秒
-        *args (P.args): 位置参数
-        **kwargs (P.kwargs): 关键字参数
+        func (Callable): the function to cache
+        cache_settings (dict): cache settings, including:
+            typed (bool): whether to enable type awareness
+            ignore (set): parameter indices or keywords to ignore
+            expire (int): cache expiry in seconds
+        *args (P.args): positional arguments
+        **kwargs (P.kwargs): keyword arguments
 
     Returns:
-        T: 函数返回值
+        T: the function return value
 
     """
     typed, ignore, expire = True, set(), None
@@ -101,20 +101,20 @@ def _buildcache_key(
     typed: bool,
     ignore: set[int | str],
 ) -> tuple:
-    """构建高效缓存键结构"""
-    # 函数标识
+    """Build an efficient cache key structure."""
+    # function identifier
     base = (f"{func.__module__}.{func.__qualname__}",)
 
-    # 过滤位置参数
+    # filter positional arguments
     filtered_args = tuple(arg for idx, arg in enumerate(args) if idx not in ignore)
 
-    # 过滤并排序关键字参数
+    # filter and sort keyword arguments
     sorted_kwargs = tuple(sorted((k, v) for k, v in kwargs.items() if k not in ignore))
 
-    # 组合基础键
+    # combine the base key
     key = base + filtered_args + sorted_kwargs
 
-    # 添加类型信息
+    # add type information
     if typed:
         type_sig = (
             *(type(arg) for arg in filtered_args),
