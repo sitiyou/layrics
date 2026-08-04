@@ -43,6 +43,7 @@ from layrics.LDDC.common.models import SongInfo, Source
 from .cache import SongCache, make_cache_key
 from .config import get_config
 from .core import ApplicationController
+from .keys import KeyManager
 from .lyricsource import (
     fetch_lyrics as _fetch_lyrics,
 )
@@ -122,6 +123,7 @@ class LayricsApp:
 
     def __init__(self, socket_path: str = ""):
         self.ctrl = ApplicationController()
+        self.key_manager = KeyManager(self)
         self._config = get_config()
         self.mpris_finder = MPRISPlayerFinder()
         self._mpris_player: Any = None
@@ -405,6 +407,22 @@ class LayricsApp:
                 self.ctrl.set_status(start_time_ms=now_ms - pos // 1000)
 
         self._last_position_us = pos
+
+    def resync_start_time(self) -> bool:
+        """Re-align start_time_ms to the player's current position.
+
+        Returns False while paused or when the position is unavailable.
+        """
+        if self.ctrl.state.paused or self._mpris_player is None:
+            return False
+        try:
+            pos = self._mpris_player.get_position()
+        except Exception:
+            logger.debug("resync: position unavailable")
+            return False
+        now_ms = int(time.monotonic() * 1000)
+        self.ctrl.set_status(start_time_ms=now_ms - pos // 1000)
+        return True
 
     # ── Lyric search (LDDC) ──────────────────────────────────────
 
@@ -850,18 +868,6 @@ class LayricsApp:
                 logger.debug("mpris poll error: %s", e)
             await asyncio.sleep(1)
 
-    # ── Keyboard poller ───────────────────────────────────────────
-
-    async def _key_poller(self):
-        while True:
-            events = self.ctrl.poll_key_events()
-            for key, state, mods in events:
-                self._on_key_event(key, state, mods)
-            await asyncio.sleep(0.01)
-
-    def _on_key_event(self, key: int, state: int, mods: int) -> None:
-        logger.debug("key: keycode=%d state=%d mods=0x%x", key, state, mods)
-
     # ── Run ───────────────────────────────────────────────────────
 
     async def run(self):
@@ -887,7 +893,7 @@ class LayricsApp:
 
         self._auto_select_player()
         poller_task = asyncio.create_task(self._mpris_poller())
-        key_poller_task = asyncio.create_task(self._key_poller())
+        key_poller_task = asyncio.create_task(self.key_manager.poller())
 
         try:
             await self._server.serve_forever()
