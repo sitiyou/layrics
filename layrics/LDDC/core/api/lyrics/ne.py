@@ -2,11 +2,13 @@
 # SPDX-License-Identifier: GPL-3.0-only
 
 import asyncio
+import functools
 import json
 import random
 import secrets
 import string
 import time
+from importlib.resources import files
 
 import httpx
 
@@ -34,6 +36,20 @@ from layrics.LDDC.core.parser.yrc import yrc2data
 
 from .models import CloudAPI
 
+_DEVICE_IDS_FILE = files("layrics.LDDC.res") / "ne_deviceids.txt"
+
+
+@functools.cache
+def _load_device_ids() -> tuple[str, ...]:
+    """Load device IDs from the bundled resource file, skipping comment lines."""
+    lines = _DEVICE_IDS_FILE.read_text(encoding="utf-8").splitlines()
+    return tuple(line for line in lines if line and not line.startswith("#"))
+
+
+def get_device_id() -> str:
+    """Return a random NetEase device ID."""
+    return random.choice(_load_device_ids())
+
 
 class NEAPI(CloudAPI):
     source = Source.NE
@@ -57,8 +73,6 @@ class NEAPI(CloudAPI):
                 random_str = "".join(secrets.choice(string.ascii_uppercase) for _ in range(8))  # random uppercase letters part
                 hash_part = secrets.token_hex(32)  # 32 bytes produce 64 chars
                 client_sign = f"{mac}@@@{random_str}@@@@@@{hash_part}"
-                from layrics.LDDC.res.ne_deviceids import get_device_id
-
                 pre_cookies = {
                     "os": "pc",
                     "deviceId": get_device_id(),
