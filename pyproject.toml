@@ -13,7 +13,6 @@ dependencies = [
     "dbus-python",
     "PyGObject",
     "click>=8.4.1",
-    "mutagen",
     "diskcache",
     "pyaes",
     "appdirs",
