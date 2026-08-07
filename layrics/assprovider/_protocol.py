@@ -27,7 +27,7 @@ _ass_providers: list[type[AssProvider]] = []
 @dataclass
 class AssTrigger:
     player_regex: str | None = None
-    lyric_types: set[LyricsType] | None = None
+    lyrics_types: set[LyricsType] | None = None
     has_translation: bool | None = None
     has_romaji: bool | None = None
     source: Source | list[Source] | None = None
@@ -35,9 +35,9 @@ class AssTrigger:
     def matches(self, player_name: str, lyrics: _LDCLyrics) -> bool:
         if self.player_regex is not None and not re.search(self.player_regex, player_name):
             return False
-        if self.lyric_types is not None:
+        if self.lyrics_types is not None:
             t = lyrics.types.get("orig")
-            if t is None or t not in self.lyric_types:
+            if t is None or t not in self.lyrics_types:
                 return False
         if self.has_translation is not None:
             has_ts = "ts" in lyrics and len(lyrics["ts"]) > 0

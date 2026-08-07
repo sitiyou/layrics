@@ -1,5 +1,5 @@
 """
-layrics - ASS subtitle overlay on wlr-layer-shell
+layrics - desktop lyrics overlay (wlr-layer-shell + libass)
 Provides JSON-based IPC control over a Unix domain socket.
 
 Protocol:
@@ -141,6 +141,7 @@ class LayricsApp:
         self._signal_monitor: MprisSignalMonitor | None = None
         self._signal_reader: asyncio.AbstractEventLoop | None = None
         self._fetch_gen: int = 0
+        self._lyrics_delay_ms: int = 0
 
     # ── overlay control ───────────────────────────────────────────
 
@@ -160,7 +161,10 @@ class LayricsApp:
 
     # ── auto-fetch ────────────────────────────────────────────────
 
-    async def _fetch_ass_for_track(self, meta: TrackMeta) -> str:
+    async def _fetch_ass_for_track(
+        self, meta: TrackMeta
+    ) -> tuple[str, str, str, str]:
+        """Fetch ASS lyrics for the track; returns (ass, cache_key, song_id, source)."""
         keyword = meta.title or ""
         if meta.artists:
             keyword += " " + " ".join(meta.artists)
@@ -196,7 +200,7 @@ class LayricsApp:
                 try:
                     ass = await _fetch_lyrics(si)
                     logger.info("fetch: cache hit %s (%d bytes)", keyword, len(ass))
-                    return ass
+                    return ass, key, cached.lyrics_song_id, cached.lyrics_source
                 except Exception as e:
                     logger.warning("fetch: error fetch lyrics: %s", e)
                     logger.warning("fetch: stale cache entry, removing: %s", key)
@@ -224,11 +228,11 @@ class LayricsApp:
 
         cache.set_if_missing(key, raw_id, src.name)
 
-        return ass
+        return ass, key, raw_id, src.name
 
     async def _auto_fetch_lyrics(self, meta: TrackMeta, gen: int) -> None:
         try:
-            ass_content = await self._fetch_ass_for_track(meta)
+            ass_content, key, song_id, source = await self._fetch_ass_for_track(meta)
         except (RuntimeError, LyricsNotFoundError, json.JSONDecodeError) as e:
             logger.error("auto-fetch: %s", e)
             return
@@ -239,13 +243,7 @@ class LayricsApp:
 
         if self._fetch_gen != gen:
             return
-        now_ms = int(time.monotonic() * 1000)
-        if not self.ctrl.state.paused:
-            try:
-                pos = self._mpris_player.get_position()
-                self.ctrl.set_status(start_time_ms=now_ms - pos // 1000)
-            except Exception:  # noqa: S110 - position unavailable, keep default
-                pass
+        self._restore_lyrics_delay(key, song_id, source)
 
     # ── MPRIS ─────────────────────────────────────────────────────
 
@@ -334,7 +332,9 @@ class LayricsApp:
                     kwargs = {"paused": False}
                     try:
                         pos = self._mpris_player.get_position()
-                        kwargs["start_time_ms"] = now_ms - pos // 1000
+                        kwargs["start_time_ms"] = (
+                            now_ms - pos // 1000 + self._lyrics_delay_ms
+                        )
                     except Exception:  # noqa: S110 - position unavailable, keep default
                         pass
                     self.ctrl.set_status(**kwargs)
@@ -344,7 +344,9 @@ class LayricsApp:
                     self.ctrl.set_status(paused=True)
             elif typ == "seeked":
                 now_ms = int(time.monotonic() * 1000)
-                self.ctrl.set_status(start_time_ms=now_ms - val // 1000)
+                self.ctrl.set_status(
+                    start_time_ms=now_ms - val // 1000 + self._lyrics_delay_ms
+                )
                 self._last_position_us = val
             elif typ == "track":
                 self._fetch_gen += 1
@@ -395,7 +397,10 @@ class LayricsApp:
             self._last_status = status
             if status == "Playing":
                 now_ms = int(time.monotonic() * 1000)
-                self.ctrl.set_status(paused=False, start_time_ms=now_ms - pos // 1000)
+                self.ctrl.set_status(
+                    paused=False,
+                    start_time_ms=now_ms - pos // 1000 + self._lyrics_delay_ms,
+                )
             elif status in ("Paused", "Stopped"):
                 self.ctrl.set_status(paused=True)
 
@@ -404,24 +409,71 @@ class LayricsApp:
             expected = self._last_position_us + 1_000_000
             if abs(pos - expected) > 500_000:
                 now_ms = int(time.monotonic() * 1000)
-                self.ctrl.set_status(start_time_ms=now_ms - pos // 1000)
+                self.ctrl.set_status(
+                    start_time_ms=now_ms - pos // 1000 + self._lyrics_delay_ms
+                )
 
         self._last_position_us = pos
 
-    def resync_start_time(self) -> bool:
-        """Re-align start_time_ms to the player's current position.
+    def adjust_lyrics_delay(self, delta_ms: int) -> None:
+        """Shift the lyrics timeline by delta_ms relative to the player."""
+        self._lyrics_delay_ms += delta_ms
+        self._persist_lyrics_delay()
+        self._sync_with_delay()
+        logger.info(
+            "lyrics delay %+dms -> total %dms", delta_ms, self._lyrics_delay_ms
+        )
 
-        Returns False while paused or when the position is unavailable.
+    def reset_lyrics_delay(self) -> bool:
+        """Reset the lyrics delay and re-align to the player position.
+
+        Returns False while paused or when no player is selected.
         """
         if self.ctrl.state.paused or self._mpris_player is None:
+            return False
+        self._lyrics_delay_ms = 0
+        self._persist_lyrics_delay()
+        self._sync_with_delay()
+        logger.info("lyrics delay reset")
+        return True
+
+    def _persist_lyrics_delay(self) -> None:
+        """Save the current lyrics delay for the current track."""
+        if self._last_track is None:
+            return
+        key = make_cache_key(self._last_track)
+        cache = SongCache()
+        entry = cache.get(key)
+        if entry is None:
+            return
+        cache.set_lyrics_delay(
+            key, entry.lyrics_song_id, entry.lyrics_source, self._lyrics_delay_ms
+        )
+        logger.debug("lyrics delay persisted: %+dms (%s)", self._lyrics_delay_ms, key)
+
+    def _restore_lyrics_delay(self, key: str, song_id: str, source: str) -> None:
+        """Load the persisted lyrics delay for this track and re-sync."""
+        cache = SongCache()
+        delay = cache.get_lyrics_delay(key, song_id, source)
+        self._lyrics_delay_ms = delay if delay is not None else 0
+        if delay:
+            logger.info("lyrics delay restored: %+dms (%s)", delay, key)
+        if not self.ctrl.state.paused:
+            self._sync_with_delay()
+
+    def _sync_with_delay(self) -> bool:
+        """Set start_time_ms = now - pos + lyrics_delay_ms.
+
+        Returns False when no player is selected or the position is unavailable.
+        """
+        if self._mpris_player is None:
             return False
         try:
             pos = self._mpris_player.get_position()
         except Exception:
-            logger.debug("resync: position unavailable")
             return False
         now_ms = int(time.monotonic() * 1000)
-        self.ctrl.set_status(start_time_ms=now_ms - pos // 1000)
+        self.ctrl.set_status(start_time_ms=now_ms - pos // 1000 + self._lyrics_delay_ms)
         return True
 
     # ── Lyric search (LDDC) ──────────────────────────────────────
@@ -493,7 +545,9 @@ class LayricsApp:
                             "type": "error",
                             "data": {"code": 400, "message": "no current track"},
                         }
-                    ass_content = await self._fetch_ass_for_track(self._last_track)
+                    ass_content, _, _, _ = await self._fetch_ass_for_track(
+                        self._last_track
+                    )
                     return {
                         "id": req_id,
                         "type": "result",
@@ -585,7 +639,8 @@ class LayricsApp:
                         pos = self._mpris_player.get_position()
                         now_ms = int(time.monotonic() * 1000)
                         self.ctrl.set_status(
-                            hidden=False, start_time_ms=now_ms - pos // 1000
+                            hidden=False,
+                            start_time_ms=now_ms - pos // 1000 + self._lyrics_delay_ms,
                         )
                         logger.info(
                             "re-synced start_time on start, pos=%dms", pos // 1000
@@ -682,13 +737,7 @@ class LayricsApp:
                 cache.set(key, raw_id, src.name)
 
                 self.ctrl.set_ass_input(ass)
-                now_ms = int(time.monotonic() * 1000)
-                if not self.ctrl.state.paused:
-                    try:
-                        pos = self._mpris_player.get_position()
-                        self.ctrl.set_status(start_time_ms=now_ms - pos // 1000)
-                    except Exception:  # noqa: S110 - position unavailable, keep default
-                        pass
+                self._restore_lyrics_delay(key, raw_id, src.name)
 
                 logger.info("cache set: %s -> %s%s", key, src.name, raw_id)
                 return {"id": req_id, "type": "result", "data": {"cached": True}}
@@ -772,15 +821,11 @@ class LayricsApp:
 
                 if self._last_track is not None:
                     try:
-                        ass = await self._fetch_ass_for_track(self._last_track)
+                        ass, ass_key, song_id, source = await self._fetch_ass_for_track(
+                            self._last_track
+                        )
                         self.ctrl.set_ass_input(ass)
-                        now_ms = int(time.monotonic() * 1000)
-                        if not self.ctrl.state.paused:
-                            try:
-                                pos = self._mpris_player.get_position()
-                                self.ctrl.set_status(start_time_ms=now_ms - pos // 1000)
-                            except Exception:  # noqa: S110 - position unavailable, keep default
-                                pass
+                        self._restore_lyrics_delay(ass_key, song_id, source)
                         logger.info(
                             "ass config: lyrics reloaded with new %s = %r", key, parsed
                         )
@@ -924,7 +969,7 @@ def main():
 
     import argparse
 
-    parser = argparse.ArgumentParser(description="layrics - ASS subtitle overlay")
+    parser = argparse.ArgumentParser(description="layrics - desktop lyrics overlay")
     parser.add_argument("--socket", "-s", help="IPC socket path")
     args = parser.parse_args()
 

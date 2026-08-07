@@ -37,7 +37,10 @@ class SongCache:
         if db_path is None:
             db_path = os.path.join(_DATA_DIR, "song_cache.db")
         os.makedirs(os.path.dirname(db_path), exist_ok=True)
-        self._conn = sqlite3.connect(db_path)
+        self._conn = sqlite3.connect(db_path, timeout=5.0)
+        # WAL: concurrent readers/writers across SongCache instances
+        self._conn.execute("PRAGMA journal_mode=WAL")
+        self._conn.execute("PRAGMA synchronous=NORMAL")
         self._conn.execute(
             "CREATE TABLE IF NOT EXISTS song_cache ("
             "  cache_key TEXT PRIMARY KEY,"
@@ -57,6 +60,16 @@ class SongCache:
             "  duration INTEGER,"
             "  updated_at INTEGER NOT NULL,"
             "  PRIMARY KEY (song_id, source)"
+            ")"
+        )
+        self._conn.execute(
+            "CREATE TABLE IF NOT EXISTS lyrics_config ("
+            "  cache_key TEXT NOT NULL,"
+            "  lyrics_song_id TEXT NOT NULL,"
+            "  lyrics_source TEXT NOT NULL,"
+            "  delay_ms INTEGER NOT NULL DEFAULT 0,"
+            "  updated_at INTEGER NOT NULL,"
+            "  PRIMARY KEY (cache_key, lyrics_song_id, lyrics_source)"
             ")"
         )
         self._conn.commit()
@@ -99,6 +112,7 @@ class SongCache:
 
     def remove(self, key: str):
         self._conn.execute("DELETE FROM song_cache WHERE cache_key = ?", (key,))
+        self._conn.execute("DELETE FROM lyrics_config WHERE cache_key = ?", (key,))
         self._conn.commit()
 
     def list_all(self) -> list[dict[str, Any]]:
@@ -123,6 +137,26 @@ class SongCache:
             }
             for row in rows
         ]
+
+    # ── lyrics_config (per-song lyrics settings) ────────────────
+
+    def get_lyrics_delay(self, key: str, song_id: str, source: str) -> int | None:
+        row = self._conn.execute(
+            "SELECT delay_ms FROM lyrics_config "
+            "WHERE cache_key = ? AND lyrics_song_id = ? AND lyrics_source = ?",
+            (key, song_id, source),
+        ).fetchone()
+        return row[0] if row is not None else None
+
+    def set_lyrics_delay(self, key: str, song_id: str, source: str, delay_ms: int):
+        now = int(time.time())
+        self._conn.execute(
+            "INSERT OR REPLACE INTO lyrics_config "
+            "(cache_key, lyrics_song_id, lyrics_source, delay_ms, updated_at) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (key, song_id, source, delay_ms, now),
+        )
+        self._conn.commit()
 
     # ── song_info_cache (song_id → SongInfo) ─────────────────────
 

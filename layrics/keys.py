@@ -152,8 +152,8 @@ class KeyManager:
     """Polls key events from the core and dispatches registered hotkeys."""
 
     POLL_INTERVAL = 0.01
-    # Temporary: lyric delay step per key press, in milliseconds.
-    LYRIC_DELAY_STEP_MS = 100
+    # Temporary: lyrics delay step per key press, in milliseconds.
+    LYRICS_DELAY_STEP_MS = 100
 
     def __init__(self, app):
         self._app = app
@@ -164,21 +164,20 @@ class KeyManager:
     def _register_defaults(self):
         """Built-in bindings; business logic lives here, not in main.py."""
         # Z: lyrics later, X: lyrics earlier, C: reset to player position.
-        self.register("Z", lambda ev: self._adjust_lyric_delay(self.LYRIC_DELAY_STEP_MS))
-        self.register("X", lambda ev: self._adjust_lyric_delay(-self.LYRIC_DELAY_STEP_MS))
-        self.register("C", self._reset_lyric_delay)
+        self.register(
+            "Z", lambda ev: self._app.adjust_lyrics_delay(self.LYRICS_DELAY_STEP_MS)
+        )
+        self.register(
+            "X", lambda ev: self._app.adjust_lyrics_delay(-self.LYRICS_DELAY_STEP_MS)
+        )
+        self.register("C", self._reset_lyrics_delay)
 
-    def _adjust_lyric_delay(self, delta_ms: int) -> None:
-        start = self._ctrl.state.start_time_ms
-        self._ctrl.set_status(start_time_ms=start + delta_ms)
-        logger.info("lyric delay %+dms -> start_time_ms=%d", delta_ms, start + delta_ms)
-
-    def _reset_lyric_delay(self, ev) -> None:
-        """Re-align the lyric timeline to the player's current position."""
-        if self._app.resync_start_time():
-            logger.info("lyric delay reset")
+    def _reset_lyrics_delay(self, ev) -> None:
+        """Reset the lyrics delay and re-align to the player's position."""
+        if self._app.reset_lyrics_delay():
+            logger.info("lyrics delay reset")
         else:
-            logger.debug("lyric delay reset skipped (paused or no player)")
+            logger.debug("lyrics delay reset skipped (paused or no player)")
 
     def register(self, spec: str, callback: Callable[[KeyEvent], Any]) -> Hotkey:
         """Bind a hotkey (e.g. "Ctrl+Shift+K") to a callback.
