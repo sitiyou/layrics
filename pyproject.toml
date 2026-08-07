@@ -5,7 +5,7 @@ build-backend = "mesonpy"
 [project]
 name = "layrics"
 version = "0.1.0"
-description = "ASS subtitle overlay on wlr-layer-shell"
+description = "Desktop lyrics overlay for Wayland — auto-synced with MPRIS players, rendered via libass on wlr-layer-shell"
 requires-python = ">=3.14"
 license = {text = "GPL-3.0-only"}
 dependencies = [

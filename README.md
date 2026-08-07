@@ -11,7 +11,7 @@
 
 # layrics
 
-layrics 是一款运行在 wlr-layer-shell 上的 ASS 字幕叠加层。可以在支持 `wlr-layer-shell` 协议的 Wayland 合成器（Sway、Hyprland、river 等）上，以overlay的形式渲染karaoke 或纯文本歌词字幕。
+layrics 是一款桌面歌词软件：从 MPRIS 兼容的播放器（Spotify、mpd 等）中获取播放状态，自动搜索并匹配当前歌曲的歌词，以卡拉 OK（逐字）或纯文本形式悬浮显示在桌面上。渲染基于 `wlr-layer-shell` 协议与 libass（ASS 字幕），支持 Sway、Hyprland、KDE Plasma 等 Wayland 合成器。
 
 <video src="https://github.com/user-attachments/assets/aaeeeda9-e5b5-434f-95f4-e1daaa7d91a1" controls></video>
 
@@ -20,11 +20,11 @@ layrics 是一款运行在 wlr-layer-shell 上的 ASS 字幕叠加层。可以�
 
 ## 功能
 
-- **Layer Shell 覆盖层**：基于wlr-layer-shell协议，自动悬浮，无需在窗口管理器额外设置规则。
+- **MPRIS 集成**：自动发现并同步 MPRIS 兼容播放器（spotify、mpd 等），跟随播放状态自动切换歌词
+- **多源歌词搜索**：跨 QQ 音乐（QM）、网易云音乐（NE）、酷狗（KG）、LRCLIB 多源并行搜索，自动匹配歌曲
+- **Layer Shell 覆盖层**：基于 wlr-layer-shell 协议自动悬浮，无需在窗口管理器额外设置规则
 - **libass 渲染**：支持 ASS 字幕全部特性，包括卡拉 OK（`\k`）、样式、字体和特效
 - **Aegisub 卡拉 OK 模板**：可选用 aegisub-cli 的 kara-templater 处理逐字歌词，实现高级卡拉 OK 效果
-- **多源歌词搜索**：跨 QQ 音乐（QM）、网易云音乐（NE）、酷狗（KG）、LRCLIB 多源并行搜索，自动匹配歌曲
-- **MPRIS 集成**：自动发现并同步 MPRIS 兼容播放器（spotify、mpv、mpd 等）
 - **歌曲-歌词缓存**：SQLite 匹配结果缓存
 - **拖拽支持**：点击拖拽覆盖层重新定位字幕位置
 - **IPC 控制**：Unix domain socket JSON 协议，支持程序化控制
@@ -198,6 +198,8 @@ layctl ass-get
 | `X` | 歌词提前 100ms |
 | `C` | 重置延迟（重新对齐播放器当前位置） |
 
+> 延迟按歌曲持久化（SQLite `lyrics_config` 表），再次播放同一首歌时自动恢复，且 seek / 暂停 / 播放切换后保持。
+
 仅当指针悬停在歌词区域时按键才生效，移出歌词区域后按键恢复正常。
 
 #### 通过桌面环境绑定（Hyprland 示例）
@@ -287,7 +289,7 @@ meson compile -C build
 
 ---
 
-ASS subtitle overlay for wlr-layer-shell. Renders karaoke and plain-text subtitles as an overlay on Wayland compositors that support `wlr-layer-shell` (Sway, Hyprland, river, etc.).
+layrics is a desktop lyrics overlay: it fetches playback state from MPRIS-compatible players (Spotify, mpd, ...), automatically searches and matches lyrics for the current track, and floats karaoke (word-by-word) or plain-text lyrics on your desktop. Rendering is built on `wlr-layer-shell` and libass (ASS subtitles), supported on Sway, Hyprland, KDE Plasma, etc.
 
 <video src="https://github.com/user-attachments/assets/4b4c9c43-a00d-4ffd-9f7f-82a77b99e076" controls></video>
 
@@ -295,11 +297,11 @@ ASS subtitle overlay for wlr-layer-shell. Renders karaoke and plain-text subtitl
 
 ## Features
 
+- **MPRIS integration**: auto-detects and syncs with MPRIS-compatible players (spotify, mpv, mpd, etc.), following play/pause/track changes
+- **Multi-source lyric fetching**: parallel search across QQ Music (QM), NetEase (NE), Kugou (KG), LRCLIB with automatic song matching
 - **Layer Shell overlay**: auto-floating layer based on `wlr-layer-shell`, no compositor-specific setup required
 - **libass rendering**: supports ASS subtitle features including karaoke (`\k`), styling, fonts, and effects
 - **Aegisub karaoke templating**: optionally processes word-timed lyrics through aegisub-cli's kara-templater for advanced karaoke effects
-- **Multi-source lyric fetching**: parallel search across QQ Music (QM), NetEase (NE), Kugou (KG), LRCLIB with automatic song matching
-- **MPRIS integration**: auto-detects and syncs with MPRIS-compatible players (spotify, mpv, mpd, etc.)
 - **Song-to-lyrics cache**: SQLite song match cache
 - **Drag support**: click and drag the overlay to reposition subtitles
 - **IPC control**: Unix domain socket JSON protocol for programmatic control
