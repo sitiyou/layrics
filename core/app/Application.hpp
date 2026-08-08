@@ -14,9 +14,9 @@
 #include "core/input/RegionManager.hpp"
 #include "core/renderer/IRenderer.hpp"
 #include "core/renderer/RenderManager.hpp"
+#include "core/renderer/VulkanContext.hpp"
 #include "core/utils/FrameRateLimiter.hpp"
 #include "core/wayland/LayerSurface.hpp"
-#include "core/wayland/ShmBuffer.hpp"
 #include "core/wayland/WaylandContext.hpp"
 
 struct wl_callback;
@@ -58,7 +58,7 @@ class Application {
   private:
     WaylandContext m_waylandCtx;
     LayerSurface m_surface;
-    ShmBuffer m_buffer;
+    VulkanContext m_vk;
     RenderManager m_renderMgr;
     FrameRateLimiter m_frameRateLimiter;
     DamageGrid m_damageGrid;
@@ -87,11 +87,12 @@ class Application {
     bool initWayland();
     bool initRenderer();
     bool initInput();
-    void initBuffers();
+    bool initVulkan();
 
     void mainLoop();
     void processState();
-    void renderAndCommit(int64_t timestampMs);
+    void produceFrame(int64_t timestampMs);
+    void updateInputRegion();
     void requestFrame();
 
     void onFrame(uint32_t time);

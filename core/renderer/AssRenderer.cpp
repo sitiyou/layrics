@@ -1,12 +1,16 @@
 #include "core/renderer/AssRenderer.hpp"
+#include "core/renderer/VulkanContext.hpp"
 #include "core/utils/Logger.hpp"
 
 #include <ass/ass.h>
-#include <cairo.h>
+#include <vulkan/vulkan.h>
 
+#include <algorithm>
+#include <cstdarg>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <utility>
 
 AssRenderer::AssRenderer(std::string assContent)
     : m_assContent(std::move(assContent)) {}
@@ -25,14 +29,15 @@ void AssRenderer::messageCallback(int level, const char *fmt, va_list va,
     }
 }
 
-bool AssRenderer::initialize() {
+bool AssRenderer::initialize(VulkanContext &vk) {
     LAY_DEBUG("initializing libass");
+    m_vk = &vk;
+
     m_library = ass_library_init();
     if (!m_library) {
         LAY_ERR("ass_library_init failed");
         return false;
     }
-
     ass_set_message_cb(m_library, messageCallback, nullptr);
 
     m_renderer = ass_renderer_init(m_library);
@@ -42,7 +47,6 @@ bool AssRenderer::initialize() {
         m_library = nullptr;
         return false;
     }
-
     ass_set_fonts(m_renderer, nullptr, "sans-serif",
                   ASS_FONTPROVIDER_AUTODETECT, nullptr, 1);
 
@@ -55,20 +59,25 @@ bool AssRenderer::initialize() {
             LAY_LOG("ASS track loaded (%zu bytes)", m_assContent.size());
         }
     }
-
     return true;
 }
 
-void AssRenderer::invalidateSurface() {
-    if (m_surface) {
-        cairo_surface_destroy(m_surface);
-        m_surface = nullptr;
+void AssRenderer::destroyAtlas() {
+    if (m_atlas.image) {
+        m_vk->destroyTexture(m_atlas);
     }
+    m_atlasReady = false;
+    m_uploadPending = false;
+    m_quads.clear();
 }
 
 void AssRenderer::shutdown() {
-    LAY_DEBUG("shutting down libass");
-    invalidateSurface();
+    LAY_DEBUG("shutting down libass renderer");
+    if (m_vk) {
+        destroyAtlas();
+        m_vk->destroyDynamicBuffer(m_vertexBuf);
+    }
+    m_vk = nullptr;
     if (m_track) {
         ass_free_track(m_track);
         m_track = nullptr;
@@ -85,9 +94,9 @@ void AssRenderer::shutdown() {
 
 void AssRenderer::setSize(int width, int height) {
     if (width != m_width || height != m_height) {
-        invalidateSurface();
         m_width = width;
         m_height = height;
+        // Glyph bitmaps are size-independent; the atlas survives a resize.
     }
     LAY_DEBUG("set render size %dx%d", width, height);
 }
@@ -97,7 +106,8 @@ void AssRenderer::loadContent(const std::string &content) {
     if (!m_library) {
         return;
     }
-    invalidateSurface();
+    m_uploadPending = false;
+    m_quads.clear();
     if (m_track) {
         ass_free_track(m_track);
         m_track = nullptr;
@@ -111,10 +121,11 @@ void AssRenderer::loadContent(const std::string &content) {
     }
 }
 
-cairo_surface_t *AssRenderer::render(int64_t timestampMs) {
+void AssRenderer::prepare(int64_t timestampMs) {
     if (!m_renderer || !m_track || m_width <= 0 || m_height <= 0) {
         lastRegions.clear();
-        return nullptr;
+        contentChanged = false;
+        return;
     }
 
     ass_set_frame_size(m_renderer, m_width, m_height);
@@ -122,72 +133,197 @@ cairo_surface_t *AssRenderer::render(int64_t timestampMs) {
     int changed = 1;
     ASS_Image *img =
         ass_render_frame(m_renderer, m_track, timestampMs, &changed);
-
-    if (!m_surface) {
-        m_surface =
-            cairo_image_surface_create(CAIRO_FORMAT_ARGB32, m_width, m_height);
-        if (cairo_surface_status(m_surface) != CAIRO_STATUS_SUCCESS) {
-            LAY_ERR("Failed to create surface %dx%d", m_width, m_height);
-            cairo_surface_destroy(m_surface);
-            m_surface = nullptr;
-            lastRegions.clear();
-            return nullptr;
-        }
-        changed = 1;
-    }
-
     contentChanged = changed;
 
     if (!changed) {
-        return cairo_surface_reference(m_surface);
+        // Same bitmaps as the previous frame: reuse packed atlas + quads
+        // (no re-pack, no re-upload).
+        return;
     }
 
-    unsigned char *data = cairo_image_surface_get_data(m_surface);
-    int stride = cairo_image_surface_get_stride(m_surface);
+    if (packImages(img)) {
+        fillVertexBuffer();
+    } else {
+        // Never draw partial quads against a stale atlas.
+        m_quads.clear();
+        lastRegions.clear();
+    }
+}
 
-    memset(data, 0, static_cast<size_t>(stride) * m_height);
-
-    lastRegions.clear();
-
-    for (ASS_Image *cur = img; cur != nullptr; cur = cur->next) {
-        if (cur->w == 0 || cur->h == 0) {
-            continue;
+// mpv-style shelf packer: w+2 x h+2 slots with a 1px edge-pixel ring so
+// linear sampling never bleeds between glyphs; doubles the atlas on overflow.
+bool AssRenderer::packImages(const ASS_Image *img) {
+    if (!m_atlasReady) {
+        m_atlasW = kAtlasMin;
+        m_atlasH = kAtlasMin;
+        m_atlas = m_vk->createTexture(m_atlasW, m_atlasH);
+        if (!m_atlas.image) {
+            LAY_ERR("failed to create atlas texture");
+            return false;
         }
+        m_atlasData.assign(static_cast<size_t>(m_atlasW) * m_atlasH, 0);
+        m_atlasReady = true;
+    }
 
-        unsigned int color = cur->color;
-        unsigned char r = (color >> 24) & 0xFF;
-        unsigned char g = (color >> 16) & 0xFF;
-        unsigned char b = (color >> 8) & 0xFF;
-        unsigned char a = 0xFF - (color & 0xFF);
+    while (true) {
+        int x = 1, y = 1, rowH = 0;
+        m_quads.clear();
+        lastRegions.clear();
+        bool overflow = false;
 
-        unsigned char *bitmap = cur->bitmap;
-        int srcStride = cur->stride;
+        for (const ASS_Image *cur = img; cur != nullptr; cur = cur->next) {
+            if (cur->w == 0 || cur->h == 0) {
+                continue;
+            }
+            // Shelf packing with padding reserved (w+2 x h+2, bitmap at +1).
+            if (x + cur->w + 2 > m_atlasW) {
+                x = 1;
+                y += rowH;
+                rowH = 0;
+            }
+            if (y + cur->h + 2 > m_atlasH) {
+                overflow = true;
+                break;
+            }
 
-        for (int y = 0; y < cur->h; y++) {
-            unsigned char *srcRow = bitmap + y * srcStride;
-            unsigned char *dstRow =
-                data + (cur->dst_y + y) * stride + cur->dst_x * 4;
-            for (int x = 0; x < cur->w; x++) {
-                unsigned long k = (unsigned)(srcRow[x] * a);
-                if (!k) {
-                    continue;
-                }
-                unsigned char *dstPixel = dstRow + 4 * x;
+            // Copy the bitmap (row-by-row, honoring the ASS stride) into the
+            // atlas slot [x, x+w) x [y, y+h).
+            uint8_t *dst = m_atlasData.data() + y * m_atlasW + x;
+            const uint8_t *src = cur->bitmap;
+            for (int r = 0; r < cur->h; r++) {
+                memcpy(dst + r * m_atlasW, src + r * cur->stride,
+                       static_cast<size_t>(cur->w));
+            }
+            // 1px duplicated edge ring (mpv fill_padding_1): no sampler bleed
+            // between neighboring atlas slots.
+            for (int r = 0; r < cur->h; r++) {
+                uint8_t *row = m_atlasData.data() + (y + r) * m_atlasW + x;
+                row[-1] = row[0];
+                row[cur->w] = row[cur->w - 1];
+            }
+            memcpy(m_atlasData.data() + (y - 1) * m_atlasW + x - 1,
+                   m_atlasData.data() + y * m_atlasW + x - 1,
+                   static_cast<size_t>(cur->w) + 2);
+            memcpy(m_atlasData.data() + (y + cur->h) * m_atlasW + x - 1,
+                   m_atlasData.data() + (y + cur->h - 1) * m_atlasW + x - 1,
+                   static_cast<size_t>(cur->w) + 2);
 
-                dstPixel[0] =
-                    (dstPixel[0] * (65025 - k) + b * k + 65025 / 2) / 65025;
-                dstPixel[1] =
-                    (dstPixel[1] * (65025 - k) + g * k + 65025 / 2) / 65025;
-                dstPixel[2] =
-                    (dstPixel[2] * (65025 - k) + r * k + 65025 / 2) / 65025;
-                dstPixel[3] =
-                    (dstPixel[3] * (65025 - k) + a * k + 65025 / 2) / 65025;
+            unsigned int color = cur->color;
+            float r = static_cast<float>((color >> 24) & 0xFF) / 255.0f;
+            float g = static_cast<float>((color >> 16) & 0xFF) / 255.0f;
+            float b = static_cast<float>((color >> 8) & 0xFF) / 255.0f;
+            float a = static_cast<float>(0xFF - (color & 0xFF)) / 255.0f;
+
+            Quad q;
+            q.x = static_cast<float>(cur->dst_x);
+            q.y = static_cast<float>(cur->dst_y);
+            q.w = static_cast<float>(cur->w);
+            q.h = static_cast<float>(cur->h);
+            // Sample exactly the bitmap slot; the padding ring is never
+            // sampled directly.
+            q.u0 = static_cast<float>(x) / m_atlasW;
+            q.v0 = static_cast<float>(y) / m_atlasH;
+            q.u1 = static_cast<float>(x + cur->w) / m_atlasW;
+            q.v1 = static_cast<float>(y + cur->h) / m_atlasH;
+            // Premultiply rgb by alpha for the shader output.
+            q.r = r * a;
+            q.g = g * a;
+            q.b = b * a;
+            q.a = a;
+            m_quads.push_back(q);
+
+            lastRegions.push_back({cur->dst_x, cur->dst_y, cur->w, cur->h});
+
+            x += cur->w + 2;
+            if (cur->h + 2 > rowH) {
+                rowH = cur->h + 2;
             }
         }
 
-        lastRegions.push_back({cur->dst_x, cur->dst_y, cur->w, cur->h});
-    }
+        if (!overflow) {
+            m_packedH = y + rowH;
+            m_uploadPending = true;
+            return true;
+        }
 
-    cairo_surface_mark_dirty(m_surface);
-    return cairo_surface_reference(m_surface);
+        // Atlas full: double it (mpv-style) and re-pack from scratch.
+        if (m_atlasW >= kAtlasMax && m_atlasH >= kAtlasMax) {
+            LAY_ERR("atlas exceeds max size %dx%d", m_atlasW, m_atlasH);
+            return false;
+        }
+        int newW = std::min(m_atlasW * 2, kAtlasMax);
+        int newH = std::min(m_atlasH * 2, kAtlasMax);
+        if (newH == m_atlasH && newW == m_atlasW) {
+            return false;
+        }
+        m_vk->destroyTexture(m_atlas);
+        m_atlas = m_vk->createTexture(newW, newH);
+        if (!m_atlas.image) {
+            LAY_ERR("failed to grow atlas texture");
+            return false;
+        }
+        m_atlasW = newW;
+        m_atlasH = newH;
+        m_atlasData.assign(static_cast<size_t>(m_atlasW) * m_atlasH, 0);
+        LAY_LOG("atlas grown to %dx%d", m_atlasW, m_atlasH);
+    }
+}
+
+void AssRenderer::fillVertexBuffer() {
+    if (m_quads.empty()) {
+        return;
+    }
+    const size_t vertexCount = m_quads.size() * 4;
+    const size_t stride = 8 * sizeof(float);
+    if (!m_vk->ensureDynamicBuffer(m_vertexBuf, vertexCount * stride,
+                                   VK_BUFFER_USAGE_VERTEX_BUFFER_BIT)) {
+        return;
+    }
+    float *dst = static_cast<float *>(m_vertexBuf.mapped);
+    for (const auto &q : m_quads) {
+        // TRIANGLE_STRIP (TL, TR, BL, BR) tiles the quad; (TL, TR, BR, BL)
+        // leaves a wedge hole between the two diagonals.
+        float verts[4][8] = {
+            {q.x, q.y, q.u0, q.v0, q.r, q.g, q.b, q.a},
+            {q.x + q.w, q.y, q.u1, q.v0, q.r, q.g, q.b, q.a},
+            {q.x, q.y + q.h, q.u0, q.v1, q.r, q.g, q.b, q.a},
+            {q.x + q.w, q.y + q.h, q.u1, q.v1, q.r, q.g, q.b, q.a},
+        };
+        memcpy(dst, verts, sizeof(verts));
+        dst += 8 * 4;
+    }
+}
+
+void AssRenderer::recordUploads(VkCommandBuffer cmd) {
+    if (!m_uploadPending || !m_atlasReady || m_packedH <= 0) {
+        return;
+    }
+    // Upload the used region of the atlas (full width x packed height).
+    m_vk->recordUploadTexture(cmd, m_atlas, m_atlasW, m_packedH,
+                              m_atlasData.data(), m_atlasW);
+    m_uploadPending = false;
+}
+
+void AssRenderer::recordDraws(VkCommandBuffer cmd, float offsetX, float offsetY,
+                              int screenW, int screenH) {
+    if (m_quads.empty() || !m_vertexBuf.buffer || !m_atlas.image) {
+        return;
+    }
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_vk->pipeline());
+
+    float push[4] = {offsetX, offsetY, static_cast<float>(screenW),
+                     static_cast<float>(screenH)};
+    vkCmdPushConstants(cmd, m_vk->pipelineLayout(), VK_SHADER_STAGE_VERTEX_BIT,
+                       0, sizeof(push), push);
+
+    VkDescriptorSet set = m_atlas.set;
+    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                            m_vk->pipelineLayout(), 0, 1, &set, 0, nullptr);
+
+    VkDeviceSize offset = 0;
+    vkCmdBindVertexBuffers(cmd, 0, 1, &m_vertexBuf.buffer, &offset);
+    // One draw per quad: consecutive strips must not share triangles.
+    for (size_t i = 0; i < m_quads.size(); i++) {
+        vkCmdDraw(cmd, 4, 1, static_cast<uint32_t>(i * 4), 0);
+    }
 }

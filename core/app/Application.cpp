@@ -6,10 +6,12 @@
 
 #include <wayland-client.h>
 
+#include <algorithm>
 #include <cerrno>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+
 #include <poll.h>
 #include <stdexcept>
 #include <unistd.h>
@@ -62,19 +64,15 @@ void Application::run() {
             }
         }
 
-        requestFrame();
-        m_surface.commitFrame(m_buffer.buffer());
-
-        LAY_LOG("entering main loop");
         mainLoop();
 
         if (!m_running) {
             LAY_DEBUG("clean up for stop");
-            m_buffer.clear();
             if (m_surface.configured()) {
                 m_regionMgr.clear(m_waylandCtx.compositor, m_surface.surface());
-                m_surface.commitFrame(m_buffer.buffer());
-                // Non-blocking: the compositor replies nothing after this commit.
+                m_surface.commit();
+                // Non-blocking: the compositor replies nothing after this
+                // commit.
                 m_waylandCtx.flush();
                 m_waylandCtx.dispatchPending();
             }
@@ -103,25 +101,33 @@ bool Application::initWayland() {
         return false;
     }
 
-    initBuffers();
+    if (!initVulkan()) {
+        LAY_ERR("Failed to initialize Vulkan");
+        return false;
+    }
 
     m_damageGrid.setSurfaceSize(m_surface.width(), m_surface.height());
 
     m_surface.setConfigureCallback(
         [this](int width, int height) { onSurfaceConfigure(width, height); });
 
-    return m_buffer.operator bool();
+    return true;
+}
+
+bool Application::initVulkan() {
+    return m_vk.initialize(m_waylandCtx.display, m_surface.surface(),
+                           m_surface.width(), m_surface.height());
 }
 
 bool Application::initRenderer() {
     auto renderer = std::make_unique<AssRenderer>("");
-    if (!renderer->initialize()) {
+    if (!renderer->initialize(m_vk)) {
         LAY_ERR("Failed to initialize ASS renderer");
         return false;
     }
 
     m_assRenderer = renderer.get();
-    m_renderMgr.setSize(m_surface.width(), m_surface.height());
+    m_renderMgr.setSize(m_vk.width(), m_vk.height());
     m_renderMgr.addRenderer(std::move(renderer));
 
     LAY_LOG("ASS renderer initialized");
@@ -152,20 +158,13 @@ bool Application::initInput() {
     m_inputMgr.setLeaveCallback([this]() { setKeyboardInteractive(false); });
 
     m_keyboardMgr.initialize(m_waylandCtx.keyboard);
-    m_keyboardMgr.setKeyCallback([this](uint32_t key, uint32_t state,
-                                        uint32_t mods) {
-        onKey(key, state, mods);
-    });
+    m_keyboardMgr.setKeyCallback(
+        [this](uint32_t key, uint32_t state, uint32_t mods) {
+            onKey(key, state, mods);
+        });
 
     LAY_LOG("input initialized");
     return true;
-}
-
-void Application::initBuffers() {
-    if (!m_buffer.allocate(m_waylandCtx.shmFd, m_waylandCtx.shm,
-                           m_surface.width(), m_surface.height())) {
-        LAY_ERR("Failed to allocate SHM buffer");
-    }
 }
 
 void Application::mainLoop() {
@@ -220,8 +219,7 @@ void Application::mainLoop() {
 }
 
 void Application::processState() {
-    // Snapshot pre-command state so first-time transitions can fire their
-    // side-effects synchronously here (not tied to frame event timing).
+    // Fire first-time transition side effects here, not on frame timing.
     bool prevPaused = m_state.paused;
     bool prevHidden = m_state.hidden;
     bool prevLocked = m_state.locked;
@@ -231,16 +229,13 @@ void Application::processState() {
     }
 
     if (m_state.hidden && !prevHidden) {
-        // Entering hidden: clear the display and commit once so the
-        // compositor shows an empty surface; the frame chain then stops.
+        // Entering hidden: clear the display, then stop the frame chain.
         hideDisplay();
         setKeyboardInteractive(false);
-        m_surface.commitFrame(m_buffer.buffer(), true);
     }
     if (!m_state.hidden && prevHidden && m_state.paused) {
-        // Unhiding while paused: render the frozen frame once so the overlay
-        // shows it again, then the frame chain stops again.
-        renderAndCommit(m_freezeTimestampMs);
+        // Unhiding while paused: re-present the frozen frame once.
+        produceFrame(m_freezeTimestampMs);
     }
     if (m_state.paused && !prevPaused) {
         m_freezeTimestampMs = nowMs() - m_state.startTimeMs;
@@ -253,14 +248,20 @@ void Application::processState() {
         }
     }
 
-    // Restart the frame chain when rendering is needed again (unhide,
-    // unpause, drag begins while paused) but no frame is in flight.
-    // m_buffer stays valid because hideDisplay() only memsets it.
-    bool needsFrame = !m_frameCallback && m_buffer && !m_state.hidden &&
+    // Swapchain recreation on layer configure (safe here, outside dispatch).
+    if (m_vk.dirty() && m_surface.configured()) {
+        m_vk.resize(m_surface.width(), m_surface.height());
+        m_renderMgr.setSize(m_vk.width(), m_vk.height());
+    }
+
+    // Restart the frame chain when needed (unhide, unpause, drag) with no
+    // frame in flight.
+    bool needsFrame = !m_frameCallback && m_vk.ready() && !m_state.hidden &&
                       (!m_state.paused || m_dragMgr.dragging());
     if (needsFrame) {
-        requestFrame();
-        m_surface.commitFrame(m_buffer.buffer(), true);
+        int64_t ts = m_state.paused ? m_freezeTimestampMs
+                                    : nowMs() - m_state.startTimeMs;
+        produceFrame(ts);
     }
 }
 
@@ -271,7 +272,7 @@ void Application::frameDone(void *data, wl_callback * /*cb*/, uint32_t time) {
 }
 
 void Application::onFrame(uint32_t time) {
-    if (!m_surface.configured() || !m_buffer) {
+    if (!m_surface.configured() || !m_vk.ready()) {
         return;
     }
 
@@ -280,57 +281,81 @@ void Application::onFrame(uint32_t time) {
     m_state.dragOffsetY = dragState.offsetY;
     m_renderMgr.setOffset(dragState.offsetX, dragState.offsetY);
 
-    // No rendering while hidden (display already cleared by mainLoop); while
-    // paused the frozen frame stays on screen unless a drag moves the offset.
-    // Returning without requestFrame() stops the frame chain.
+    // Hidden/paused: frozen frame stays unless dragging. Returning without
+    // requestFrame() stops the frame chain.
     if (m_state.hidden || (m_state.paused && !m_dragMgr.dragging())) {
         return;
     }
 
     int64_t timestampMs =
-        m_state.paused
-            ? m_freezeTimestampMs
-            : static_cast<int64_t>(time) - m_state.startTimeMs;
+        m_state.paused ? m_freezeTimestampMs
+                       : static_cast<int64_t>(time) - m_state.startTimeMs;
 
-    renderAndCommit(timestampMs);
+    produceFrame(timestampMs);
 }
 
-void Application::renderAndCommit(int64_t timestampMs) {
-    uint8_t *bufData = static_cast<uint8_t *>(m_buffer.data());
-    RenderResult result = m_renderMgr.render(bufData, timestampMs);
+void Application::produceFrame(int64_t timestampMs) {
+    m_renderMgr.prepare(timestampMs);
 
     // Nothing changed: stop the frame chain (static lyrics cost ~0 GFX).
-    if (!result.contentChanged && !m_dragMgr.dragging() &&
+    // needsFrame restarts it when libass reports new content.
+    if (!m_renderMgr.contentChanged() && !m_dragMgr.dragging() &&
         m_renderMgr.everRendered()) {
         return;
     }
 
-    if (result.contentChanged) {
-        m_damageGrid.beginFrame();
-        for (const auto &rect : result.regions) {
-            m_damageGrid.addRegion(rect.x, rect.y, rect.w, rect.h);
-        }
+    // wl_surface_frame must precede the present commit (WSI attaches inside
+    // vkQueuePresentKHR).
+    requestFrame();
 
-        if (!m_state.locked) {
-            m_regionMgr.update(m_waylandCtx.compositor, m_surface.surface(),
-                               m_damageGrid.buildRegions(), m_surface.width(),
-                               m_surface.height());
+    if (!m_vk.beginFrame()) {
+        // Swapchain out of date; drop the callback so processState can
+        // recreate the swapchain and restart the chain.
+        if (m_frameCallback) {
+            wl_callback_destroy(m_frameCallback);
+            m_frameCallback = nullptr;
         }
-
-        requestFrame();
-        m_surface.commitFrame(m_buffer.buffer(), m_damageGrid.buildDamage());
-    } else {
-        if (!m_state.locked) {
-            m_regionMgr.update(m_waylandCtx.compositor, m_surface.surface(),
-                               result.regions, m_surface.width(),
-                               m_surface.height());
-        }
-
-        requestFrame();
-        m_surface.commitFrame(m_buffer.buffer(), false);
+        return;
     }
 
+    m_renderMgr.recordUploads(m_vk.commandBuffer());
+    m_vk.beginRenderPass();
+    m_renderMgr.recordDraws(m_vk.commandBuffer());
+
+    // Damage grid (current+previous cells) so moved-away content is
+    // re-composited too.
+    m_damageGrid.beginFrame();
+    for (const auto &rect : m_renderMgr.regions()) {
+        m_damageGrid.addRegion(rect.x, rect.y, rect.w, rect.h);
+    }
+    m_vk.endFrame(m_damageGrid.buildDamage());
+
+    if (m_vk.dirty() && m_frameCallback) {
+        // Present failed: no commit happened, so the frame callback never
+        // fires; drop it and let processState restart after resize.
+        wl_callback_destroy(m_frameCallback);
+        m_frameCallback = nullptr;
+    }
+
+    updateInputRegion();
     m_frameRateLimiter.wait();
+}
+
+void Application::updateInputRegion() {
+    if (m_state.locked || !m_surface.configured()) {
+        return;
+    }
+
+    if (m_renderMgr.contentChanged()) {
+        // Grid cells were populated in produceFrame (before the present).
+        m_regionMgr.update(m_waylandCtx.compositor, m_surface.surface(),
+                           m_damageGrid.buildRegions(), m_surface.width(),
+                           m_surface.height());
+    } else {
+        m_regionMgr.update(m_waylandCtx.compositor, m_surface.surface(),
+                           m_renderMgr.regions(), m_surface.width(),
+                           m_surface.height());
+    }
 }
 
 void Application::onPointerMotion(double x, double y) {
@@ -357,11 +382,8 @@ void Application::setKeyboardInteractive(bool on) {
         return;
     }
     m_keyboardInteractive = on;
-    // ON_DEMAND instead of EXCLUSIVE: Hyprland forces full-screen pointer
-    // focus onto EXCLUSIVE layer surfaces (m_exclusiveLSes fallback), which
-    // would bypass the input region and never release the pointer. ON_DEMAND
-    // keeps pointer focus region-bound while still granting keyboard focus on
-    // hover (Hyprland allowKeyboardRefocus path) or click (sway).
+    // ON_DEMAND keeps pointer focus region-bound: EXCLUSIVE forces full-screen
+    // focus in Hyprland, bypassing the input region.
     m_surface.setKeyboardInteractivity(
         on ? ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_ON_DEMAND
            : ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_NONE);
@@ -387,9 +409,17 @@ void Application::requestFrame() {
 }
 
 void Application::hideDisplay() {
-    m_buffer.clear();
     m_regionMgr.clear(m_waylandCtx.compositor, m_surface.surface());
     m_renderMgr.reset();
+    // Present one fully transparent frame so the overlay clears; if the
+    // swapchain is not ready, drop the callback (chain restarts on unhide).
+    requestFrame();
+    if (m_vk.ready()) {
+        m_vk.presentTransparent();
+    } else if (m_frameCallback) {
+        wl_callback_destroy(m_frameCallback);
+        m_frameCallback = nullptr;
+    }
 }
 
 void Application::applyLockedInputRegion() {
@@ -418,7 +448,6 @@ void Application::updateCursor() {
 
 void Application::onSurfaceConfigure(int width, int height) {
     LAY_LOG("surface resized: %dx%d", width, height);
-    m_buffer.allocate(m_waylandCtx.shmFd, m_waylandCtx.shm, width, height);
     m_damageGrid.setSurfaceSize(width, height);
-    m_renderMgr.setSize(width, height);
+    m_vk.markDirty();
 }

@@ -6,39 +6,8 @@
 
 #include <cstdio>
 #include <cstring>
-#include <ctime>
 #include <errno.h>
-#include <fcntl.h>
 #include <stdexcept>
-#include <sys/mman.h>
-#include <unistd.h>
-
-static void randname(char *buf) {
-    struct timespec ts;
-    clock_gettime(CLOCK_REALTIME, &ts);
-    long r = ts.tv_nsec;
-    for (int i = 0; i < 6; ++i) {
-        buf[i] = 'A' + (r & 15) + (r & 16) * 2;
-        r >>= 5;
-    }
-}
-
-static int anonymousShmOpen() {
-    char name[] = "/layrics-XXXXXX";
-    int retries = 100;
-
-    do {
-        randname(name + strlen(name) - 6);
-        --retries;
-        int fd = shm_open(name, O_RDWR | O_CREAT | O_EXCL, 0600);
-        if (fd >= 0) {
-            shm_unlink(name);
-            return fd;
-        }
-    } while (retries > 0 && errno == EEXIST);
-
-    return -1;
-}
 
 static void seatHandleCapabilities(void *data, wl_seat *seat, uint32_t caps) {
     auto *ctx = static_cast<WaylandContext *>(data);
@@ -261,13 +230,6 @@ void WaylandContext::connect() {
         throw std::runtime_error("Missing required Wayland protocols");
     }
 
-    shmFd = anonymousShmOpen();
-    if (shmFd < 0) {
-        LAY_ERR("Failed to create anonymous SHM file");
-        disconnect();
-        throw std::runtime_error("Failed to create anonymous SHM file");
-    }
-
     LAY_LOG("Wayland connected, %zu output(s) discovered", outputs.size());
 }
 
@@ -293,10 +255,6 @@ int WaylandContext::dispatchPending() {
 
 void WaylandContext::disconnect() {
     LAY_DEBUG("disconnecting");
-    if (shmFd >= 0) {
-        close(shmFd);
-        shmFd = -1;
-    }
 
     for (auto &info : outputs) {
         if (info.output) {
