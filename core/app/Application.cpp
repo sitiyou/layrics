@@ -328,6 +328,7 @@ void Application::produceFrame(int64_t timestampMs) {
     for (const auto &rect : m_renderMgr.regions()) {
         m_damageGrid.addRegion(rect.x, rect.y, rect.w, rect.h);
     }
+    updateInputRegion();
     m_vk.endFrame(m_damageGrid.buildDamage());
 
     if (m_vk.dirty() && m_frameCallback) {
@@ -337,7 +338,6 @@ void Application::produceFrame(int64_t timestampMs) {
         m_frameCallback = nullptr;
     }
 
-    updateInputRegion();
     m_frameRateLimiter.wait();
 }
 
