@@ -74,7 +74,9 @@ void Application::run() {
             if (m_surface.configured()) {
                 m_regionMgr.clear(m_waylandCtx.compositor, m_surface.surface());
                 m_surface.commitFrame(m_buffer.buffer());
-                m_waylandCtx.dispatch();
+                // Non-blocking: the compositor replies nothing after this commit.
+                m_waylandCtx.flush();
+                m_waylandCtx.dispatchPending();
             }
         }
     }
@@ -296,6 +298,12 @@ void Application::onFrame(uint32_t time) {
 void Application::renderAndCommit(int64_t timestampMs) {
     uint8_t *bufData = static_cast<uint8_t *>(m_buffer.data());
     RenderResult result = m_renderMgr.render(bufData, timestampMs);
+
+    // Nothing changed: stop the frame chain (static lyrics cost ~0 GFX).
+    if (!result.contentChanged && !m_dragMgr.dragging() &&
+        m_renderMgr.everRendered()) {
+        return;
+    }
 
     if (result.contentChanged) {
         m_damageGrid.beginFrame();
