@@ -15,6 +15,7 @@ class RenderManager {
     void setOffset(double offsetX, double offsetY);
 
     RenderResult render(uint8_t *buffer, int64_t timestampMs);
+    bool everRendered() const { return m_everRendered; }
 
     void reset();
 
