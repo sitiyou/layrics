@@ -2,12 +2,8 @@
 
 #include <cstdint>
 #include <functional>
-#include <vector>
-
-#include "core/types/Common.hpp"
 
 struct wl_surface;
-struct wl_buffer;
 struct wl_output;
 struct zwlr_layer_surface_v1;
 struct WaylandContext;
@@ -36,13 +32,7 @@ class LayerSurface {
                     const LayerSurfaceConfig &config);
     void destroy();
 
-    void attach(wl_buffer *buffer, int x, int y);
-    void damage(int x, int y, int width, int height);
-    void damageFull();
     void commit();
-    void commitFrame(wl_buffer *buffer, bool fullDamage = true);
-    void commitFrame(wl_buffer *buffer,
-                     const std::vector<RenderRect> &damageRects);
 
     // Runtime keyboard focus capture: toggle interactivity between ON_DEMAND
     // (pointer inside input region) and NONE (double-buffered, applied on

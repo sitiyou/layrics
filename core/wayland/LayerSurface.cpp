@@ -5,8 +5,6 @@
 
 #include <wayland-client.h>
 
-#include <climits>
-
 void LayerSurface::onConfigure(void *data, zwlr_layer_surface_v1 *surface,
                                uint32_t serial, uint32_t width,
                                uint32_t height) {
@@ -111,18 +109,6 @@ void LayerSurface::destroy() {
     m_configured = false;
 }
 
-void LayerSurface::attach(wl_buffer *buffer, int x, int y) {
-    wl_surface_attach(m_surface, buffer, x, y);
-}
-
-void LayerSurface::damage(int x, int y, int width, int height) {
-    wl_surface_damage_buffer(m_surface, x, y, width, height);
-}
-
-void LayerSurface::damageFull() {
-    wl_surface_damage_buffer(m_surface, 0, 0, INT32_MAX, INT32_MAX);
-}
-
 void LayerSurface::commit() { wl_surface_commit(m_surface); }
 
 void LayerSurface::setKeyboardInteractivity(uint32_t value) {
@@ -130,22 +116,5 @@ void LayerSurface::setKeyboardInteractivity(uint32_t value) {
         return;
     }
     zwlr_layer_surface_v1_set_keyboard_interactivity(m_layerSurface, value);
-    wl_surface_commit(m_surface);
-}
-
-void LayerSurface::commitFrame(wl_buffer *buffer, bool fullDamage) {
-    wl_surface_attach(m_surface, buffer, 0, 0);
-    if (fullDamage) {
-        wl_surface_damage_buffer(m_surface, 0, 0, INT32_MAX, INT32_MAX);
-    }
-    wl_surface_commit(m_surface);
-}
-
-void LayerSurface::commitFrame(wl_buffer *buffer,
-                               const std::vector<RenderRect> &damageRects) {
-    wl_surface_attach(m_surface, buffer, 0, 0);
-    for (const auto &r : damageRects) {
-        wl_surface_damage_buffer(m_surface, r.x, r.y, r.w, r.h);
-    }
     wl_surface_commit(m_surface);
 }

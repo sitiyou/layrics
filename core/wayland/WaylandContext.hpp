@@ -41,8 +41,6 @@ struct WaylandContext {
     };
     std::vector<OutputInfo> outputs;
 
-    int shmFd = -1;
-
     void roundtrip();
     void disconnect();
     int dispatch();

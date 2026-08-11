@@ -3,15 +3,15 @@ project(
   ['c', 'cpp'],
   meson_version : '>= 1.3.0',
   version : '0.1.0',
-  default_options : ['warning_level=3', 'cpp_std=c++17', 'buildtype=debugoptimized'],
+  default_options : ['warning_level=3', 'cpp_std=c++20', 'buildtype=debugoptimized'],
 )
 
 wayland_scanner = find_program('wayland-scanner')
-wayland_protocols_dep = dependency('wayland-protocols')
 wayland_client_dep = dependency('wayland-client')
 wayland_cursor_dep = dependency('wayland-cursor')
-cairo_dep = dependency('cairo')
 libass_dep = dependency('libass')
+vulkan_dep = dependency('vulkan')
+glslc = find_program('glslc')
 
 layer_shell_xml = files('protocol/wlr-layer-shell-unstable-v1.xml')
 xdg_shell_xml = files('protocol/xdg-shell.xml')
@@ -57,11 +57,29 @@ xdg_shell_src = custom_target(
 dependencies = [
   wayland_client_dep,
   wayland_cursor_dep,
-  cairo_dep,
   libass_dep,
+  vulkan_dep,
   meson.get_compiler('cpp').find_library('rt', required: false),
   meson.get_compiler('cpp').find_library('m', required: false),
 ]
+
+# Embed SPIR-V shaders as C arrays: glslc -mfmt=c emits a bare initializer
+# list; the array declaration lives at the include site (VulkanContext.cpp).
+subtitle_vert_h = custom_target(
+  'subtitle-vert-header',
+  command: [glslc, '-mfmt=c', '-o', '@OUTPUT@',
+            files('core/renderer/shaders/subtitle.vert')],
+  output: 'subtitle_vert.inc',
+  build_by_default: true,
+)
+
+subtitle_frag_h = custom_target(
+  'subtitle-frag-header',
+  command: [glslc, '-mfmt=c', '-o', '@OUTPUT@',
+            files('core/renderer/shaders/subtitle.frag')],
+  output: 'subtitle_frag.inc',
+  build_by_default: true,
+)
 
 protocol_sources = [
   layer_shell_src,
@@ -73,7 +91,6 @@ protocol_sources = [
 wayland_sources = files(
   'core/wayland/WaylandContext.cpp',
   'core/wayland/LayerSurface.cpp',
-  'core/wayland/ShmBuffer.cpp',
 )
 
 input_sources = files(
@@ -89,6 +106,7 @@ input_sources = files(
 renderer_sources = files(
   'core/renderer/AssRenderer.cpp',
   'core/renderer/RenderManager.cpp',
+  'core/renderer/VulkanContext.cpp',
 )
 
 utils_sources = files(
@@ -119,6 +137,8 @@ if pybind11_dep.found()
     app_sources,
     utils_sources,
     protocol_sources,
+    subtitle_vert_h,
+    subtitle_frag_h,
   ]
 
   py.extension_module(
@@ -126,8 +146,8 @@ if pybind11_dep.found()
     [binding_sources, all_core_sources],
     include_directories : inc,
     dependencies : [py_dep, pybind11_dep, dependencies],
-    # PYBIND11_MODULE uses an empty variadic-macro arg (legal only from C++20)
-    cpp_args : ['-Wno-c++20-extensions'],
+    # Vulkan structs use designated initializers that omit zero-filled fields.
+    cpp_args : ['-Wno-missing-field-initializers'],
     install : true,
     subdir : 'layrics',
   )
@@ -143,4 +163,22 @@ if pybind11_dep.found()
 
 endif
 
+# Headless unit test: renders an ASS frame offscreen (no Wayland surface, no
+# presentation) and compares the GPU pixels against a CPU libass composite.
+test_render_sources = files(
+  'tests/ass_render_test.cpp',
+  'core/renderer/AssRenderer.cpp',
+  'core/renderer/RenderManager.cpp',
+  'core/renderer/VulkanContext.cpp',
+)
+
+test_render_exe = executable('ass-render-test',
+  [test_render_sources, subtitle_vert_h, subtitle_frag_h],
+  include_directories : inc,
+  dependencies : dependencies,
+  # Vulkan structs use designated initializers that omit zero-filled fields.
+  cpp_args : ['-Wno-missing-field-initializers'],
+)
+
+test('ass-render', test_render_exe)
 
