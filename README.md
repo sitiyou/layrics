@@ -24,6 +24,7 @@ layrics 是一款桌面歌词软件：从 MPRIS 兼容的播放器（Spotify、m
 - **多源歌词搜索**：跨 QQ 音乐（QM）、网易云音乐（NE）、酷狗（KG）、LRCLIB 多源并行搜索，自动匹配歌曲
 - **Layer Shell 覆盖层**：基于 wlr-layer-shell 协议自动悬浮，无需在窗口管理器额外设置规则
 - **libass 渲染**：支持 ASS 字幕全部特性，包括卡拉 OK（`\k`）、样式、字体和特效
+- **硬件加速**：基于 Vulkan 提供 GPU 硬件加速
 - **Aegisub 卡拉 OK 模板**：可选用 aegisub-cli 的 kara-templater 处理逐字歌词，实现高级卡拉 OK 效果
 - **歌曲-歌词缓存**：SQLite 匹配结果缓存
 - **拖拽支持**：点击拖拽覆盖层重新定位字幕位置
@@ -52,10 +53,10 @@ layrics (Python)
 C++ overlay (core/)                            
 ├── Application      事件循环、帧调度          
 ├── ApplicationController  线程安全命令队列    
-├── RenderManager    cairo 合成 + 拖拽偏移     
-├── AssRenderer      libass -> cairo surface   
+├── RenderManager    渲染流程编排 + 拖拽偏移   
+├── AssRenderer      libass -> R8 纹理图集     
 ├── LayerSurface     wlr-layer-shell surface   
-├── ShmBuffer        SHM pool -> wl_buffer     
+├── VulkanContext    Vulkan 实现   
 ├── FrameRateLimiter 目标帧率限制              
 ├── InputManager     wl_pointer 事件           
 ├── DragManager      拖拽状态机                
@@ -72,11 +73,12 @@ C++ overlay (core/)
 
 ### 系统依赖
 
-- `wayland-client`、`wayland-scanner`
-- `cairo`
+- `meson`、`pkg-config`
+- `wayland`
+- `vulkan`、`vulkan-headers`
+- `shaderc`
 - `libass`
-- `meson`（>= 1.3.0）
-- `pkg-config`
+- `uv`
 
 ### Python 依赖（pip 自动安装）
 
@@ -86,23 +88,18 @@ C++ overlay (core/)
 ### 安装
 
 ```bash
-git clone https://github.com/sitiyou/layrics
-cd layrics
-
-# uv
-uv tool install .
-# pipx
-pipx install .
-
-# or install directly
+# uv / pipx
 uv tool install git+https://github.com/sitiyou/layrics
 pipx install git+https://github.com/sitiyou/layrics
-```
 
-### 开发安装
+# AUR
+yay -S layrics-git
+paru -S layrics-git
 
-```bash
-pip install -e .
+# install from source
+git clone https://github.com/sitiyou/layrics
+cd layrics
+uv tool install .
 ```
 
 ## 使用
@@ -289,7 +286,7 @@ meson compile -C build
 
 ---
 
-layrics is a desktop lyrics overlay: it fetches playback state from MPRIS-compatible players (Spotify, mpd, ...), automatically searches and matches lyrics for the current track, and floats karaoke (word-by-word) or plain-text lyrics on your desktop. Rendering is built on `wlr-layer-shell` and libass (ASS subtitles), supported on Sway, Hyprland, KDE Plasma, etc.
+layrics is a desktop lyrics overlay: it fetches playback state from MPRIS-compatible players (Spotify, mpd, ...), automatically searches and matches lyrics for the current track, and floats karaoke (word-by-word) or plain-text lyrics on your desktop. Rendering is built on `wlr-layer-shell`, libass (ASS subtitles) and Vulkan GPU compositing, supported on Sway, Hyprland, KDE Plasma, etc.
 
 <video src="https://github.com/user-attachments/assets/4b4c9c43-a00d-4ffd-9f7f-82a77b99e076" controls></video>
 
@@ -301,6 +298,7 @@ layrics is a desktop lyrics overlay: it fetches playback state from MPRIS-compat
 - **Multi-source lyric fetching**: parallel search across QQ Music (QM), NetEase (NE), Kugou (KG), LRCLIB with automatic song matching
 - **Layer Shell overlay**: auto-floating layer based on `wlr-layer-shell`, no compositor-specific setup required
 - **libass rendering**: supports ASS subtitle features including karaoke (`\k`), styling, fonts, and effects
+- **Vulkan hardware acceleration**: GPU-accelerated rendering
 - **Aegisub karaoke templating**: optionally processes word-timed lyrics through aegisub-cli's kara-templater for advanced karaoke effects
 - **Song-to-lyrics cache**: SQLite song match cache
 - **Drag support**: click and drag the overlay to reposition subtitles
@@ -313,11 +311,11 @@ layrics is a desktop lyrics overlay: it fetches playback state from MPRIS-compat
 layrics (Python)                    C++ overlay (core/)
 ├── main.py          IPC server     ├── Application      event loop, frame scheduling
 │   ├── MPRIS sync  MPRIS polling  ├── ApplicationController  thread-safe command queue
-│   ├── lyric fetch LDDC adapter   ├── RenderManager     cairo composition + drag offset
-│   └── IPC server  Unix socket    ├── AssRenderer       libass -> cairo surface
+│   ├── lyric fetch LDDC adapter   ├── RenderManager     render flow + drag offset
+│   └── IPC server  Unix socket    ├── AssRenderer       libass -> R8 texture atlas
 ├── lyricsource.py  search/fetch   ├── LayerSurface      wlr-layer-shell surface
 ├── LDDC/           bundled slimmed lyric library
-├── matching.py     song matching  ├── ShmBuffer         SHM pool -> wl_buffer
+├── matching.py     song matching  ├── VulkanContext     instance/swapchain/present
 ├── cache.py        song cache     ├── FrameRateLimiter  target FPS limiting
 ├── layctl.py       control CLI    ├── DamageGrid        per-tile damage tracking
 ├── mpris.py        D-Bus signals  ├── InputManager      wl_pointer events
@@ -334,11 +332,14 @@ layrics (Python)                    C++ overlay (core/)
 
 ### System dependencies
 
-- `wayland-client`, `wayland-scanner`
-- `cairo`
+### System dependencies
+
+- `meson`, `pkg-config`
+- `wayland`
+- `vulkan`, `vulkan-headers`
+- `shaderc`
 - `libass`
-- `meson` (>= 1.3.0)
-- `pkg-config`
+- `uv`
 
 ### Python dependencies (installed automatically via pip)
 
@@ -348,23 +349,18 @@ layrics (Python)                    C++ overlay (core/)
 ### Install
 
 ```bash
-git clone https://github.com/sitiyou/layrics
-cd layrics
-
-# uv
-uv tool install .
-# pipx
-pipx install .
-
-# or install directly
+# uv / pipx
 uv tool install git+https://github.com/sitiyou/layrics
 pipx install git+https://github.com/sitiyou/layrics
-```
 
-### Development install
+# AUR
+yay -S layrics-git
+paru -S layrics-git
 
-```bash
-pip install -e .
+# install from source
+git clone https://github.com/sitiyou/layrics
+cd layrics
+uv tool install .
 ```
 
 ## Usage
