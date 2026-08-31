@@ -28,6 +28,7 @@ layrics 是一款桌面歌词软件：从 MPRIS 兼容的播放器（Spotify、m
 - **Aegisub 卡拉 OK 模板**：可选用 aegisub-cli 的 kara-templater 处理逐字歌词，实现高级卡拉 OK 效果
 - **歌曲-歌词缓存**：SQLite 匹配结果缓存
 - **拖拽支持**：点击拖拽覆盖层重新定位字幕位置
+- **右键菜单**：悬停字幕时右键弹出菜单（搜索歌词/显示/锁定/ASS 配置/帧率/播放器/缓存等，基于 imgui 渲染进覆盖层；菜单内容与动作处理在 Python 侧，参考 `layctl dmenu`）
 - **IPC 控制**：Unix domain socket JSON 协议，支持程序化控制
 - **可配置输出**：TOML 配置字体、颜色、定位、渲染模式、歌词轨道选择
 
@@ -64,6 +65,7 @@ C++ overlay (core/)
 ├── DamageGrid       逐区域 damage 追踪         
 ├── CursorTracker    全局光标（Hyprland）      
 ├── CursorManager    悬停/拖拽光标切换          
+├── UIManager        imgui 右键菜单（渲染/输入/状态机）
 ├── WaylandContext   display、全局对象、事件循 
 └── binding.cpp      pybind11 绑定              
 

@@ -81,6 +81,14 @@ subtitle_frag_h = custom_target(
   build_by_default: true,
 )
 
+imgui_frag_h = custom_target(
+  'imgui-frag-header',
+  command: [glslc, '-mfmt=c', '-o', '@OUTPUT@',
+            files('core/renderer/shaders/imgui.frag')],
+  output: 'imgui_frag.inc',
+  build_by_default: true,
+)
+
 protocol_sources = [
   layer_shell_src,
   layer_shell_header_cpp,
@@ -109,6 +117,21 @@ renderer_sources = files(
   'core/renderer/VulkanContext.cpp',
 )
 
+ui_sources = files(
+  'core/ui/UIManager.cpp',
+)
+
+# Vendored Dear ImGui (official usage: compile the sources into your app).
+imgui_sources = files(
+  'vendor/imgui/imgui.cpp',
+  'vendor/imgui/imgui_draw.cpp',
+  'vendor/imgui/imgui_tables.cpp',
+  'vendor/imgui/imgui_widgets.cpp',
+  'vendor/imgui/backends/imgui_impl_vulkan.cpp',
+)
+
+imgui_inc = include_directories('vendor/imgui', 'vendor/imgui/backends')
+
 utils_sources = files(
   'core/utils/FrameRateLimiter.cpp',
 )
@@ -134,17 +157,20 @@ if pybind11_dep.found()
     wayland_sources,
     input_sources,
     renderer_sources,
+    ui_sources,
+    imgui_sources,
     app_sources,
     utils_sources,
     protocol_sources,
     subtitle_vert_h,
     subtitle_frag_h,
+    imgui_frag_h,
   ]
 
   py.extension_module(
     'core',
     [binding_sources, all_core_sources],
-    include_directories : inc,
+    include_directories : [inc, imgui_inc],
     dependencies : [py_dep, pybind11_dep, dependencies],
     # Vulkan structs use designated initializers that omit zero-filled fields.
     cpp_args : ['-Wno-missing-field-initializers'],
@@ -181,4 +207,22 @@ test_render_exe = executable('ass-render-test',
 )
 
 test('ass-render', test_render_exe)
+
+# Headless UI test: imgui menu pipeline (init + premultiplied blend + clamp)
+# on the offscreen Vulkan target.
+test_ui_sources = files(
+  'tests/ui_menu_test.cpp',
+  'core/renderer/VulkanContext.cpp',
+  'core/ui/UIManager.cpp',
+)
+
+test_ui_exe = executable('ui-menu-test',
+  [test_ui_sources, imgui_sources, imgui_frag_h],
+  include_directories : [inc, imgui_inc],
+  dependencies : dependencies,
+  # Vulkan structs use designated initializers that omit zero-filled fields.
+  cpp_args : ['-Wno-missing-field-initializers'],
+)
+
+test('ui-menu', test_ui_exe)
 

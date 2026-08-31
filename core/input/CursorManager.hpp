@@ -21,6 +21,7 @@ class CursorManager {
 
     void setGrabCursor(wl_pointer *pointer, uint32_t serial);
     void setGrabbingCursor(wl_pointer *pointer, uint32_t serial);
+    void setDefaultCursor(wl_pointer *pointer, uint32_t serial);
     void restoreCursor(wl_pointer *pointer, uint32_t serial);
 
   private:

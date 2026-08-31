@@ -76,6 +76,10 @@ void CursorManager::setGrabbingCursor(wl_pointer *pointer, uint32_t serial) {
     applyCursor(pointer, serial, "grabbing");
 }
 
+void CursorManager::setDefaultCursor(wl_pointer *pointer, uint32_t serial) {
+    applyCursor(pointer, serial, "left_ptr");
+}
+
 void CursorManager::restoreCursor(wl_pointer *pointer, uint32_t serial) {
     if (!pointer || !serial || !m_cursorSurface) {
         return;

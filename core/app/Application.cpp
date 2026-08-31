@@ -12,6 +12,7 @@
 #include <cstdio>
 #include <cstring>
 
+#include <linux/input-event-codes.h>
 #include <poll.h>
 #include <stdexcept>
 #include <unistd.h>
@@ -130,6 +131,13 @@ bool Application::initRenderer() {
     m_renderMgr.setSize(m_vk.width(), m_vk.height());
     m_renderMgr.addRenderer(std::move(renderer));
 
+    if (!m_uiMgr.initialize(m_vk)) {
+        LAY_ERR("Failed to initialize UI manager");
+        return false;
+    }
+    m_uiMgr.setActionCallback(
+        [this](const std::string &action) { onUiAction(action); });
+
     LAY_LOG("ASS renderer initialized");
     return true;
 }
@@ -155,7 +163,10 @@ bool Application::initInput() {
         setKeyboardInteractive(true);
     });
 
-    m_inputMgr.setLeaveCallback([this]() { setKeyboardInteractive(false); });
+    m_inputMgr.setLeaveCallback([this]() {
+        m_uiMgr.requestClose(); // pointer left the input region
+        setKeyboardInteractive(false);
+    });
 
     m_keyboardMgr.initialize(m_waylandCtx.keyboard);
     m_keyboardMgr.setKeyCallback(
@@ -229,7 +240,9 @@ void Application::processState() {
     }
 
     if (m_state.hidden && !prevHidden) {
-        // Entering hidden: clear the display, then stop the frame chain.
+        // Entering hidden: close the menu (no frame may follow), clear the
+        // display, then stop the frame chain.
+        m_uiMgr.closeNow();
         hideDisplay();
         setKeyboardInteractive(false);
     }
@@ -241,6 +254,9 @@ void Application::processState() {
         m_freezeTimestampMs = nowMs() - m_state.startTimeMs;
     }
     if (m_state.locked != prevLocked) {
+        if (m_state.locked) {
+            m_uiMgr.closeNow();
+        }
         updateCursor();
         if (m_state.locked && m_surface.configured()) {
             applyLockedInputRegion();
@@ -254,10 +270,11 @@ void Application::processState() {
         m_renderMgr.setSize(m_vk.width(), m_vk.height());
     }
 
-    // Restart the frame chain when needed (unhide, unpause, drag) with no
-    // frame in flight.
+    // Restart the frame chain when needed (unhide, unpause, drag, menu) with
+    // no frame in flight.
     bool needsFrame = !m_frameCallback && m_vk.ready() && !m_state.hidden &&
-                      (!m_state.paused || m_dragMgr.dragging());
+                      (!m_state.paused || m_dragMgr.dragging() ||
+                       m_uiMgr.isActive());
     if (needsFrame) {
         int64_t ts = m_state.paused ? m_freezeTimestampMs
                                     : nowMs() - m_state.startTimeMs;
@@ -281,9 +298,10 @@ void Application::onFrame(uint32_t time) {
     m_state.dragOffsetY = dragState.offsetY;
     m_renderMgr.setOffset(dragState.offsetX, dragState.offsetY);
 
-    // Hidden/paused: frozen frame stays unless dragging. Returning without
-    // requestFrame() stops the frame chain.
-    if (m_state.hidden || (m_state.paused && !m_dragMgr.dragging())) {
+    // Hidden/paused: frozen frame stays unless dragging or the menu is open.
+    // Returning without requestFrame() stops the frame chain.
+    if (m_state.hidden ||
+        (m_state.paused && !m_dragMgr.dragging() && !m_uiMgr.isActive())) {
         return;
     }
 
@@ -296,11 +314,20 @@ void Application::onFrame(uint32_t time) {
 
 void Application::produceFrame(int64_t timestampMs) {
     m_renderMgr.prepare(timestampMs);
+    // Menu state (open/close) is updated here, so this must run before the
+    // early-return checks below.
+    m_uiMgr.newFrame(m_state);
+
+    // Switch between the default cursor (menu open) and the hover cursor.
+    if (m_uiMenuWasOpen != m_uiMgr.menuOpen()) {
+        m_uiMenuWasOpen = m_uiMgr.menuOpen();
+        updateCursor();
+    }
 
     // Nothing changed: stop the frame chain (static lyrics cost ~0 GFX).
-    // needsFrame restarts it when libass reports new content.
+    // needsFrame restarts it when libass or the menu reports new content.
     if (!m_renderMgr.contentChanged() && !m_dragMgr.dragging() &&
-        m_renderMgr.everRendered()) {
+        !m_uiMgr.isActive() && m_renderMgr.everRendered()) {
         return;
     }
 
@@ -321,12 +348,19 @@ void Application::produceFrame(int64_t timestampMs) {
     m_renderMgr.recordUploads(m_vk.commandBuffer());
     m_vk.beginRenderPass();
     m_renderMgr.recordDraws(m_vk.commandBuffer());
+    // Menu is drawn in surface coordinates (no drag offset), so it stays put
+    // while the subtitles are dragged.
+    m_uiMgr.render(m_vk.commandBuffer());
 
     // Damage grid (current+previous cells) so moved-away content is
     // re-composited too.
     m_damageGrid.beginFrame();
     for (const auto &rect : m_renderMgr.regions()) {
         m_damageGrid.addRegion(rect.x, rect.y, rect.w, rect.h);
+    }
+    if (m_uiMgr.menuOpen()) {
+        m_damageGrid.addRegion(m_uiMgr.menuRect().x, m_uiMgr.menuRect().y,
+                               m_uiMgr.menuRect().w, m_uiMgr.menuRect().h);
     }
     updateInputRegion();
     m_vk.endFrame(m_damageGrid.buildDamage());
@@ -346,24 +380,46 @@ void Application::updateInputRegion() {
         return;
     }
 
+    std::vector<RenderRect> regions;
     if (m_renderMgr.contentChanged()) {
         // Grid cells were populated in produceFrame (before the present).
-        m_regionMgr.update(m_waylandCtx.compositor, m_surface.surface(),
-                           m_damageGrid.buildRegions(), m_surface.width(),
-                           m_surface.height());
+        regions = m_damageGrid.buildRegions();
     } else {
-        m_regionMgr.update(m_waylandCtx.compositor, m_surface.surface(),
-                           m_renderMgr.regions(), m_surface.width(),
-                           m_surface.height());
+        regions = m_renderMgr.regions();
     }
+    // The menu must stay interactive: merge its rect into the input region.
+    if (m_uiMgr.menuOpen()) {
+        regions.push_back(m_uiMgr.menuRect());
+    }
+    m_regionMgr.update(m_waylandCtx.compositor, m_surface.surface(), regions,
+                       m_surface.width(), m_surface.height());
 }
 
 void Application::onPointerMotion(double x, double y) {
+    m_uiMgr.onPointerMotion(x, y);
     m_dragMgr.onMotion(x, y);
 }
 
 void Application::onPointerButton(uint32_t button, uint32_t state, double x,
                                   double y) {
+    const bool pressed = (state == WL_POINTER_BUTTON_STATE_PRESSED);
+    if (m_uiMgr.menuOpen()) {
+        // The menu owns the pointer: item clicks and outside-clicks are fed
+        // to imgui (outside clicks close the popup); never start a drag here.
+        m_uiMgr.onPointerButton(static_cast<int>(button), pressed);
+        updateCursor();
+        return;
+    }
+    if (button == BTN_RIGHT && pressed && !m_dragMgr.dragging()) {
+        // Open the cached menu instantly; ask Python to rebuild the content
+        // with fresh state, which replaces the items on the next frame.
+        m_uiMgr.openAt(x, y);
+        if (m_uiEventSink) {
+            m_uiEventSink("menu_requested");
+        }
+        updateCursor();
+        return;
+    }
     m_dragMgr.onButton(button, state, x, y);
     updateCursor();
 }
@@ -372,6 +428,12 @@ void Application::onKey(uint32_t key, uint32_t state, uint32_t mods) {
     LAY_LOG("key: keycode=%u state=%s mods=0x%x", key,
             state == WL_KEYBOARD_KEY_STATE_PRESSED ? "pressed" : "released",
             mods);
+    // ESC is consumed by the open menu (never forwarded to Python).
+    if (m_uiMgr.menuOpen() && key == KEY_ESC &&
+        state == WL_KEYBOARD_KEY_STATE_PRESSED) {
+        m_uiMgr.requestClose();
+        return;
+    }
     if (m_keyEventSink) {
         m_keyEventSink(KeyEvent{key, state, mods});
     }
@@ -393,6 +455,27 @@ void Application::setKeyboardInteractive(bool on) {
 void Application::loadAssContent(const std::string &content) {
     m_assRenderer->loadContent(content);
     LAY_LOG("Loaded ASS content (%zu bytes)", content.size());
+}
+
+void Application::setUiMenuItems(std::vector<UiMenuItem> items) {
+    m_uiMgr.setMenuItems(std::move(items));
+    LAY_DEBUG("UI menu items updated");
+}
+
+void Application::onUiAction(const std::string &action) {
+    if (action == "reset_drag") {
+        resetDrag();
+        return;
+    }
+    if (m_uiEventSink) {
+        m_uiEventSink(action);
+    }
+}
+
+void Application::resetDrag() {
+    m_dragMgr.reset();
+    m_renderMgr.setOffset(0.0, 0.0);
+    LAY_DEBUG("drag offset reset");
 }
 
 void Application::requestStop() { m_running = false; }
@@ -438,7 +521,10 @@ void Application::updateCursor() {
     }
 
     if (m_state.locked) {
-        m_cursorMgr.restoreCursor(pointer, serial);
+        m_cursorMgr.restoreCursor(pointer, serial); // locked: hidden cursor
+    } else if (m_uiMgr.menuOpen()) {
+        // Menu open: show the default arrow instead of the hover hand.
+        m_cursorMgr.setDefaultCursor(pointer, serial);
     } else if (m_dragMgr.dragging()) {
         m_cursorMgr.setGrabbingCursor(pointer, serial);
     } else {

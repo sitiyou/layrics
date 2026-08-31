@@ -91,6 +91,10 @@ class VulkanContext {
 
     VkDevice device() const { return m_device; }
     VkPhysicalDevice physicalDevice() const { return m_phys; }
+    VkInstance instance() const { return m_instance; }
+    VkQueue queue() const { return m_queue; }
+    uint32_t queueFamily() const { return m_queueFamily; }
+    VkRenderPass renderPass() const { return m_renderPass; }
     VkPipeline pipeline() const { return m_pipeline; }
     VkPipelineLayout pipelineLayout() const { return m_pipelineLayout; }
 

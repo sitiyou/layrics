@@ -15,6 +15,7 @@
 #include "core/renderer/IRenderer.hpp"
 #include "core/renderer/RenderManager.hpp"
 #include "core/renderer/VulkanContext.hpp"
+#include "core/ui/UIManager.hpp"
 #include "core/utils/FrameRateLimiter.hpp"
 #include "core/wayland/LayerSurface.hpp"
 #include "core/wayland/WaylandContext.hpp"
@@ -38,6 +39,7 @@ class Application {
 
     void loadAssContent(const std::string &content);
     void requestStop();
+    void setUiMenuItems(std::vector<UiMenuItem> items);
 
     // Pure state setters — no side-effects
     void setPaused(bool v) { m_state.paused = v; }
@@ -59,6 +61,8 @@ class Application {
     WaylandContext m_waylandCtx;
     LayerSurface m_surface;
     VulkanContext m_vk;
+    // Declared after m_vk: destroyed (shutdown) before the VulkanContext.
+    UIManager m_uiMgr;
     RenderManager m_renderMgr;
     FrameRateLimiter m_frameRateLimiter;
     DamageGrid m_damageGrid;
@@ -77,6 +81,8 @@ class Application {
     AssRenderer *m_assRenderer = nullptr;
     std::function<void()> m_processCommands;
     std::function<void(const KeyEvent &)> m_keyEventSink;
+    std::function<void(const std::string &)> m_uiEventSink;
+    bool m_uiMenuWasOpen = false;
 
     // Frozen rendering timestamp (CLOCK_MONOTONIC ms) while paused; captured
     // in mainLoop() when the pause command is processed.
@@ -99,6 +105,8 @@ class Application {
     void onPointerMotion(double x, double y);
     void onPointerButton(uint32_t button, uint32_t state, double x, double y);
     void onKey(uint32_t key, uint32_t state, uint32_t mods);
+    void onUiAction(const std::string &action);
+    void resetDrag();
     void setKeyboardInteractive(bool on);
     void onSurfaceConfigure(int width, int height);
 };

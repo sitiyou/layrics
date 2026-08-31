@@ -40,6 +40,7 @@ from typing import Any
 from layrics.LDDC.common.exceptions import LyricsNotFoundError
 from layrics.LDDC.common.models import SongInfo, Source
 
+from . import menu
 from .cache import SongCache, make_cache_key
 from .config import get_config
 from .core import ApplicationController
@@ -55,6 +56,7 @@ from .lyricsource import (
 )
 from .matching import clean_search_keyword, match_song
 from .mpris import MPRISPlayerFinder, MprisSignalMonitor, TrackMeta
+from .uimanager import UIManager
 
 logging.basicConfig(
     level=logging.INFO,
@@ -124,6 +126,7 @@ class LayricsApp:
     def __init__(self, socket_path: str = ""):
         self.ctrl = ApplicationController()
         self.key_manager = KeyManager(self)
+        self.ui_manager = UIManager(self)
         self._config = get_config()
         self.mpris_finder = MPRISPlayerFinder()
         self._mpris_player: Any = None
@@ -158,6 +161,102 @@ class LayricsApp:
             content = f.read()
         self.ctrl.set_ass_input(content)
         logger.info("loaded ass: %s", path)
+
+    async def ui_action(self, action: str) -> None:
+        """Dispatch a right-click menu action (handling lives in menu.py)."""
+        await menu.handle_action(self, action)
+
+    async def refresh_menu(self) -> None:
+        """Rebuild the menu items from current state and push them to the core.
+
+        Triggered on every right-click (menu_requested); the running C++ menu
+        swaps to the fresh items on the next frame.
+        """
+        items = await menu.build_menu(self)
+        self.ctrl.set_ui_menu(items)
+
+    # ── shared actions (IPC + right-click menu) ───────────────────
+
+    def apply_target_fps(self, fps: int) -> None:
+        """Set the target frame rate and persist it in the config."""
+        self.ctrl.set_status(target_fps=fps)
+        self._config.overlay.target_fps = fps
+
+    async def apply_ass_config(self, key: str, raw_value: str) -> tuple[str, Any]:
+        """Apply an ASS renderer config update; reloads lyrics when available.
+
+        Accepts the same values as the ass_set IPC method (incl. "toggle").
+        Returns (key, parsed_value); raises on invalid input.
+        """
+        if key not in _ASS_CONFIG_KEYS:
+            raise ValueError(f"unknown config key: {key}")
+        if key == "line_mode":
+            v = raw_value.lower().strip()
+            if v == "single":
+                parsed = "single"
+            elif v == "double":
+                parsed = "double"
+            elif v == "toggle":
+                parsed = None
+            else:
+                raise ValueError(
+                    f"invalid line_mode: {raw_value!r} (expected single/double/toggle)"
+                )
+        else:
+            parsed = _parse_bool(raw_value)
+        if parsed is None:
+            current = self._config._provider_config.get("default", {}).get(key)
+            if key == "line_mode":
+                parsed = "double" if current == "single" else "single"
+            else:
+                parsed = not bool(current)
+        self._config._provider_config.setdefault("default", {})[key] = parsed
+        logger.info("ass config: %s = %r", key, parsed)
+
+        if self._last_track is not None:
+            try:
+                ass, ass_key, song_id, source = await self._fetch_ass_for_track(
+                    self._last_track
+                )
+                self.ctrl.set_ass_input(ass)
+                self._restore_lyrics_delay(ass_key, song_id, source)
+                logger.info(
+                    "ass config: lyrics reloaded with new %s = %r", key, parsed
+                )
+            except Exception as e:
+                logger.warning(
+                    "ass config: reload failed for %s = %r: %s", key, parsed, e
+                )
+        return key, parsed
+
+    async def apply_cache_set(self, song_id: str, key: str = "") -> None:
+        """Fetch lyrics for song_id, store the mapping and display them."""
+        if not song_id:
+            raise RuntimeError("song_id required")
+        if not key:
+            if self._last_track is None:
+                raise RuntimeError("no current track")
+            key = make_cache_key(self._last_track)
+
+        cache = SongCache()
+        src, raw_id = parse_composite_id(song_id)
+        si = cache.lookup_song_info(raw_id, src.name)
+        song_info = si or SongInfo.from_dict({"source": src.name, "id": raw_id})
+        ass = await _fetch_lyrics(song_info)
+        cache.set(key, raw_id, src.name)
+
+        self.ctrl.set_ass_input(ass)
+        self._restore_lyrics_delay(key, raw_id, src.name)
+        logger.info("cache set: %s -> %s%s", key, src.name, raw_id)
+
+    def apply_cache_remove(self, key: str = "") -> None:
+        """Remove a cached song-to-lyrics mapping (defaults to current track)."""
+        if not key:
+            if self._last_track is None:
+                raise RuntimeError("no current track")
+            key = make_cache_key(self._last_track)
+        SongCache().remove(key)
+        logger.info("cache removed: %s", key)
 
     # ── auto-fetch ────────────────────────────────────────────────
 
@@ -620,8 +719,7 @@ class LayricsApp:
                             "message": "fps must be > 0 or -1 (vsync)",
                         },
                     }
-                self.ctrl.set_status(target_fps=fps)
-                self._config.overlay.target_fps = fps
+                self.apply_target_fps(fps)
                 return {"id": req_id, "type": "result", "data": {"target_fps": fps}}
 
             elif method == "stop":
@@ -711,50 +809,32 @@ class LayricsApp:
 
             elif method == "cache_set":
                 song_id = params.get("song_id", "")
-                if not song_id:
+                key = params.get("key") or ""
+                try:
+                    await self.apply_cache_set(song_id, key)
+                except (
+                    RuntimeError,
+                    ValueError,
+                    LyricsNotFoundError,
+                    json.JSONDecodeError,
+                ) as e:
                     return {
                         "id": req_id,
                         "type": "error",
-                        "data": {"code": 400, "message": "song_id required"},
+                        "data": {"code": 400, "message": str(e)},
                     }
-                key = params.get("key") or ""
-                if not key:
-                    if not self._last_track:
-                        return {
-                            "id": req_id,
-                            "type": "error",
-                            "data": {"code": 400, "message": "no current track"},
-                        }
-                    key = make_cache_key(self._last_track)
-
-                cache = SongCache()
-                src, raw_id = parse_composite_id(song_id)
-                si = cache.lookup_song_info(raw_id, src.name)
-                song_info = si or SongInfo.from_dict(
-                    {"source": src.name, "id": raw_id}
-                )
-                ass = await _fetch_lyrics(song_info)
-                cache.set(key, raw_id, src.name)
-
-                self.ctrl.set_ass_input(ass)
-                self._restore_lyrics_delay(key, raw_id, src.name)
-
-                logger.info("cache set: %s -> %s%s", key, src.name, raw_id)
                 return {"id": req_id, "type": "result", "data": {"cached": True}}
 
             elif method == "cache_remove":
                 key = params.get("key") or ""
-                if not key:
-                    if not self._last_track:
-                        return {
-                            "id": req_id,
-                            "type": "error",
-                            "data": {"code": 400, "message": "no current track"},
-                        }
-                    key = make_cache_key(self._last_track)
-                cache = SongCache()
-                cache.remove(key)
-                logger.info("cache removed: %s", key)
+                try:
+                    self.apply_cache_remove(key)
+                except RuntimeError as e:
+                    return {
+                        "id": req_id,
+                        "type": "error",
+                        "data": {"code": 400, "message": str(e)},
+                    }
                 return {"id": req_id, "type": "result", "data": {"removed": True}}
 
             elif method == "ass_get":
@@ -778,62 +858,14 @@ class LayricsApp:
                         "type": "error",
                         "data": {"code": 400, "message": "key and value required"},
                     }
-                if key not in _ASS_CONFIG_KEYS:
-                    return {
-                        "id": req_id,
-                        "type": "error",
-                        "data": {"code": 400, "message": f"unknown config key: {key}"},
-                    }
                 try:
-                    if key == "line_mode":
-                        v = raw_value.lower().strip()
-                        if v == "single":
-                            parsed = "single"
-                        elif v == "double":
-                            parsed = "double"
-                        elif v == "toggle":
-                            parsed = None
-                        else:
-                            return {
-                                "id": req_id,
-                                "type": "error",
-                                "data": {
-                                    "code": 400,
-                                    "message": f"invalid line_mode: {raw_value!r} (expected single/double/toggle)",
-                                },
-                            }
-                    else:
-                        parsed = _parse_bool(raw_value)
+                    key, parsed = await self.apply_ass_config(key, raw_value)
                 except ValueError as e:
                     return {
                         "id": req_id,
                         "type": "error",
                         "data": {"code": 400, "message": str(e)},
                     }
-                if parsed is None:
-                    current = self._config._provider_config.get("default", {}).get(key)
-                    if key == "line_mode":
-                        parsed = "double" if current == "single" else "single"
-                    else:
-                        parsed = not bool(current)
-                self._config._provider_config.setdefault("default", {})[key] = parsed
-                logger.info("ass config: %s = %r", key, parsed)
-
-                if self._last_track is not None:
-                    try:
-                        ass, ass_key, song_id, source = await self._fetch_ass_for_track(
-                            self._last_track
-                        )
-                        self.ctrl.set_ass_input(ass)
-                        self._restore_lyrics_delay(ass_key, song_id, source)
-                        logger.info(
-                            "ass config: lyrics reloaded with new %s = %r", key, parsed
-                        )
-                    except Exception as e:
-                        logger.warning(
-                            "ass config: reload failed for %s = %r: %s", key, parsed, e
-                        )
-
                 return {
                     "id": req_id,
                     "type": "result",
@@ -936,9 +968,17 @@ class LayricsApp:
         os.chmod(self.socket_path, 0o666)
         logger.info("ipc server listening on %s", self.socket_path)
 
+        # Seed the menu cache so the first right-click opens with content (the
+        # core renders the cached items synchronously, then Python refreshes).
+        try:
+            await self.refresh_menu()
+        except Exception:
+            logger.exception("initial menu refresh failed")
+
         self._auto_select_player()
         poller_task = asyncio.create_task(self._mpris_poller())
         key_poller_task = asyncio.create_task(self.key_manager.poller())
+        ui_poller_task = asyncio.create_task(self.ui_manager.poller())
 
         try:
             await self._server.serve_forever()
@@ -947,6 +987,7 @@ class LayricsApp:
         finally:
             poller_task.cancel()
             key_poller_task.cancel()
+            ui_poller_task.cancel()
             self._server.close()
             await self._server.wait_closed()
 

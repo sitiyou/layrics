@@ -1,10 +1,20 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
 #include <vector>
 
 struct RenderRect {
     int x, y, w, h;
+};
+
+// Right-click menu item as pushed from Python. Leaf items carry an action id
+// that is reported back on click; items with children render as submenus.
+// The C++ side is a pure renderer: menu content and handling live in Python.
+struct UiMenuItem {
+    std::string label;
+    std::string action;                // leaf action; empty for submenus
+    std::vector<UiMenuItem> children;  // submenu entries
 };
 
 struct RenderResult {

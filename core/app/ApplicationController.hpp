@@ -42,9 +42,17 @@ class ApplicationController {
     void setStatus(const PendingUpdate &update);
     const AppState &state() const { return m_app.state(); }
 
+    // Menu content from Python; applied on the render thread via the pending
+    // command chain (replaces the open menu's items on the next frame).
+    void setUiMenu(std::vector<UiMenuItem> items);
+
     // Keyboard events captured on the render thread, drained from Python.
     void pushKeyEvent(const KeyEvent &event);
     std::vector<KeyEvent> pollKeyEvents();
+
+    // UI (menu) actions captured on the render thread, drained from Python.
+    void pushUiEvent(const std::string &event);
+    std::vector<std::string> pollUiEvents();
 
   private:
     void processPendingCommands();
@@ -55,7 +63,12 @@ class ApplicationController {
     std::mutex m_mutex;
     PendingUpdate m_pending;
     std::string m_pendingAssContent;
+    std::vector<UiMenuItem> m_pendingUiMenu;
+    bool m_hasPendingUiMenu = false;
 
     std::deque<KeyEvent> m_keyEvents;
     static constexpr size_t kMaxKeyEvents = 128;
+
+    std::deque<std::string> m_uiEvents;
+    static constexpr size_t kMaxUiEvents = 64;
 };
