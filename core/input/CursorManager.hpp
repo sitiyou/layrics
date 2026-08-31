@@ -17,9 +17,9 @@ class CursorManager {
     CursorManager &operator=(const CursorManager &) = delete;
 
     bool initialize(wl_compositor *compositor, wl_shm *shm);
-    void release();
+    void shutdown();
 
-    void setGrabCursor(wl_pointer *pointer, uint32_t serial);
+    void setHoverCursor(wl_pointer *pointer, uint32_t serial);
     void setGrabbingCursor(wl_pointer *pointer, uint32_t serial);
     void setDefaultCursor(wl_pointer *pointer, uint32_t serial);
     void restoreCursor(wl_pointer *pointer, uint32_t serial);

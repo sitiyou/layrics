@@ -17,14 +17,14 @@ void noopAxisRelativeDirection(void *, wl_pointer *, uint32_t, uint32_t) {}
 
 } // namespace
 
-InputManager::~InputManager() { release(); }
+InputManager::~InputManager() { shutdown(); }
 
 bool InputManager::initialize(wl_seat *seat) {
     if (!seat) {
         return false;
     }
 
-    release();
+    shutdown();
 
     m_pointer = wl_seat_get_pointer(seat);
     if (!m_pointer) {
@@ -50,7 +50,7 @@ bool InputManager::initialize(wl_seat *seat) {
     return true;
 }
 
-void InputManager::release() {
+void InputManager::shutdown() {
     if (m_pointer) {
         LAY_DEBUG("releasing wl_pointer");
         wl_pointer_release(m_pointer);

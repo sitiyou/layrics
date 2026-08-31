@@ -28,7 +28,7 @@ class UIManager {
     // Called once per produced frame before the render pass; builds the menu
     // and updates the open/close state (must run before the early-return
     // checks in produceFrame/onFrame).
-    void newFrame(const AppState &state);
+    void newFrame();
 
     // Records the imgui draw data inside the render pass (after subtitles).
     void render(VkCommandBuffer cmd);
@@ -38,7 +38,7 @@ class UIManager {
     bool isActive() const {
         return m_menuOpen || m_openRequested || m_closeRequested || m_needsClear;
     }
-    bool menuOpen() const { return m_menuOpen; }
+    bool isMenuOpen() const { return m_menuOpen; }
     // Popup rect in surface coordinates (no drag offset); empty when closed.
     RenderRect menuRect() const { return m_menuRect; }
 
@@ -60,7 +60,7 @@ class UIManager {
     }
 
   private:
-    void build(const AppState &state);
+    void build();
     void renderItems(const std::vector<UiMenuItem> &items,
                      std::string &action);
 

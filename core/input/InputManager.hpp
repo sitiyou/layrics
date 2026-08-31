@@ -29,7 +29,7 @@ class InputManager {
     InputManager &operator=(const InputManager &) = delete;
 
     bool initialize(wl_seat *seat);
-    void release();
+    void shutdown();
 
     void setMotionCallback(MotionCallback cb) { m_motionCb = std::move(cb); }
     void setButtonCallback(ButtonCallback cb) { m_buttonCb = std::move(cb); }

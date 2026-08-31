@@ -748,7 +748,7 @@ bool VulkanContext::createSyncObjects() {
 // ---------------------------------------------------------------------------
 
 bool VulkanContext::beginFrame() {
-    if (!ready()) {
+    if (!isReady()) {
         m_swapchainDirty = true;
         return false;
     }

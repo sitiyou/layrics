@@ -146,6 +146,21 @@ class LayricsApp:
         self._fetch_gen: int = 0
         self._lyrics_delay_ms: int = 0
 
+    @property
+    def current_track(self) -> TrackMeta | None:
+        """The track currently being displayed (public read for companion modules)."""
+        return self._last_track
+
+    @property
+    def mpris_player(self) -> Any | None:
+        """The selected MPRIS player (public read for companion modules)."""
+        return self._mpris_player
+
+    def quit(self) -> None:
+        """Close the IPC server; the event loop then exits run()."""
+        if self._server is not None:
+            self._server.close()
+
     # ── overlay control ───────────────────────────────────────────
 
     def start_overlay(self):

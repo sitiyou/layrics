@@ -6,7 +6,7 @@
 
 #include <cstring>
 
-CursorManager::~CursorManager() { release(); }
+CursorManager::~CursorManager() { shutdown(); }
 
 bool CursorManager::initialize(wl_compositor *compositor, wl_shm *shm) {
     if (!compositor || !shm) {
@@ -31,7 +31,7 @@ bool CursorManager::initialize(wl_compositor *compositor, wl_shm *shm) {
     return true;
 }
 
-void CursorManager::release() {
+void CursorManager::shutdown() {
     if (m_cursorTheme) {
         wl_cursor_theme_destroy(m_cursorTheme);
         m_cursorTheme = nullptr;
@@ -68,7 +68,7 @@ void CursorManager::applyCursor(wl_pointer *pointer, uint32_t serial,
     wl_surface_commit(m_cursorSurface);
 }
 
-void CursorManager::setGrabCursor(wl_pointer *pointer, uint32_t serial) {
+void CursorManager::setHoverCursor(wl_pointer *pointer, uint32_t serial) {
     applyCursor(pointer, serial, "grab");
 }
 

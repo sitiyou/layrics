@@ -32,8 +32,8 @@ class VulkanContext {
     void endOffscreenFrame();
     std::vector<uint8_t> readbackOffscreen();
 
-    bool ready() const { return m_swapchain != VK_NULL_HANDLE || m_offscreen; }
-    bool dirty() const { return m_swapchainDirty; }
+    bool isReady() const { return m_swapchain != VK_NULL_HANDLE || m_offscreen; }
+    bool isDirty() const { return m_swapchainDirty; }
     void markDirty() { m_swapchainDirty = true; }
 
     int width() const { return static_cast<int>(m_extent.width); }

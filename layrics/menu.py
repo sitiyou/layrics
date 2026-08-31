@@ -29,7 +29,7 @@ def notify(body: str, title: str = "layrics") -> None:
 
 
 def _ass_config(app) -> dict:
-    return app._config._provider_config.get("default", {})
+    return app._config.get_provider_config("default")
 
 
 def _fps_label(fps: int) -> str:
@@ -38,10 +38,10 @@ def _fps_label(fps: int) -> str:
 
 async def _song_items(app) -> list[dict]:
     """Submenu items: search results for the current track; [] when unavailable."""
-    if app._last_track is None:
+    if app.current_track is None:
         return []
-    keyword = app._last_track.title or ""
-    artists = app._last_track.artists or []
+    keyword = app.current_track.title or ""
+    artists = app.current_track.artists or []
     if artists:
         keyword += " " + " ".join(artists)
     keyword = clean_search_keyword(keyword.strip())
@@ -81,9 +81,9 @@ async def build_menu(app) -> list[dict]:
     song: list[dict] = await _song_items(app)
     players = app.list_players()
     player_name = "无"
-    if app._mpris_player is not None:
+    if app.mpris_player is not None:
         try:
-            player_name = app._mpris_player.get_identity() or "?"
+            player_name = app.mpris_player.get_identity() or "?"
         except Exception:
             player_name = "?"
 
@@ -158,14 +158,14 @@ def _cache_summary(app) -> str:
 
 def _status_lines(app) -> str:
     player = None
-    if app._mpris_player is not None:
+    if app.mpris_player is not None:
         try:
             player = {
-                "identity": app._mpris_player.get_identity(),
-                "bus_name": app._mpris_player.bus_name,
-                "playback_status": app._mpris_player.get_playback_status(),
-                "position_ms": app._mpris_player.get_position() // 1000,
-                "track": app._last_track,
+                "identity": app.mpris_player.get_identity(),
+                "bus_name": app.mpris_player.bus_name,
+                "playback_status": app.mpris_player.get_playback_status(),
+                "position_ms": app.mpris_player.get_position() // 1000,
+                "track": app.current_track,
             }
         except Exception:
             player = {"error": "disconnected"}
@@ -198,8 +198,7 @@ async def handle_action(app, action: str) -> None:
     """Dispatch a menu action; the heavy lifting lives on LayricsApp methods."""
     try:
         if action == "quit":
-            if app._server is not None:
-                app._server.close()
+            app.quit()
         elif action == "hide":
             app.ctrl.set_status(hidden=not app.ctrl.state.hidden)
         elif action == "lock":

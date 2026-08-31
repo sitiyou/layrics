@@ -5,14 +5,14 @@
 
 #include <unistd.h>
 
-KeyboardManager::~KeyboardManager() { release(); }
+KeyboardManager::~KeyboardManager() { shutdown(); }
 
 bool KeyboardManager::initialize(wl_keyboard *keyboard) {
     if (!keyboard) {
         return false;
     }
 
-    release();
+    shutdown();
 
     m_keyboard = keyboard;
 
@@ -30,7 +30,7 @@ bool KeyboardManager::initialize(wl_keyboard *keyboard) {
     return true;
 }
 
-void KeyboardManager::release() {
+void KeyboardManager::shutdown() {
     if (m_keyboard) {
         LAY_DEBUG("releasing wl_keyboard");
         wl_keyboard_release(m_keyboard);

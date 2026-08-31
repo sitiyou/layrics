@@ -107,6 +107,6 @@ class Application {
     void onKey(uint32_t key, uint32_t state, uint32_t mods);
     void onUiAction(const std::string &action);
     void resetDrag();
-    void setKeyboardInteractive(bool on);
+    void setInputInteractive(bool on);
     void onSurfaceConfigure(int width, int height);
 };

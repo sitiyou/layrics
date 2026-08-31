@@ -37,7 +37,7 @@ static const zwlr_layer_surface_v1_listener layerSurfaceListener = {
     LayerSurface::onClosed,
 };
 
-LayerSurface::~LayerSurface() { destroy(); }
+LayerSurface::~LayerSurface() { shutdown(); }
 
 bool LayerSurface::initialize(WaylandContext &ctx, wl_output *output,
                               uint32_t layer,
@@ -48,7 +48,7 @@ bool LayerSurface::initialize(WaylandContext &ctx, wl_output *output,
         return false;
     }
 
-    destroy();
+    shutdown();
 
     m_surface = wl_compositor_create_surface(ctx.compositor);
     if (!m_surface) {
@@ -87,7 +87,7 @@ bool LayerSurface::initialize(WaylandContext &ctx, wl_output *output,
 
     if (!m_configured) {
         LAY_ERR("Layer surface did not receive configure");
-        destroy();
+        shutdown();
         return false;
     }
 
@@ -95,7 +95,7 @@ bool LayerSurface::initialize(WaylandContext &ctx, wl_output *output,
     return true;
 }
 
-void LayerSurface::destroy() {
+void LayerSurface::shutdown() {
     if (m_layerSurface) {
         zwlr_layer_surface_v1_destroy(m_layerSurface);
         m_layerSurface = nullptr;

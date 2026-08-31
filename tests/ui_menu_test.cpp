@@ -35,10 +35,8 @@ int main() {
         return 1;
     }
 
-    AppState state{};
-
     ui.closeNow();
-    CHECK(!ui.menuOpen());
+    CHECK(!ui.isMenuOpen());
 
     // Menu content mirrors the Python-side tree (leaf actions + a nested
     // submenu); replaced the old hard-coded test entries.
@@ -53,9 +51,9 @@ int main() {
     // The popup's first frame is hidden while its size is computed, so build
     // two frames before rendering.
     ui.openAt(W - 10, H - 10);
-    ui.newFrame(state);
-    ui.newFrame(state);
-    CHECK(ui.menuOpen());
+    ui.newFrame();
+    ui.newFrame();
+    CHECK(ui.isMenuOpen());
 
     const RenderRect r = ui.menuRect();
     CHECK(r.w > 0 && r.h > 0);

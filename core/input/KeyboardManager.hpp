@@ -20,7 +20,7 @@ class KeyboardManager {
     KeyboardManager &operator=(const KeyboardManager &) = delete;
 
     bool initialize(wl_keyboard *keyboard);
-    void release();
+    void shutdown();
 
     void setKeyCallback(KeyCallback cb) { m_keyCb = std::move(cb); }
     void setFocusCallback(FocusCallback cb) { m_focusCb = std::move(cb); }

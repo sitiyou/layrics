@@ -119,7 +119,7 @@ void UIManager::shutdown() {
     m_menuRect = {};
 }
 
-void UIManager::newFrame(const AppState &state) {
+void UIManager::newFrame() {
     if (!isActive()) {
         return; // closed and idle: zero per-frame cost
     }
@@ -129,13 +129,12 @@ void UIManager::newFrame(const AppState &state) {
                static_cast<float>(m_vk->height()));
     ImGui_ImplVulkan_NewFrame();
     ImGui::NewFrame();
-    build(state);
+    build();
     ImGui::Render();
     updateMenuRect();
 }
 
-void UIManager::build(const AppState &state) {
-    (void)state;
+void UIManager::build() {
     if (m_openRequested) {
         // ImGui positions mouse-triggered popups at the pointer and clamps
         // them to the screen (FindBestWindowPosForPopup), so no manual

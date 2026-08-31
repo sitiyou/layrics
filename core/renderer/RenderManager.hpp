@@ -22,8 +22,8 @@ class RenderManager {
     void recordDraws(VkCommandBuffer cmd);
 
     const std::vector<RenderRect> &regions() const { return m_regions; }
-    bool contentChanged() const { return m_contentChanged; }
-    bool everRendered() const { return m_everRendered; }
+    bool hasContentChanged() const { return m_contentChanged; }
+    bool hasRendered() const { return m_everRendered; }
 
     void reset();
 

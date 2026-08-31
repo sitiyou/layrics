@@ -13,7 +13,7 @@ class DragManager {
     void onMotion(double x, double y);
 
     const DragState &state() const { return m_state; }
-    bool dragging() const { return m_dragging; }
+    bool isDragging() const { return m_dragging; }
     void reset();
 
   private:

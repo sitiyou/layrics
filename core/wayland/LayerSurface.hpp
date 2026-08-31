@@ -30,7 +30,7 @@ class LayerSurface {
 
     bool initialize(WaylandContext &ctx, wl_output *output, uint32_t layer,
                     const LayerSurfaceConfig &config);
-    void destroy();
+    void shutdown();
 
     void commit();
 
@@ -42,7 +42,7 @@ class LayerSurface {
     wl_surface *surface() const { return m_surface; }
     int width() const { return m_width; }
     int height() const { return m_height; }
-    bool configured() const { return m_configured; }
+    bool isConfigured() const { return m_configured; }
 
     using ConfigureCallback = std::function<void(int, int)>;
     void setConfigureCallback(ConfigureCallback cb) {
