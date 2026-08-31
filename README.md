@@ -80,6 +80,7 @@ C++ overlay (core/)
 - `vulkan`、`vulkan-headers`
 - `shaderc`
 - `libass`
+- `fontconfig`
 - `uv`
 
 ### Python 依赖（pip 自动安装）

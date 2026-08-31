@@ -8,6 +8,8 @@ import logging
 import shutil
 import subprocess
 
+from .matching import clean_search_keyword
+
 logger = logging.getLogger(__name__)
 
 
@@ -42,7 +44,7 @@ async def _song_items(app) -> list[dict]:
     artists = app._last_track.artists or []
     if artists:
         keyword += " " + " ".join(artists)
-    keyword = keyword.strip()
+    keyword = clean_search_keyword(keyword.strip())
     if not keyword:
         return []
     try:

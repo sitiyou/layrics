@@ -14,6 +14,8 @@
 #include <unistd.h>
 #include <utility>
 
+#include <fontconfig/fontconfig.h>
+
 UIManager::~UIManager() { shutdown(); }
 
 bool UIManager::initialize(VulkanContext &vk) {
@@ -26,27 +28,41 @@ bool UIManager::initialize(VulkanContext &vk) {
     ImGuiIO &io = ImGui::GetIO();
     io.IniFilename = nullptr; // do not persist layout to imgui.ini
 
-    // Load a CJK-capable system font so Chinese menu labels render (the
-    // embedded ProggyClean font has no CJK glyphs; since 1.92 glyphs are
-    // rasterized on demand, no glyph ranges are needed).
-    static const char *kCjkFonts[] = {
-        "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc",
-        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
-        "/usr/share/fonts/noto-cjk/NotoSansCJKsc-Regular.otf",
-        "/usr/share/fonts/wqy-microhei/wqy-microhei.ttc",
-        "/usr/share/fonts/wqy-zenhei/wqy-zenhei.ttc",
-        "/usr/share/fonts/sarasa-gothic/Sarasa-Regular.ttc",
-        "/usr/share/fonts/adobe-source-han-sans/SourceHanSansCN-Regular.otf",
-    };
+    // Resolve a CJK-capable system font through fontconfig (sans:lang=zh)
+    // instead of hard-coded paths: the ttc index is honored via FontNo, and
+    // corrupt candidates fall through to the next match. The embedded
+    // ProggyClean font has no CJK glyphs, so it is only a last resort; since
+    // 1.92 glyphs are rasterized on demand, no glyph ranges are needed.
+    FcInit();
+    FcPattern *fontPat =
+        FcNameParse(reinterpret_cast<const FcChar8 *>("sans:lang=zh"));
+    FcConfigSubstitute(nullptr, fontPat, FcMatchPattern);
+    FcDefaultSubstitute(fontPat);
+    FcResult matchResult;
+    FcFontSet *set =
+        FcFontSort(nullptr, fontPat, FcFalse, nullptr, &matchResult);
+    FcPatternDestroy(fontPat);
     bool cjkFontLoaded = false;
-    for (const char *path : kCjkFonts) {
-        if (access(path, R_OK) != 0) {
-            continue;
+    if (set != nullptr) {
+        for (int i = 0; i < set->nfont; i++) {
+            FcChar8 *file = nullptr;
+            if (FcPatternGetString(set->fonts[i], FC_FILE, 0, &file) !=
+                FcResultMatch) {
+                continue;
+            }
+            int index = 0;
+            FcPatternGetInteger(set->fonts[i], FC_INDEX, 0, &index);
+            ImFontConfig cfg;
+            cfg.FontNo = index;
+            if (io.Fonts->AddFontFromFileTTF(
+                    reinterpret_cast<const char *>(file), 20.0f, &cfg) !=
+                nullptr) {
+                LAY_LOG("UI font: %s (index %d)", file, index);
+                cjkFontLoaded = true;
+                break;
+            }
         }
-        io.Fonts->AddFontFromFileTTF(path, 20.0f);
-        LAY_LOG("UI font: %s", path);
-        cjkFontLoaded = true;
-        break;
+        FcFontSetDestroy(set);
     }
     if (!cjkFontLoaded) {
         // Fallback to the embedded font; scale it for readability.
@@ -227,6 +243,9 @@ void UIManager::onPointerButton(int button, bool pressed) {
 }
 
 void UIManager::requestClose() {
+    // Cancel a pending open so a close arriving between openAt() and the next
+    // frame is not dropped (build() clears m_closeRequested unconditionally).
+    m_openRequested = false;
     m_closeRequested = true;
 }
 

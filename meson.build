@@ -11,6 +11,7 @@ wayland_client_dep = dependency('wayland-client')
 wayland_cursor_dep = dependency('wayland-cursor')
 libass_dep = dependency('libass')
 vulkan_dep = dependency('vulkan')
+fontconfig_dep = dependency('fontconfig')
 glslc = find_program('glslc')
 
 layer_shell_xml = files('protocol/wlr-layer-shell-unstable-v1.xml')
@@ -59,6 +60,7 @@ dependencies = [
   wayland_cursor_dep,
   libass_dep,
   vulkan_dep,
+  fontconfig_dep,
   meson.get_compiler('cpp').find_library('rt', required: false),
   meson.get_compiler('cpp').find_library('m', required: false),
 ]
