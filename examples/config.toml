@@ -13,6 +13,15 @@ sources = ["QM", "NE"]
 [overlay]
 target_fps = -1
 
+# 显示/隐藏覆盖层时的转场动画
+# type: none / rise / fade / zoom / cascade / wave / scatter / flip / wipe / blur / flash
+# duration: 动画时长(毫秒), 0 表示无动画
+# amplitude: 动画幅度(像素), 如 rise 的上浮距离、cascade 的下落距离、scatter 的扩散半径
+[overlay.animation]
+type = "rise"
+duration = 200
+amplitude = 48
+
 # 忽略的 MPRIS 播放器(使用 layctl players 查看当前 mpris 实例)
 # eg: bus_name: "org.mpris.MediaPlayer2.firefox.instance_1_2345" -> "firefox"
 #               "org.mpris.MediaPlayer2.mpd"                     -> "mpd"

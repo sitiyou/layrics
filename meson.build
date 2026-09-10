@@ -116,6 +116,7 @@ input_sources = files(
 renderer_sources = files(
   'core/renderer/AssRenderer.cpp',
   'core/renderer/RenderManager.cpp',
+  'core/renderer/Transition.cpp',
   'core/renderer/VulkanContext.cpp',
 )
 
@@ -209,6 +210,15 @@ test_render_exe = executable('ass-render-test',
 )
 
 test('ass-render', test_render_exe)
+
+# Headless unit test for the show/hide transition clock (no GPU needed).
+test_transition_exe = executable('transition-test',
+  files('tests/transition_test.cpp', 'core/renderer/Transition.cpp'),
+  include_directories : inc,
+  dependencies : dependencies,
+)
+
+test('transition', test_transition_exe)
 
 # Headless UI test: imgui menu pipeline (init + premultiplied blend + clamp)
 # on the offscreen Vulkan target.

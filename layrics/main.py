@@ -978,11 +978,15 @@ class LayricsApp:
     async def run(self):
         self.start_overlay()
 
-        if self._config.overlay.target_fps > 0:
-            self.ctrl.set_status(target_fps=self._config.overlay.target_fps)
-            logger.info(
-                "target FPS set from config: %d", self._config.overlay.target_fps
-            )
+        overlay = self._config.overlay
+        if overlay.target_fps > 0:
+            self.ctrl.set_status(target_fps=overlay.target_fps)
+            logger.info("target FPS set from config: %d", overlay.target_fps)
+        self.ctrl.set_animation(
+            overlay.animation.type,
+            overlay.animation.duration,
+            overlay.animation.amplitude,
+        )
 
         try:
             os.unlink(self.socket_path)

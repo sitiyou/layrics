@@ -16,6 +16,9 @@ class RenderManager {
 
     void setSize(int width, int height);
     void setOffset(double offsetX, double offsetY);
+    void setTransition(const RenderTransition &transition) {
+        m_transition = transition;
+    }
 
     void prepare(int64_t timestampMs);
     void recordUploads(VkCommandBuffer cmd);
@@ -31,6 +34,7 @@ class RenderManager {
     std::vector<std::unique_ptr<IRenderer>> m_renderers;
     double m_offsetX = 0.0;
     double m_offsetY = 0.0;
+    RenderTransition m_transition;
     int m_width = 0;
     int m_height = 0;
 

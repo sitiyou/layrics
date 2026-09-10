@@ -22,8 +22,18 @@ class SearchConfig:
 
 
 @dataclass
+class AnimationConfig:
+    """Overlay show/hide transition."""
+
+    type: str = "rise"
+    duration: int = 200
+    amplitude: int = 48
+
+
+@dataclass
 class OverlayConfig:
     target_fps: int = -1
+    animation: AnimationConfig = field(default_factory=AnimationConfig)
 
 
 @dataclass
@@ -167,6 +177,17 @@ class Config:
             raw_fps = raw_overlay.get("target_fps", -1)
             if isinstance(raw_fps, int) and (raw_fps > 0 or raw_fps == -1):
                 self.overlay.target_fps = raw_fps
+            raw_anim = raw_overlay.get("animation", {})
+            if isinstance(raw_anim, dict):
+                raw_type = raw_anim.get("type", "rise")
+                if isinstance(raw_type, str) and raw_type.strip():
+                    self.overlay.animation.type = raw_type.strip()
+                raw_dur = raw_anim.get("duration", 200)
+                if isinstance(raw_dur, int) and raw_dur >= 0:
+                    self.overlay.animation.duration = raw_dur
+                raw_amp = raw_anim.get("amplitude", 48)
+                if isinstance(raw_amp, int) and raw_amp > 0:
+                    self.overlay.animation.amplitude = raw_amp
 
         # [mpris]
         raw_mpris = data.get("mpris", {})

@@ -3,6 +3,7 @@
 #include <pybind11/stl.h>
 
 #include "core/app/ApplicationController.hpp"
+#include "core/renderer/Transition.hpp"
 #include "core/types/Common.hpp"
 
 namespace py = pybind11;
@@ -54,6 +55,18 @@ PYBIND11_MODULE(core, m) {
                 ctrl.setUiMenu(parseMenuItems(items));
             },
             py::arg("items"))
+        .def(
+            "set_animation",
+            [](ApplicationController &ctrl, const std::string &effect,
+               int durationMs, int amplitude) {
+                TransitionEffect parsed = TransitionEffect::Fade;
+                if (!Transition::fromName(effect, parsed)) {
+                    throw std::invalid_argument("unknown animation: " + effect);
+                }
+                ctrl.setTransition(parsed, durationMs, amplitude);
+            },
+            py::arg("effect"), py::arg("duration_ms") = 200,
+            py::arg("amplitude") = 48)
         .def("set_status",
              [](ApplicationController &ctrl, py::kwargs kwargs) {
                  PendingUpdate update;

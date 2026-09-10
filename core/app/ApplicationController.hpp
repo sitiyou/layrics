@@ -15,6 +15,9 @@ struct PendingUpdate {
     bool locked = false;
     int64_t startTimeMs = 0;
     int targetFps = -1;
+    TransitionEffect transitionEffect = TransitionEffect::Fade;
+    int transitionDurationMs = 0;
+    int transitionAmplitude = 0;
     uint8_t mask = 0;
 
     enum Mask : uint8_t {
@@ -23,6 +26,7 @@ struct PendingUpdate {
         LOCKED = 1 << 2,
         START_TIME = 1 << 3,
         TARGET_FPS = 1 << 4,
+        TRANSITION = 1 << 5,
     };
 };
 
@@ -40,6 +44,10 @@ class ApplicationController {
 
     void setAssInput(const std::string &path);
     void setStatus(const PendingUpdate &update);
+
+    // Show/hide animation; applies on the render thread via the pending
+    // command chain.
+    void setTransition(TransitionEffect effect, int durationMs, int amplitude);
     const AppState &state() const { return m_app.state(); }
 
     // Menu content from Python; applied on the render thread via the pending

@@ -29,6 +29,7 @@ layrics 是一款桌面歌词软件：从 MPRIS 兼容的播放器（Spotify、m
 - **歌曲-歌词缓存**：匹配结果本地缓存
 - **拖拽支持**：点击拖拽覆盖层重新定位字幕位置
 - **右键菜单**：悬停字幕时右键弹出菜单（搜索歌词/显示/锁定/ASS 配置/帧率/播放器/缓存等）
+- **歌词显隐动画**：显示/隐藏覆盖层时播放转场动画（淡入淡出、上浮、缩放、逐字错峰等 11 种）
 - **IPC控制**：通过 `layctl` 命令行或脚本控制
 - **可配置输出**：TOML 配置字体、颜色、定位、渲染模式、歌词轨道选择
 
@@ -234,6 +235,7 @@ layrics is a desktop lyrics overlay: it fetches playback state from MPRIS-compat
 - **Song-to-lyrics cache**: local song match cache
 - **Drag support**: click and drag the overlay to reposition subtitles
 - **Right-click menu**: right-click the lyrics to open a menu (search songs / show / lock / ASS config / FPS / player / cache, etc.)
+- **Show/hide animation**: transition effects when the overlay appears or disappears (fade, rise, zoom, per-glyph stagger, 11 effects in total)
 - **IPC control**: control via the `layctl` CLI or scripts
 - **Configurable output**: TOML configuration for fonts, colors, positioning, render modes, and lyric track selection
 

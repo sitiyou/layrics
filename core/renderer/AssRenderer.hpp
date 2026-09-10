@@ -32,7 +32,8 @@ class AssRenderer : public IRenderer {
     void prepare(int64_t timestampMs) override;
     void recordUploads(VkCommandBuffer cmd) override;
     void recordDraws(VkCommandBuffer cmd, float offsetX, float offsetY,
-                     int screenW, int screenH) override;
+                     int screenW, int screenH,
+                     const RenderTransition &transition) override;
 
     void loadContent(const std::string &content);
     ASS_Track *track() const { return m_track; }

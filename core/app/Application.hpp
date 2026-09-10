@@ -14,6 +14,7 @@
 #include "core/input/RegionManager.hpp"
 #include "core/renderer/IRenderer.hpp"
 #include "core/renderer/RenderManager.hpp"
+#include "core/renderer/Transition.hpp"
 #include "core/renderer/VulkanContext.hpp"
 #include "core/ui/UIManager.hpp"
 #include "core/utils/FrameRateLimiter.hpp"
@@ -47,6 +48,8 @@ class Application {
     void setLocked(bool v) { m_state.locked = v; }
     void setStartTime(int64_t v) { m_state.startTimeMs = v; }
     void setTargetFps(int v);
+    void setTransitionConfig(TransitionEffect effect, int durationMs,
+                             int amplitude);
 
     // Explicit actions — must be called explicitly
     void hideDisplay();
@@ -64,6 +67,13 @@ class Application {
     // Declared after m_vk: destroyed (shutdown) before the VulkanContext.
     UIManager m_uiMgr;
     RenderManager m_renderMgr;
+    // Show/hide animation; non-identity only while a hide/unhide is in flight.
+    Transition m_transition;
+    bool m_hideFinalized = true;
+    // First-paint entrance is a one-shot: only the very first lyrics to reach
+    // the screen animate in, later content swaps appear in place. A manual
+    // visibility toggle supersedes it (that fade already covers "appearing").
+    bool m_introPlayed = false;
     FrameRateLimiter m_frameRateLimiter;
     DamageGrid m_damageGrid;
     InputManager m_inputMgr;

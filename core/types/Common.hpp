@@ -17,6 +17,31 @@ struct UiMenuItem {
     std::vector<UiMenuItem> children;  // submenu entries
 };
 
+// Overlay show/hide transition effects. The numeric values are the dispatch ids
+// used by subtitle.vert; keep both sides in sync.
+enum class TransitionEffect : int {
+    None = 0,
+    Fade = 1,
+    Rise = 2,
+    Zoom = 3,
+    Cascade = 4,
+    Wave = 5,
+    Scatter = 6,
+    Flip = 7,
+    Wipe = 8,
+    BlurIn = 9,
+    Flash = 10,
+};
+
+inline constexpr int kTransitionEffectCount = 11;
+
+// Per-frame overlay transform: progress 0 = hidden, 1 = fully shown.
+struct RenderTransition {
+    TransitionEffect effect = TransitionEffect::None;
+    float progress = 1.0f;
+    float amplitude = 48.0f;
+};
+
 struct RenderResult {
     std::vector<RenderRect> regions;
     bool contentChanged = true;

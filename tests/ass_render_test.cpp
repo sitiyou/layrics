@@ -14,6 +14,8 @@
 #include <string>
 #include <vector>
 
+#include <algorithm>
+
 #include "core/renderer/AssRenderer.hpp"
 #include "core/renderer/RenderManager.hpp"
 #include "core/renderer/VulkanContext.hpp"
@@ -101,7 +103,66 @@ std::vector<uint8_t> cpuReference(int64_t tsMs) {
     return frame;
 }
 
+// Offscreen stats for one transition state: covered pixels + bounding box.
+struct FrameStats {
+    size_t pixels = 0;
+    int x0 = kWidth, y0 = kHeight, x1 = -1, y1 = -1;
+};
+
+FrameStats statsOf(const std::vector<uint8_t> &px) {
+    FrameStats s;
+    for (int y = 0; y < kHeight; y++) {
+        for (int x = 0; x < kWidth; x++) {
+            if (px[(static_cast<size_t>(y) * kWidth + x) * 4 + 3] == 0) {
+                continue;
+            }
+            s.pixels++;
+            s.x0 = std::min(s.x0, x);
+            s.y0 = std::min(s.y0, y);
+            s.x1 = std::max(s.x1, x);
+            s.y1 = std::max(s.y1, y);
+        }
+    }
+    return s;
+}
+
 } // namespace
+
+// Renders the test ASS once per transition effect at a fixed progress and
+// reports the covered area, so every shader branch is exercised headlessly.
+int runEffectPreview() {
+    VulkanContext vk;
+    if (!vk.initializeOffscreen(kWidth, kHeight)) {
+        std::fprintf(stderr, "FAIL: offscreen Vulkan init failed\n");
+        return 1;
+    }
+    RenderManager rm;
+    auto renderer = std::make_unique<AssRenderer>(std::string(kTestAss));
+    if (!renderer->initialize(vk)) {
+        std::fprintf(stderr, "FAIL: renderer initialize failed\n");
+        return 1;
+    }
+    rm.addRenderer(std::move(renderer));
+    rm.setSize(kWidth, kHeight);
+
+    const float progress[] = {1.0f, 0.5f, 0.0f};
+    for (int id = 0; id < kTransitionEffectCount; id++) {
+        for (float p : progress) {
+            rm.setTransition({static_cast<TransitionEffect>(id), p, 48.0f});
+            vk.beginOffscreenFrame();
+            rm.prepare(1000);
+            rm.recordUploads(vk.commandBuffer());
+            vk.beginRenderPass();
+            rm.recordDraws(vk.commandBuffer());
+            vk.endOffscreenFrame();
+            FrameStats s = statsOf(vk.readbackOffscreen());
+            std::printf(
+                "effect %2d progress %.1f: %6zu px  bbox [%4d,%4d]-[%4d,%4d]\n",
+                id, p, s.pixels, s.x0, s.y0, s.x1, s.y1);
+        }
+    }
+    return 0;
+}
 
 // Karaoke-style: one line split into per-syllable \pos + \clip events.
 std::string karaokeAss() {
@@ -190,6 +251,10 @@ int main(int argc, char **argv) {
 
     if (benchFrames > 0) {
         return runBenchmark(benchFrames);
+    }
+
+    if (argc > 1 && std::strcmp(argv[1], "--effects") == 0) {
+        return runEffectPreview();
     }
 
     VulkanContext vk;

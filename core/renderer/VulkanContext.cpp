@@ -585,10 +585,11 @@ bool VulkanContext::createPipeline() {
 
     VkVertexInputBindingDescription binding = {
         .binding = 0,
-        .stride = 8 * sizeof(float), /* pos(2) uv(2) color(4) */
+        .stride =
+            11 * sizeof(float), /* pos(2) uv(2) color(4) center(2) seed(1) */
         .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
     };
-    VkVertexInputAttributeDescription attrs[3] = {
+    VkVertexInputAttributeDescription attrs[5] = {
         {.location = 0,
          .binding = 0,
          .format = VK_FORMAT_R32G32_SFLOAT,
@@ -601,12 +602,20 @@ bool VulkanContext::createPipeline() {
          .binding = 0,
          .format = VK_FORMAT_R32G32B32A32_SFLOAT,
          .offset = 4 * sizeof(float)},
+        {.location = 3,
+         .binding = 0,
+         .format = VK_FORMAT_R32G32_SFLOAT,
+         .offset = 8 * sizeof(float)},
+        {.location = 4,
+         .binding = 0,
+         .format = VK_FORMAT_R32_SFLOAT,
+         .offset = 10 * sizeof(float)},
     };
     VkPipelineVertexInputStateCreateInfo vertexInput = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
         .vertexBindingDescriptionCount = 1,
         .pVertexBindingDescriptions = &binding,
-        .vertexAttributeDescriptionCount = 3,
+        .vertexAttributeDescriptionCount = 5,
         .pVertexAttributeDescriptions = attrs,
     };
     VkPipelineInputAssemblyStateCreateInfo ia = {
@@ -657,7 +666,9 @@ bool VulkanContext::createPipeline() {
     VkPushConstantRange pushRange = {
         .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
         .offset = 0,
-        .size = 4 * sizeof(float), /* offset(2) + screen(2) */
+        .size =
+            8 *
+            sizeof(float), /* offset(2) screen(2) progress effect amp param */
     };
     VkPipelineLayoutCreateInfo plci = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,

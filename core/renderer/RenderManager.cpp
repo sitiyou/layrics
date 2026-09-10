@@ -29,6 +29,7 @@ void RenderManager::reset() {
     m_everRendered = false;
     m_regions.clear();
     m_contentChanged = false;
+    m_transition = {};
 }
 
 void RenderManager::prepare(int64_t timestampMs) {
@@ -54,7 +55,8 @@ void RenderManager::recordUploads(VkCommandBuffer cmd) {
 void RenderManager::recordDraws(VkCommandBuffer cmd) {
     for (auto &r : m_renderers) {
         r->recordDraws(cmd, static_cast<float>(m_offsetX),
-                       static_cast<float>(m_offsetY), m_width, m_height);
+                       static_cast<float>(m_offsetY), m_width, m_height,
+                       m_transition);
     }
     m_everRendered = true;
 }

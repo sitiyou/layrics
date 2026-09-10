@@ -29,7 +29,8 @@ class IRenderer {
     // Draw commands; inside the render pass, pipeline/push constants/viewport
     // already set up by the caller.
     virtual void recordDraws(VkCommandBuffer cmd, float offsetX, float offsetY,
-                             int screenW, int screenH) = 0;
+                             int screenW, int screenH,
+                             const RenderTransition &transition) = 0;
 
     // Renderer-local regions (no drag offset); valid after prepare().
     std::vector<RenderRect> lastRegions;

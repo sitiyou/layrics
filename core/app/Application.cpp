@@ -240,11 +240,25 @@ void Application::processState() {
     }
 
     if (m_state.hidden && !prevHidden) {
-        // Entering hidden: close the menu (no frame may follow), clear the
-        // display, then stop the frame chain.
+        // Entering hidden: close the menu, stop accepting pointer input at
+        // once, then play the hide animation. The surface keeps its last
+        // content until the animation settles (see below).
         m_uiMgr.closeNow();
-        hideDisplay();
         setInputInteractive(false);
+        m_regionMgr.clear(m_waylandCtx.compositor, m_surface.surface());
+        m_transition.start(false, nowMs());
+        m_hideFinalized = false;
+        m_introPlayed = true;
+    }
+    if (!m_state.hidden && prevHidden) {
+        m_transition.start(true, nowMs());
+        m_hideFinalized = false;
+        m_introPlayed = true;
+    }
+    m_transition.update(nowMs());
+    if (m_state.hidden && !m_hideFinalized && !m_transition.isActive()) {
+        hideDisplay();
+        m_hideFinalized = true;
     }
     if (!m_state.hidden && prevHidden && m_state.paused) {
         // Unhiding while paused: re-present the frozen frame once.
@@ -272,9 +286,10 @@ void Application::processState() {
 
     // Restart the frame chain when needed (unhide, unpause, drag, menu) with
     // no frame in flight.
-    bool needsFrame = !m_frameCallback && m_vk.isReady() && !m_state.hidden &&
+    bool needsFrame = !m_frameCallback && m_vk.isReady() &&
+                      (!m_state.hidden || m_transition.isActive()) &&
                       (!m_state.paused || m_dragMgr.isDragging() ||
-                       m_uiMgr.isActive());
+                       m_uiMgr.isActive() || m_transition.isActive());
     if (needsFrame) {
         int64_t ts = m_state.paused ? m_freezeTimestampMs
                                     : nowMs() - m_state.startTimeMs;
@@ -300,8 +315,9 @@ void Application::onFrame(uint32_t time) {
 
     // Hidden/paused: frozen frame stays unless dragging or the menu is open.
     // Returning without requestFrame() stops the frame chain.
-    if (m_state.hidden ||
-        (m_state.paused && !m_dragMgr.isDragging() && !m_uiMgr.isActive())) {
+    if ((m_state.hidden && !m_transition.isActive()) ||
+        (m_state.paused && !m_dragMgr.isDragging() && !m_uiMgr.isActive() &&
+         !m_transition.isActive())) {
         return;
     }
 
@@ -314,6 +330,15 @@ void Application::onFrame(uint32_t time) {
 
 void Application::produceFrame(int64_t timestampMs) {
     m_renderMgr.prepare(timestampMs);
+    // Glyphs appearing for the first time animate in; this must be decided
+    // after prepare() so it sees this frame's real content.
+    if (!m_introPlayed && !m_state.hidden && !m_transition.isActive() &&
+        !m_renderMgr.regions().empty()) {
+        m_introPlayed = true;
+        m_transition.reveal(nowMs());
+    }
+    m_renderMgr.setTransition({m_transition.effect(), m_transition.progress(),
+                               m_transition.amplitude()});
     // Menu state (open/close) is updated here, so this must run before the
     // early-return checks below.
     m_uiMgr.newFrame();
@@ -327,7 +352,8 @@ void Application::produceFrame(int64_t timestampMs) {
     // Nothing changed: stop the frame chain (static lyrics cost ~0 GFX).
     // needsFrame restarts it when libass or the menu reports new content.
     if (!m_renderMgr.hasContentChanged() && !m_dragMgr.isDragging() &&
-        !m_uiMgr.isActive() && m_renderMgr.hasRendered()) {
+        !m_uiMgr.isActive() && m_renderMgr.hasRendered() &&
+        !m_transition.isActive()) {
         return;
     }
 
@@ -363,7 +389,10 @@ void Application::produceFrame(int64_t timestampMs) {
                                m_uiMgr.menuRect().w, m_uiMgr.menuRect().h);
     }
     updateInputRegion();
-    m_vk.endFrame(m_damageGrid.buildDamage());
+    // Glyphs move outside their resting regions while animating, which the
+    // damage grid does not cover; present full-surface damage until settled.
+    m_vk.endFrame(m_transition.isActive() ? std::vector<RenderRect>{}
+                                          : m_damageGrid.buildDamage());
 
     if (m_vk.isDirty() && m_frameCallback) {
         // Present failed: no commit happened, so the frame callback never
@@ -377,6 +406,13 @@ void Application::produceFrame(int64_t timestampMs) {
 
 void Application::updateInputRegion() {
     if (m_state.locked || !m_surface.isConfigured()) {
+        return;
+    }
+    if (m_transition.isActive()) {
+        // Glyphs are in motion, so any region would only approximate them;
+        // stay click-through until the overlay settles (the last animation
+        // frame runs with an identity transform and restores the region).
+        m_regionMgr.clear(m_waylandCtx.compositor, m_surface.surface());
         return;
     }
 
@@ -484,6 +520,13 @@ void Application::setTargetFps(int fps) {
     m_state.targetFps = fps;
     m_frameRateLimiter.setTargetFps(fps);
     LAY_LOG("target FPS set to %d", fps);
+}
+
+void Application::setTransitionConfig(TransitionEffect effect, int durationMs,
+                                      int amplitude) {
+    m_transition.configure(effect, durationMs, amplitude);
+    LAY_LOG("transition: effect=%s duration=%dms amplitude=%d",
+            Transition::nameOf(effect), durationMs, amplitude);
 }
 
 void Application::requestFrame() {

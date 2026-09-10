@@ -274,23 +274,39 @@ void AssRenderer::fillVertexBuffer() {
         return;
     }
     const size_t vertexCount = m_quads.size() * 4;
-    const size_t stride = 8 * sizeof(float);
+    const size_t stride = 11 * sizeof(float);
     if (!m_vk->ensureDynamicBuffer(m_vertexBuf, vertexCount * stride,
                                    VK_BUFFER_USAGE_VERTEX_BUFFER_BIT)) {
         return;
     }
+
+    // Glyphs are laid out left to right, so a normalized center-x gives the
+    // shader a per-glyph stagger order without a second draw call.
+    float minCx = m_quads[0].x + m_quads[0].w * 0.5f;
+    float maxCx = minCx;
+    for (const auto &q : m_quads) {
+        float cx = q.x + q.w * 0.5f;
+        minCx = std::min(minCx, cx);
+        maxCx = std::max(maxCx, cx);
+    }
+    const float span = std::max(maxCx - minCx, 1.0f);
+
     float *dst = static_cast<float *>(m_vertexBuf.mapped);
     for (const auto &q : m_quads) {
+        const float cx = q.x + q.w * 0.5f;
+        const float cy = q.y + q.h * 0.5f;
+        const float seed = (cx - minCx) / span;
         // TRIANGLE_STRIP (TL, TR, BL, BR) tiles the quad; (TL, TR, BR, BL)
         // leaves a wedge hole between the two diagonals.
-        float verts[4][8] = {
-            {q.x, q.y, q.u0, q.v0, q.r, q.g, q.b, q.a},
-            {q.x + q.w, q.y, q.u1, q.v0, q.r, q.g, q.b, q.a},
-            {q.x, q.y + q.h, q.u0, q.v1, q.r, q.g, q.b, q.a},
-            {q.x + q.w, q.y + q.h, q.u1, q.v1, q.r, q.g, q.b, q.a},
+        float verts[4][11] = {
+            {q.x, q.y, q.u0, q.v0, q.r, q.g, q.b, q.a, cx, cy, seed},
+            {q.x + q.w, q.y, q.u1, q.v0, q.r, q.g, q.b, q.a, cx, cy, seed},
+            {q.x, q.y + q.h, q.u0, q.v1, q.r, q.g, q.b, q.a, cx, cy, seed},
+            {q.x + q.w, q.y + q.h, q.u1, q.v1, q.r, q.g, q.b, q.a, cx, cy,
+             seed},
         };
         memcpy(dst, verts, sizeof(verts));
-        dst += 8 * 4;
+        dst += 11 * 4;
     }
 }
 
@@ -305,14 +321,24 @@ void AssRenderer::recordUploads(VkCommandBuffer cmd) {
 }
 
 void AssRenderer::recordDraws(VkCommandBuffer cmd, float offsetX, float offsetY,
-                              int screenW, int screenH) {
+                              int screenW, int screenH,
+                              const RenderTransition &transition) {
     if (m_quads.empty() || !m_vertexBuf.buffer || !m_atlas.image) {
         return;
     }
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_vk->pipeline());
 
-    float push[4] = {offsetX, offsetY, static_cast<float>(screenW),
-                     static_cast<float>(screenH)};
+    // One texel of the atlas in UV units; the blur effect needs it to keep its
+    // taps inside the per-slot padding ring.
+    const float texelV = 1.0f / static_cast<float>(std::max(m_atlasH, 1));
+    float push[8] = {offsetX,
+                     offsetY,
+                     static_cast<float>(screenW),
+                     static_cast<float>(screenH),
+                     transition.progress,
+                     static_cast<float>(transition.effect),
+                     transition.amplitude,
+                     texelV};
     vkCmdPushConstants(cmd, m_vk->pipelineLayout(), VK_SHADER_STAGE_VERTEX_BIT,
                        0, sizeof(push), push);
 

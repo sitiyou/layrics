@@ -64,7 +64,22 @@ void ApplicationController::setStatus(const PendingUpdate &update) {
         m_pending.startTimeMs = update.startTimeMs;
     if (update.mask & PendingUpdate::TARGET_FPS)
         m_pending.targetFps = update.targetFps;
+    if (update.mask & PendingUpdate::TRANSITION) {
+        m_pending.transitionEffect = update.transitionEffect;
+        m_pending.transitionDurationMs = update.transitionDurationMs;
+        m_pending.transitionAmplitude = update.transitionAmplitude;
+    }
     m_pending.mask |= update.mask;
+}
+
+void ApplicationController::setTransition(TransitionEffect effect,
+                                         int durationMs, int amplitude) {
+    PendingUpdate update;
+    update.transitionEffect = effect;
+    update.transitionDurationMs = durationMs;
+    update.transitionAmplitude = amplitude;
+    update.mask = PendingUpdate::TRANSITION;
+    setStatus(update);
 }
 
 void ApplicationController::processPendingCommands() {
@@ -92,6 +107,10 @@ void ApplicationController::processPendingCommands() {
         m_app.setStartTime(pending.startTimeMs);
     if (pending.mask & PendingUpdate::TARGET_FPS)
         m_app.setTargetFps(pending.targetFps);
+    if (pending.mask & PendingUpdate::TRANSITION)
+        m_app.setTransitionConfig(pending.transitionEffect,
+                                  pending.transitionDurationMs,
+                                  pending.transitionAmplitude);
     if (!assContent.empty())
         m_app.loadAssContent(std::move(assContent));
     if (hasUiMenu)
