@@ -6,16 +6,16 @@ import unicodedata
 from difflib import SequenceMatcher
 from typing import Any
 
-from .mpris import TrackMeta
+from .player import TrackMeta
 
 logger = logging.getLogger("layrics.match")
 
-_TITLE_MIN_SIMILARITY = 0.6
-_DURATION_MAX_DIFF_SEC = 5
+TITLE_MIN_SIMILARITY = 0.6
+DURATION_MAX_DIFF_SEC = 5
 
 # ── character normalization map ──────────────────────────────────────
 # Key: ordinal, Value: replacement string
-_CHAR_MAP = {
+CHAR_MAP = {
     # wave dashes → ~
     0x301C: "~",  # 〜 WAVE DASH
     0x223C: "~",  # ∼ TILDE OPERATOR
@@ -42,7 +42,7 @@ _CHAR_MAP = {
 }
 
 # ── annotation keywords ──────────────────────────────────────────────
-_ANNOT_KEYWORDS = [
+ANNOT_KEYWORDS = [
     "inst",
     "instrumental",
     "feat",
@@ -90,25 +90,25 @@ _ANNOT_KEYWORDS = [
     "テレビサイズ",
 ]
 
-_KEYWORD_OR = "|".join(_ANNOT_KEYWORDS)
+KEYWORD_OR = "|".join(ANNOT_KEYWORDS)
 
-_ANNOT_RE = re.compile(
+ANNOT_RE = re.compile(
     r"(?:"
-    r"\([^)]*(?:" + _KEYWORD_OR + r")[^)]*\)"
-    r"|\[[^\]]*(?:" + _KEYWORD_OR + r")[^\]]*\]"
-    r"|【[^】]*(?:" + _KEYWORD_OR + r")[^】]*】"
-    r"|〈[^〉]*(?:" + _KEYWORD_OR + r")[^〉]*〉"
+    r"\([^)]*(?:" + KEYWORD_OR + r")[^)]*\)"
+    r"|\[[^\]]*(?:" + KEYWORD_OR + r")[^\]]*\]"
+    r"|【[^】]*(?:" + KEYWORD_OR + r")[^】]*】"
+    r"|〈[^〉]*(?:" + KEYWORD_OR + r")[^〉]*〉"
     r")",
     re.IGNORECASE,
 )
 
 # wavy-delimited annotations: e.g. 〜2025ver〜
-_WAVY_ANNOT_RE = re.compile(
-    r"[~〜][^~〜]*(?:" + _KEYWORD_OR + r")[^~〜]*[~〜]",
+WAVY_ANNOT_RE = re.compile(
+    r"[~〜][^~〜]*(?:" + KEYWORD_OR + r")[^~〜]*[~〜]",
     re.IGNORECASE,
 )
 
-_TRACK_PREFIX_RE = re.compile(r"^\d+[.．\-\)\s]+")
+TRACK_PREFIX_RE = re.compile(r"^\d+[.．\-\)\s]+")
 
 
 # ── normalization ────────────────────────────────────────────────────
@@ -116,17 +116,17 @@ _TRACK_PREFIX_RE = re.compile(r"^\d+[.．\-\)\s]+")
 
 def normalize_title(title: str) -> str:
     s = unicodedata.normalize("NFKC", title)
-    s = s.translate(_CHAR_MAP)
-    s = _ANNOT_RE.sub("", s)
-    s = _WAVY_ANNOT_RE.sub("", s)
-    s = _TRACK_PREFIX_RE.sub("", s)
+    s = s.translate(CHAR_MAP)
+    s = ANNOT_RE.sub("", s)
+    s = WAVY_ANNOT_RE.sub("", s)
+    s = TRACK_PREFIX_RE.sub("", s)
     s = s.lower().strip()
     s = re.sub(r"\s+", " ", s)
     return s
 
 
-_BRACKET_PAIRS = [("(", ")"), ("[", "]"), ("【", "】"), ("〈", "〉")]
-_ANNOT_KEYWORDS_LONGEST = sorted(_ANNOT_KEYWORDS, key=len, reverse=True)
+BRACKET_PAIRS = [("(", ")"), ("[", "]"), ("【", "】"), ("〈", "〉")]
+ANNOT_KEYWORDS_LONGEST = sorted(ANNOT_KEYWORDS, key=len, reverse=True)
 
 
 def clean_search_keyword(keyword: str) -> str:
@@ -136,7 +136,7 @@ def clean_search_keyword(keyword: str) -> str:
     ``Lemon (cover)`` → ``Lemon``
     """
     kw = keyword
-    for lb, rb in _BRACKET_PAIRS:
+    for lb, rb in BRACKET_PAIRS:
         pat = re.compile(
             re.escape(lb) + r"([^" + re.escape(rb) + r"]*)" + re.escape(rb)
         )
@@ -145,10 +145,10 @@ def clean_search_keyword(keyword: str) -> str:
             inner = m.group(1)
             if not any(
                 re.search(r"\b" + re.escape(k) + r"\b", inner, re.IGNORECASE)
-                for k in _ANNOT_KEYWORDS_LONGEST
+                for k in ANNOT_KEYWORDS_LONGEST
             ):
                 return m.group(0)
-            for k in _ANNOT_KEYWORDS_LONGEST:
+            for k in ANNOT_KEYWORDS_LONGEST:
                 inner = re.sub(
                     r"\b" + re.escape(k) + r"\.?\s*", "", inner, flags=re.IGNORECASE
                 )
@@ -231,7 +231,7 @@ def match_song(
 
         # Stage 1: title similarity
         title_score = _title_similarity(q_title, c_title)
-        if title_score < _TITLE_MIN_SIMILARITY:
+        if title_score < TITLE_MIN_SIMILARITY:
             continue
 
         # Stage 2: duration check
@@ -243,13 +243,13 @@ def match_song(
             and c_duration_s > 0
         ):
             dur_diff = abs(q_duration_s - c_duration_s)
-            if dur_diff > _DURATION_MAX_DIFF_SEC:
+            if dur_diff > DURATION_MAX_DIFF_SEC:
                 logger.info(
                     "  skip %s: title=%.3f OK but duration diff=%.1fs > %ds",
                     _composite_id(c),
                     title_score,
                     dur_diff,
-                    _DURATION_MAX_DIFF_SEC,
+                    DURATION_MAX_DIFF_SEC,
                 )
                 continue
 

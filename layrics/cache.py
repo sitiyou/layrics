@@ -10,9 +10,9 @@ import appdirs
 
 from layrics.LDDC.common.models import SongInfo
 
-from .mpris import TrackMeta
+from .player import TrackMeta
 
-_DATA_DIR = appdirs.user_data_dir("layrics")
+DATA_DIR = appdirs.user_data_dir("layrics")
 
 
 def make_cache_key(meta: TrackMeta) -> str:
@@ -35,7 +35,7 @@ class CacheEntry:
 class SongCache:
     def __init__(self, db_path: str | None = None):
         if db_path is None:
-            db_path = os.path.join(_DATA_DIR, "song_cache.db")
+            db_path = os.path.join(DATA_DIR, "song_cache.db")
         os.makedirs(os.path.dirname(db_path), exist_ok=True)
         self._conn = sqlite3.connect(db_path, timeout=5.0)
         # WAL: concurrent readers/writers across SongCache instances

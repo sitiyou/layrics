@@ -79,11 +79,11 @@ async def build_menu(app) -> list[dict]:
     s = app.ctrl.state
 
     song: list[dict] = await _song_items(app)
-    players = app.list_players()
+    sources = app.list_players()
     player_name = "无"
-    if app.mpris_player is not None:
+    if app.player is not None:
         try:
-            player_name = app.mpris_player.get_identity() or "?"
+            player_name = app.player.identity() or "?"
         except Exception:
             player_name = "?"
 
@@ -93,8 +93,14 @@ async def build_menu(app) -> list[dict]:
     else:
         items.append({"label": "搜索并设置歌词（无当前曲目/结果）", "action": ""})
     items += [
-        {"label": f"显示/隐藏（当前：{'隐藏' if s.hidden else '显示'}）", "action": "hide"},
-        {"label": f"锁定（当前：{'已锁定' if s.locked else '未锁定'}）", "action": "lock"},
+        {
+            "label": f"显示/隐藏（当前：{'隐藏' if s.hidden else '显示'}）",
+            "action": "hide",
+        },
+        {
+            "label": f"锁定（当前：{'已锁定' if s.locked else '未锁定'}）",
+            "action": "lock",
+        },
         {"label": f"卡拉OK（{'开' if karaoke else '关'}）", "action": "karaoke"},
         {
             "label": f"歌词模式（{'双行' if line_mode == 'double' else '单行'}）",
@@ -111,13 +117,16 @@ async def build_menu(app) -> list[dict]:
             ],
         },
     ]
-    if players:
+    if sources:
         items.append(
             {
                 "label": f"播放器（当前：{player_name}）",
                 "children": [
-                    {"label": f"{identity} ({bus})", "action": f"player:{bus}"}
-                    for bus, identity in players
+                    {"label": "自动选择", "action": "player:auto"},
+                    *[
+                        {"label": f"{identity} ({pid})", "action": f"player:{pid}"}
+                        for pid, identity in sources
+                    ],
                 ],
             }
         )
@@ -147,39 +156,44 @@ def _cache_summary(app) -> str:
     for e in entries[:5]:
         title = e.get("lyrics_title") or ""
         artists = e.get("lyrics_artists") or []
-        artist_str = (
-            ", ".join(artists) if isinstance(artists, list) else str(artists)
+        artist_str = ", ".join(artists) if isinstance(artists, list) else str(artists)
+        lines.append(
+            f"{e['key']} -> {e.get('song_id', '')} {title} {artist_str}".rstrip()
         )
-        lines.append(f"{e['key']} -> {e.get('song_id', '')} {title} {artist_str}".rstrip())
     if len(entries) > 5:
         lines.append(f"... 共 {len(entries)} 条")
     return "\n".join(lines)
 
 
 def _status_lines(app) -> str:
-    player = None
-    if app.mpris_player is not None:
+    source = None
+    if app.player is not None:
         try:
-            player = {
-                "identity": app.mpris_player.get_identity(),
-                "bus_name": app.mpris_player.bus_name,
-                "playback_status": app.mpris_player.get_playback_status(),
-                "position_ms": app.mpris_player.get_position() // 1000,
-                "track": app.current_track,
+            snap = app.player.snapshot()
+            source = {
+                "kind": app.player.kind,
+                "identity": app.player.identity(),
+                "playback_status": snap.state.value,
+                "position_ms": snap.position_us // 1000,
+                "track": snap.track,
             }
         except Exception:
-            player = {"error": "disconnected"}
+            source = {"error": "disconnected"}
     s = app.ctrl.state
     lines = []
-    if not player:
-        lines.append("播放器: 无")
+    if not source:
+        lines.append("播放源: 无")
+    elif "error" in source:
+        lines.append("播放源: 已断开")
     else:
-        lines.append(f"播放器: {player.get('identity', '?')} ({player.get('bus_name', '?')})")
-        lines.append(f"状态: {player.get('playback_status', '?')}")
-        pos = player.get("position_ms")
+        kind = {"mpris": "MPRIS", "mpd": "MPD"}.get(source.get("kind", ""), "?")
+        lines.append(f"来源: {kind}")
+        lines.append(f"播放源: {source.get('identity', '?')}")
+        lines.append(f"状态: {source.get('playback_status', '?')}")
+        pos = source.get("position_ms")
         if isinstance(pos, int):
             lines.append(f"进度: {pos // 60000}:{(pos // 1000) % 60:02d}")
-        track = player.get("track")
+        track = source.get("track")
         if track:
             title = track.title or ""
             if title:
@@ -206,11 +220,11 @@ async def handle_action(app, action: str) -> None:
         elif action in ("karaoke", "line_mode", "secondary"):
             await app.apply_ass_config(action, "toggle")
         elif action.startswith("fps:"):
-            app.apply_target_fps(int(action[len("fps:"):]))
+            app.apply_target_fps(int(action[len("fps:") :]))
         elif action.startswith("player:"):
-            app.select_mpris_player(action[len("player:"):])
+            app.select_player(action[len("player:") :])
         elif action.startswith("song:"):
-            await app.apply_cache_set(action[len("song:"):])
+            await app.apply_cache_set(action[len("song:") :])
         elif action == "cache:list":
             notify(_cache_summary(app), "layrics 缓存")
         elif action == "cache:remove":

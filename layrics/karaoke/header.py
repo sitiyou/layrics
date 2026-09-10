@@ -39,7 +39,7 @@ Comment: 0,0:00:00.00,0:00:00.00,K2,music,0,0,0,template fx no_k,!retime("line",
 """
 
 
-_DEFAULTS: dict[str, str | int] = {
+DEFAULTS: dict[str, str | int] = {
     "FONTNAME": "sans-serif",
     "FONTSIZE": 96,
     "BORD": 5,
@@ -54,7 +54,7 @@ _DEFAULTS: dict[str, str | int] = {
 
 
 def render_karaoke_header(**overrides: str | int) -> str:
-    values = dict(_DEFAULTS)
+    values = dict(DEFAULTS)
     values.update(overrides)
     values.setdefault(
         "MARGIN_K1", int(values["MARGIN_V"]) * 2 + int(values["FONTSIZE"]) // 2 * 3

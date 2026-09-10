@@ -29,18 +29,18 @@ from .config import get_config
 logger = logging.getLogger("layrics.lyrics")
 
 
-_SOURCE_PREFIXES: list[tuple[str, Source]] | None = None
+SOURCE_PREFIXES: list[tuple[str, Source]] | None = None
 
 
 def _init_prefixes() -> list[tuple[str, Source]]:
-    global _SOURCE_PREFIXES
-    if _SOURCE_PREFIXES is None:
+    global SOURCE_PREFIXES
+    if SOURCE_PREFIXES is None:
         cfg = get_config()
-        _SOURCE_PREFIXES = sorted(
+        SOURCE_PREFIXES = sorted(
             [(s.name, s) for s in cfg.search.sources],
             key=lambda x: -len(x[0]),
         )
-    return _SOURCE_PREFIXES
+    return SOURCE_PREFIXES
 
 
 def parse_composite_id(song_id: str) -> tuple[Source, str]:
@@ -147,25 +147,25 @@ def _postprocess_aegisub(
     return result
 
 
-_KANA_RE = re.compile(r"[\u3040-\u309f\u30a0-\u30ff]")
+KANA_RE = re.compile(r"[\u3040-\u309f\u30a0-\u30ff]")
 
-_S2S_JSON = Path(__file__).resolve().parent / "data" / "simplified_to_shinjitai.json"
-_S2S_MAP: dict[str, str] | None = None
+S2S_JSON = Path(__file__).resolve().parent / "data" / "simplified_to_shinjitai.json"
+S2S_MAP: dict[str, str] | None = None
 
 
 def _load_s2s_map() -> dict[str, str]:
-    global _S2S_MAP
-    if _S2S_MAP is None:
-        with open(_S2S_JSON, encoding="utf-8") as f:
-            _S2S_MAP = json.load(f)
-    return _S2S_MAP
+    global S2S_MAP
+    if S2S_MAP is None:
+        with open(S2S_JSON, encoding="utf-8") as f:
+            S2S_MAP = json.load(f)
+    return S2S_MAP
 
 
 def _convert_japanese(lyrics_data: _LDCLyrics) -> None:
     s2s = _load_s2s_map()
     for data in lyrics_data.values():
         text = "".join(w.text for line in data for w in line.words)
-        if not _KANA_RE.search(text):
+        if not KANA_RE.search(text):
             continue
         for i, line in enumerate(data):
             new_words = [

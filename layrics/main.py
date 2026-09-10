@@ -8,8 +8,8 @@ Protocol:
   Error:    {"id": <int>, "type": "error", "data": {"code": <int>, "message": "<str>"}}
 
 Methods:
-  list_players                         -> [{bus_name, identity}]
-  select_player  {name}                -> {selected}    (name = D-Bus bus name)
+  list_players                         -> [{id, identity}]        (sources of every backend)
+  select_player  {id}                  -> {selected}    (id = bus name, "mpd", or "auto")
   search_songs   {keyword, limit?}     -> [{id (composite), name, artists, album, source}]
    fetch_lyrics   {song_id?}            -> {ass}  (song_id e.g. "QM248672467", omit for current track)
    load_ass       {path}                -> {loaded}
@@ -20,7 +20,7 @@ Methods:
    set_fps      {fps}                   -> {target_fps}
    stop                                 -> {status}
    start                                -> {status}
-   get_status                           -> {mpris_player, overlay}
+   get_status                           -> {player, overlay}
    cache_list                           -> [{key, song_id, lyrics_title, lyrics_artists, updated_at}]
    cache_set     {song_id, key?}       -> {cached}  (key defaults to current track)
    cache_remove  {key?}                -> {removed}  (key defaults to current track)
@@ -55,7 +55,16 @@ from .lyricsource import (
     search_songs as _search_songs,
 )
 from .matching import clean_search_keyword, match_song
-from .mpris import MPRISPlayerFinder, MprisSignalMonitor, TrackMeta
+from .player import (
+    PlaybackState,
+    PlayerSource,
+    PlayerUnavailable,
+    SourceSnapshot,
+    TrackMeta,
+    list_sources,
+    open_source,
+    pick_active_source,
+)
 from .uimanager import UIManager
 
 logging.basicConfig(
@@ -92,9 +101,9 @@ def _acquire_instance_lock() -> int:
     return fd
 
 
-_ASS_CONFIG_KEYS = {"karaoke", "line_mode", "secondary"}
+ASS_CONFIG_KEYS = {"karaoke", "line_mode", "secondary"}
 
-_EMPTY_ASS = """\
+EMPTY_ASS = """\
 [Script Info]
 ScriptType: v4.00+
 PlayResX: 384
@@ -121,16 +130,20 @@ def _parse_bool(raw: str) -> bool | None:
 
 
 class LayricsApp:
-    """Orchestrates overlay, MPRIS monitoring, NetEase API, and IPC."""
+    """Orchestrates overlay, playback source, lyric fetching, and IPC."""
 
     def __init__(self, socket_path: str = ""):
         self.ctrl = ApplicationController()
         self.key_manager = KeyManager(self)
         self.ui_manager = UIManager(self)
         self._config = get_config()
-        self.mpris_finder = MPRISPlayerFinder()
-        self._mpris_player: Any = None
+        self._sources: dict[str, PlayerSource] = {}
+        self._monitors: dict[str, Any] = {}  # source id -> change monitor (has an fd)
+        self._active_id: str | None = None
+        self._pinned_id: str | None = None
         self._last_track: TrackMeta | None = None
+        self._last_track_key: str | None = None
+        self._last_state: PlaybackState | None = None
 
         self.socket_path = (
             socket_path
@@ -139,10 +152,7 @@ class LayricsApp:
         )
 
         self._server: asyncio.AbstractServer | None = None
-        self._last_status: str | None = None
         self._last_position_us: int = 0
-        self._signal_monitor: MprisSignalMonitor | None = None
-        self._signal_reader: asyncio.AbstractEventLoop | None = None
         self._fetch_gen: int = 0
         self._lyrics_delay_ms: int = 0
 
@@ -152,9 +162,11 @@ class LayricsApp:
         return self._last_track
 
     @property
-    def mpris_player(self) -> Any | None:
-        """The selected MPRIS player (public read for companion modules)."""
-        return self._mpris_player
+    def player(self) -> PlayerSource | None:
+        """The source currently being followed (public read for companion modules)."""
+        if self._active_id is None:
+            return None
+        return self._sources.get(self._active_id)
 
     def quit(self) -> None:
         """Close the IPC server; the event loop then exits run()."""
@@ -203,7 +215,7 @@ class LayricsApp:
         Accepts the same values as the ass_set IPC method (incl. "toggle").
         Returns (key, parsed_value); raises on invalid input.
         """
-        if key not in _ASS_CONFIG_KEYS:
+        if key not in ASS_CONFIG_KEYS:
             raise ValueError(f"unknown config key: {key}")
         if key == "line_mode":
             v = raw_value.lower().strip()
@@ -235,9 +247,7 @@ class LayricsApp:
                 )
                 self.ctrl.set_ass_input(ass)
                 self._restore_lyrics_delay(ass_key, song_id, source)
-                logger.info(
-                    "ass config: lyrics reloaded with new %s = %r", key, parsed
-                )
+                logger.info("ass config: lyrics reloaded with new %s = %r", key, parsed)
             except Exception as e:
                 logger.warning(
                     "ass config: reload failed for %s = %r: %s", key, parsed, e
@@ -275,9 +285,7 @@ class LayricsApp:
 
     # ── auto-fetch ────────────────────────────────────────────────
 
-    async def _fetch_ass_for_track(
-        self, meta: TrackMeta
-    ) -> tuple[str, str, str, str]:
+    async def _fetch_ass_for_track(self, meta: TrackMeta) -> tuple[str, str, str, str]:
         """Fetch ASS lyrics for the track; returns (ass, cache_key, song_id, source)."""
         keyword = meta.title or ""
         if meta.artists:
@@ -359,174 +367,187 @@ class LayricsApp:
             return
         self._restore_lyrics_delay(key, song_id, source)
 
-    # ── MPRIS ─────────────────────────────────────────────────────
+    # ── playback sources (MPRIS players / direct MPD) ─────────────
 
-    def list_players(self):
-        return [
-            (p.bus_name, p.get_identity()) for p in self.mpris_finder.find_all_players()
-        ]
+    def list_players(self) -> list[tuple[str, str]]:
+        """Available sources of every backend: [(id, identity)]."""
+        sources = list_sources(self._config, attached=self._sources)
+        return [(s["id"], s["identity"]) for s in sources]
 
-    def select_mpris_player(self, name: str) -> bool:
-        for p in self.mpris_finder.find_all_players():
-            if p.bus_name == name:
-                self._mpris_player = p
-                self._last_track = None
-                self._start_signal_monitor()
-                logger.info("selected mpris player: %s", p.get_identity())
-                return True
-        logger.warning("mpris player not found: %s", name)
-        return False
-
-    def _auto_select_player(self) -> bool:
-        players = self.mpris_finder.find_all_players()
-
-        def _match_name(p):
-            bus = getattr(p, "bus_name", "")
-            prefix = "org.mpris.MediaPlayer2."
-            return bus.removeprefix(prefix)
-
-        if self._config.exclude_players:
-            players = [
-                p
-                for p in players
-                if not any(
-                    pat.search(_match_name(p)) or pat.search(p.get_identity())
-                    for pat in self._config.exclude_players
-                )
-            ]
-        elif self._config.include_players:
-            players = [
-                p
-                for p in players
-                if any(
-                    pat.search(_match_name(p)) or pat.search(p.get_identity())
-                    for pat in self._config.include_players
-                )
-            ]
-        if not players:
+    def select_player(self, name: str) -> bool:
+        """Pin the followed source by id; "auto" (or "") clears the pin."""
+        if name in ("", "auto"):
+            self._pinned_id = None
+            self._sync()
+            return True
+        self._refresh_sources()
+        if name not in self._sources:
+            logger.warning("source not found: %s", name)
             return False
-        for p in players:
-            try:
-                if p.get_playback_status() == "Playing":
-                    self._mpris_player = p
-                    self._last_track = None
-                    logger.info("auto-selected player: %s", p.get_identity())
-                    self._start_signal_monitor()
-                    return True
-            except Exception:  # noqa: S112 - unresponsive player, try next
-                continue
-        p = players[0]
-        self._mpris_player = p
-        self._last_track = None
-        logger.info("auto-selected player: %s", p.get_identity())
-        self._start_signal_monitor()
+        self._pinned_id = name
+        self._sync()
+        logger.info("pinned source: %s", name)
         return True
 
-    def _start_signal_monitor(self):
-        if self._signal_monitor:
-            self._signal_monitor.stop()
-            self._signal_monitor = None
-        if not self._mpris_player:
-            return
-        self._signal_monitor = MprisSignalMonitor(self._mpris_player.bus_name)
-        self._signal_monitor.start()
-        loop = asyncio.get_event_loop()
-        loop.add_reader(self._signal_monitor.fileno(), self._on_mpris_signal)
+    def _refresh_sources(self) -> None:
+        """Attach sources that appeared, drop MPRIS ones that vanished.
 
-    def _on_mpris_signal(self):
-        assert self._signal_monitor is not None
-        for event in self._signal_monitor.read_events():
-            typ = event.get("type")
-            val = event.get("value")
-            if typ == "status":
-                if val == "Playing":
-                    if not self.ctrl.state.paused:
-                        continue
-                    now_ms = int(time.monotonic() * 1000)
-                    kwargs = {"paused": False}
-                    try:
-                        pos = self._mpris_player.get_position()
-                        kwargs["start_time_ms"] = (
-                            now_ms - pos // 1000 + self._lyrics_delay_ms
-                        )
-                    except Exception:  # noqa: S110 - position unavailable, keep default
-                        pass
-                    self.ctrl.set_status(**kwargs)
-                elif val in ("Paused", "Stopped"):
-                    if self.ctrl.state.paused:
-                        continue
-                    self.ctrl.set_status(paused=True)
-            elif typ == "seeked":
-                now_ms = int(time.monotonic() * 1000)
-                self.ctrl.set_status(
-                    start_time_ms=now_ms - val // 1000 + self._lyrics_delay_ms
-                )
-                self._last_position_us = val
-            elif typ == "track":
-                self._fetch_gen += 1
-                self._last_track = None
-                logger.info("signal: track changed: %s", val)
-                self.ctrl.set_ass_input(_EMPTY_ASS)
+        MPD stays attached while its monitor reconnects; it is only dropped
+        by shutdown.
+        """
+        ids = {s["id"] for s in list_sources(self._config, attached=self._sources)}
+        for sid in ids - self._sources.keys():
+            self._attach_source(sid)
+        for sid in [s for s, src in self._sources.items() if src.kind != "mpd"]:
+            if sid not in ids:
+                self._detach_source(sid)
 
-    def _stop_signal_monitor(self):
-        if self._signal_reader:
-            assert self._signal_monitor is not None
-            loop = asyncio.get_event_loop()
-            loop.remove_reader(self._signal_monitor.fileno())
-            self._signal_reader = None
-        if self._signal_monitor:
-            self._signal_monitor.stop()
-            self._signal_monitor = None
-
-    def _mpris_sync(self) -> None:
-        if not self._mpris_player:
-            return
+    def _attach_source(self, source_id: str) -> bool:
+        """Open a source and register its change monitor with the event loop."""
+        source: PlayerSource | None = None
         try:
-            meta = self._mpris_player.get_metadata()
-            status = self._mpris_player.get_playback_status()
-            pos = self._mpris_player.get_position()
-        except Exception as e:
-            logger.warning("mpris player disconnected: %s", e)
-            self._fetch_gen += 1
-            self._mpris_player = None
-            self._last_track = None
-            self._last_status = None
-            self._stop_signal_monitor()
-            self.ctrl.set_ass_input(_EMPTY_ASS)
+            source = open_source(self._config, source_id)
+            monitor = source.start()
+        except (ConnectionError, PlayerUnavailable, ValueError) as e:
+            logger.warning("cannot attach source %s: %s", source_id, e)
+            if source is not None:
+                source.close()
+            return False
+        self._sources[source_id] = source
+        self._monitors[source_id] = monitor
+        try:
+            loop = asyncio.get_event_loop()
+            loop.add_reader(monitor.fileno(), self._on_source_signal, monitor)
+        except RuntimeError:
+            pass  # event loop not running yet; the poller picks it up
+        logger.info("source attached: %s", source_id)
+        return True
+
+    def _detach_source(self, source_id: str) -> None:
+        """Drop one source, its monitor and its pin."""
+        monitor = self._monitors.pop(source_id, None)
+        if monitor is not None:
+            try:
+                loop = asyncio.get_event_loop()
+                loop.remove_reader(monitor.fileno())
+            except RuntimeError, ValueError:
+                pass
+            monitor.stop()
+        source = self._sources.pop(source_id, None)
+        if source is not None:
+            source.close()
+        if self._active_id == source_id:
+            self._active_id = None
+        if self._pinned_id == source_id:
+            self._pinned_id = None
+
+    def _reset_track_state(self, clear_screen: bool) -> None:
+        """Forget the current song; optionally blank the overlay."""
+        self._last_track = None
+        self._last_track_key = None
+        self._last_state = None
+        self._last_position_us = 0
+        self._fetch_gen += 1
+        if clear_screen:
+            self.ctrl.set_ass_input(EMPTY_ASS)
+
+    def _on_source_signal(self, monitor) -> None:
+        """A change event arrived on a monitor fd: reconcile once."""
+        monitor.read_events()
+        self._sync()
+
+    def _collect_snapshots(self) -> tuple[dict[str, SourceSnapshot], set[str]]:
+        """Snapshot every attached source; drop the MPRIS ones that died."""
+        snaps: dict[str, SourceSnapshot] = {}
+        failed: set[str] = set()
+        for sid, source in list(self._sources.items()):
+            try:
+                snaps[sid] = source.snapshot()
+            except PlayerUnavailable as e:
+                failed.add(sid)
+                if source.kind == "mpd":
+                    # The idle thread reconnects on its own; freeze the overlay
+                    # until the next successful snapshot resumes tracking.
+                    logger.debug("mpd unavailable: %s", e)
+                else:
+                    logger.warning("player disconnected: %s", e)
+                    self._detach_source(sid)
+        return snaps, failed
+
+    def _sync(self) -> None:
+        """Pick the source to follow and apply its deltas to the overlay.
+
+        Single reconciliation path used by both the 1s poller and the change
+        monitors; each step is idempotent. start_time_ms is only rebased on
+        real transitions (new track, play/pause, seek jumps) to avoid drift.
+        """
+        snaps, failed = self._collect_snapshots()
+        active = pick_active_source(
+            snaps, current=self._active_id, pinned=self._pinned_id
+        )
+
+        if active is None:
+            if self._active_id in failed:
+                if not self.ctrl.state.paused:
+                    self.ctrl.set_status(paused=True)
+                return
+            # Every source is stopped or unloaded: clear the screen and freeze.
+            if (
+                self._last_state is not PlaybackState.STOPPED
+                or self._last_track is not None
+            ):
+                self._reset_track_state(clear_screen=True)
+            if not self.ctrl.state.paused:
+                self.ctrl.set_status(paused=True)
+            self._last_state = PlaybackState.STOPPED
+            self._last_position_us = 0
             return
 
-        cur_id = meta.unique_song_id
-        last_id = self._last_track.unique_song_id if self._last_track else None
-        track_changed = cur_id != last_id
-        if track_changed:
-            self._fetch_gen += 1
-            gen = self._fetch_gen
-            self._last_track = meta
-            logger.info("track changed: %s", meta.title or "?")
-            self.ctrl.set_ass_input(_EMPTY_ASS)
-            asyncio.get_event_loop().create_task(self._auto_fetch_lyrics(meta, gen))
+        if active != self._active_id:
+            logger.info("following: %s", active)
+            self._active_id = active
 
-        # play / pause
-        if status != self._last_status:
-            self._last_status = status
-            if status == "Playing":
-                now_ms = int(time.monotonic() * 1000)
+        snap = snaps[active]
+        state = snap.state
+        pos = snap.position_us
+        track = snap.track
+
+        # Track changes are detected by cache key, not by per-source song id:
+        # the same song can be published by two backends at once (MPD and
+        # mpDris2 wrapping it), and switching between them must not re-fetch.
+        track_key = make_cache_key(track) if track and track.title else None
+        if track_key != self._last_track_key:
+            self._fetch_gen += 1
+            self._last_track_key = track_key
+            self._last_track = track
+            self._last_position_us = pos
+            if track_key is None:
+                self.ctrl.set_ass_input(EMPTY_ASS)
+                return
+            logger.info("track changed: %s", track.title)
+            self.ctrl.set_ass_input(EMPTY_ASS)
+            asyncio.get_event_loop().create_task(
+                self._auto_fetch_lyrics(track, self._fetch_gen)
+            )
+
+        now_ms = int(time.monotonic() * 1000)
+        if state is not self._last_state:
+            self._last_state = state
+            if state is PlaybackState.PLAYING:
                 self.ctrl.set_status(
                     paused=False,
                     start_time_ms=now_ms - pos // 1000 + self._lyrics_delay_ms,
                 )
-            elif status in ("Paused", "Stopped"):
+            elif state is PlaybackState.PAUSED:
                 self.ctrl.set_status(paused=True)
 
-        # seek detection (position jump)
-        if status == "Playing":
+        # Seek detection: a position jump while playing means the user seeked.
+        if state is PlaybackState.PLAYING:
             expected = self._last_position_us + 1_000_000
             if abs(pos - expected) > 500_000:
-                now_ms = int(time.monotonic() * 1000)
                 self.ctrl.set_status(
                     start_time_ms=now_ms - pos // 1000 + self._lyrics_delay_ms
                 )
-
         self._last_position_us = pos
 
     def adjust_lyrics_delay(self, delta_ms: int) -> None:
@@ -534,16 +555,14 @@ class LayricsApp:
         self._lyrics_delay_ms += delta_ms
         self._persist_lyrics_delay()
         self._sync_with_delay()
-        logger.info(
-            "lyrics delay %+dms -> total %dms", delta_ms, self._lyrics_delay_ms
-        )
+        logger.info("lyrics delay %+dms -> total %dms", delta_ms, self._lyrics_delay_ms)
 
     def reset_lyrics_delay(self) -> bool:
         """Reset the lyrics delay and re-align to the player position.
 
-        Returns False while paused or when no player is selected.
+        Returns False while paused or when no source is selected.
         """
-        if self.ctrl.state.paused or self._mpris_player is None:
+        if self.ctrl.state.paused or self.player is None:
             return False
         self._lyrics_delay_ms = 0
         self._persist_lyrics_delay()
@@ -578,13 +597,15 @@ class LayricsApp:
     def _sync_with_delay(self) -> bool:
         """Set start_time_ms = now - pos + lyrics_delay_ms.
 
-        Returns False when no player is selected or the position is unavailable.
+        Returns False when no source is selected or its position is
+        unavailable.
         """
-        if self._mpris_player is None:
+        source = self.player
+        if source is None:
             return False
         try:
-            pos = self._mpris_player.get_position()
-        except Exception:
+            pos = source.snapshot().position_us
+        except PlayerUnavailable:
             return False
         now_ms = int(time.monotonic() * 1000)
         self.ctrl.set_status(start_time_ms=now_ms - pos // 1000 + self._lyrics_delay_ms)
@@ -614,17 +635,17 @@ class LayricsApp:
                 return {
                     "id": req_id,
                     "type": "result",
-                    "data": [{"bus_name": bn, "identity": id_} for bn, id_ in players],
+                    "data": [{"id": pid, "identity": name} for pid, name in players],
                 }
 
             elif method == "select_player":
                 name = params.get("name", "")
-                ok = self.select_mpris_player(name)
+                ok = self.select_player(name)
                 if ok:
                     return {
                         "id": req_id,
                         "type": "result",
-                        "data": {"selected": name},
+                        "data": {"selected": name or "auto"},
                     }
                 return {
                     "id": req_id,
@@ -747,19 +768,13 @@ class LayricsApp:
 
             elif method == "start":
                 self.start_overlay()
-                if self._last_track is not None and self._mpris_player is not None:
-                    try:
-                        pos = self._mpris_player.get_position()
-                        now_ms = int(time.monotonic() * 1000)
-                        self.ctrl.set_status(
-                            hidden=False,
-                            start_time_ms=now_ms - pos // 1000 + self._lyrics_delay_ms,
-                        )
-                        logger.info(
-                            "re-synced start_time on start, pos=%dms", pos // 1000
-                        )
-                    except Exception as e:
-                        logger.warning("start: failed to sync position: %s", e)
+                if (
+                    self._last_track is not None
+                    and self.player is not None
+                    and self._sync_with_delay()
+                ):
+                    self.ctrl.set_status(hidden=False)
+                    logger.info("re-synced start_time on start")
                 return {
                     "id": req_id,
                     "type": "result",
@@ -768,18 +783,20 @@ class LayricsApp:
 
             elif method == "get_status":
                 player_info = None
-                if self._mpris_player:
+                source = self.player
+                if source is not None:
                     try:
-                        status = self._mpris_player.get_playback_status()
-                        pos = self._mpris_player.get_position()
+                        snap = source.snapshot()
                         player_info = {
-                            "identity": self._mpris_player.get_identity(),
-                            "bus_name": self._mpris_player.bus_name,
-                            "playback_status": status,
-                            "position_ms": pos // 1000,
+                            "kind": source.kind,
+                            "id": source.source_id,
+                            "identity": source.identity(),
+                            "pinned": source.source_id == self._pinned_id,
+                            "playback_status": snap.state.value,
+                            "position_ms": snap.position_us // 1000,
                         }
-                        if self._last_track:
-                            player_info["track"] = asdict(self._last_track)
+                        if snap.track:
+                            player_info["track"] = asdict(snap.track)
                     except Exception:
                         player_info = {"error": "disconnected"}
                 s = self.ctrl.state
@@ -797,7 +814,7 @@ class LayricsApp:
                     "id": req_id,
                     "type": "result",
                     "data": {
-                        "mpris_player": player_info,
+                        "player": player_info,
                         "overlay": overlay,
                     },
                 }
@@ -945,19 +962,15 @@ class LayricsApp:
             except Exception:  # noqa: S110 - ignore close failure
                 pass
 
-    # ── MPRIS poller ──────────────────────────────────────────────
+    # ── player poller ─────────────────────────────────────────────
 
-    async def _mpris_poller(self):
+    async def _player_poller(self):
         while True:
             try:
-                if not self._mpris_player:
-                    self._auto_select_player()
-                    if not self._mpris_player:
-                        await asyncio.sleep(1)
-                        continue
-                self._mpris_sync()
+                self._refresh_sources()
+                self._sync()
             except Exception as e:
-                logger.debug("mpris poll error: %s", e)
+                logger.debug("player poll error: %s", e)
             await asyncio.sleep(1)
 
     # ── Run ───────────────────────────────────────────────────────
@@ -990,8 +1003,9 @@ class LayricsApp:
         except Exception:
             logger.exception("initial menu refresh failed")
 
-        self._auto_select_player()
-        poller_task = asyncio.create_task(self._mpris_poller())
+        self._refresh_sources()
+        self._sync()
+        poller_task = asyncio.create_task(self._player_poller())
         key_poller_task = asyncio.create_task(self.key_manager.poller())
         ui_poller_task = asyncio.create_task(self.ui_manager.poller())
 
@@ -1007,10 +1021,11 @@ class LayricsApp:
             await self._server.wait_closed()
 
     def cleanup(self):
-        self._stop_signal_monitor()
+        for source_id in list(self._sources):
+            self._detach_source(source_id)
         try:
             os.unlink(self.socket_path)
-        except (FileNotFoundError, OSError):
+        except FileNotFoundError, OSError:
             pass
         self.ctrl.stop()
         self.ctrl.join()

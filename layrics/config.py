@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-import re
 from dataclasses import dataclass, field, fields
 from typing import Any
 
@@ -10,11 +9,11 @@ import appdirs
 from layrics.LDDC.common.models import Source
 
 if os.environ.get("LAYRICS_CONFIG_DIR"):
-    _CONFIG_DIR = os.environ["LAYRICS_CONFIG_DIR"]
+    CONFIG_DIR = os.environ["LAYRICS_CONFIG_DIR"]
 else:
-    _CONFIG_DIR = appdirs.user_config_dir("layrics")
+    CONFIG_DIR = appdirs.user_config_dir("layrics")
 
-_CONFIG_PATH = os.path.join(_CONFIG_DIR, "config.toml")
+CONFIG_PATH = os.path.join(CONFIG_DIR, "config.toml")
 
 
 @dataclass
@@ -29,8 +28,21 @@ class OverlayConfig:
 
 @dataclass
 class MprisConfig:
-    include_players: list[str] = field(default_factory=list)
-    exclude_players: list[str] = field(default_factory=list)
+    """MPRIS bus names to ignore when discovering players."""
+
+    exclude: list[str] = field(default_factory=list)
+
+
+@dataclass
+class MpdConfig:
+    """Direct MPD connection; the MPD_* environment overrides these fields.
+
+    host accepts mpc-style values: hostname, "/unix/socket", "@abstract".
+    """
+
+    host: str = ""
+    port: int = 0
+    password: str = ""
 
 
 @dataclass
@@ -99,13 +111,12 @@ class Config:
         self.search = SearchConfig()
         self.overlay = OverlayConfig()
         self.mpris = MprisConfig()
+        self.mpd = MpdConfig()
         self.fonts = FontsConfig()
         self.style = StyleConfig()
         self.lyrics = LyricsConfig()
         self.dmenu = DmenuConfig()
         self._provider_config: dict[str, dict[str, Any]] = {}
-        self._include_patterns: list[re.Pattern] = []
-        self._exclude_patterns: list[re.Pattern] = []
         self._load()
         self._provider_config.setdefault(
             "default",
@@ -135,10 +146,10 @@ class Config:
         return parsed
 
     def _load(self):
-        if not os.path.exists(_CONFIG_PATH):
+        if not os.path.exists(CONFIG_PATH):
             return
         import tomllib
-        with open(_CONFIG_PATH, "rb") as f:
+        with open(CONFIG_PATH, "rb") as f:
             data = tomllib.load(f)
 
         # [search]
@@ -160,15 +171,22 @@ class Config:
         # [mpris]
         raw_mpris = data.get("mpris", {})
         if isinstance(raw_mpris, dict):
-            raw_include = raw_mpris.get("include_players", [])
-            if isinstance(raw_include, list):
-                self.mpris.include_players = [str(p) for p in raw_include]
-            raw_exclude = raw_mpris.get("exclude_players", [])
+            raw_exclude = raw_mpris.get("exclude", [])
             if isinstance(raw_exclude, list):
-                self.mpris.exclude_players = [str(p) for p in raw_exclude]
+                self.mpris.exclude = [str(p) for p in raw_exclude]
 
-        self._include_patterns = [re.compile(p) for p in self.mpris.include_players]
-        self._exclude_patterns = [re.compile(p) for p in self.mpris.exclude_players]
+        # [mpd]
+        raw_mpd = data.get("mpd", {})
+        if isinstance(raw_mpd, dict):
+            raw_host = raw_mpd.get("host")
+            if isinstance(raw_host, str):
+                self.mpd.host = raw_host
+            raw_port = raw_mpd.get("port")
+            if isinstance(raw_port, int) and raw_port > 0:
+                self.mpd.port = raw_port
+            raw_password = raw_mpd.get("password")
+            if isinstance(raw_password, str):
+                self.mpd.password = raw_password
 
         # [fonts]
         raw_fonts = data.get("fonts", {})
@@ -220,28 +238,12 @@ class Config:
     def get_provider_config(self, name: str) -> dict[str, Any]:
         return dict(self._provider_config.get(name, {}))
 
-    @property
-    def include_players(self) -> list[re.Pattern]:
-        return self._include_patterns
 
-    @include_players.setter
-    def include_players(self, patterns: list[re.Pattern]) -> None:
-        self._include_patterns = list(patterns)
-
-    @property
-    def exclude_players(self) -> list[re.Pattern]:
-        return self._exclude_patterns
-
-    @exclude_players.setter
-    def exclude_players(self, patterns: list[re.Pattern]) -> None:
-        self._exclude_patterns = list(patterns)
-
-
-_CONFIG: Config | None = None
+CONFIG: Config | None = None
 
 
 def get_config() -> Config:
-    global _CONFIG
-    if _CONFIG is None:
-        _CONFIG = Config()
-    return _CONFIG
+    global CONFIG
+    if CONFIG is None:
+        CONFIG = Config()
+    return CONFIG

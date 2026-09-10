@@ -75,7 +75,7 @@ def status(ctx):
 @cli.command(name="players")
 @click.pass_context
 def list_players(ctx):
-    """List available MPRIS players"""
+    """List available sources (MPRIS players / MPD)"""
     _pp(_call(ctx.obj["socket"], "list_players"))
 
 
@@ -83,7 +83,7 @@ def list_players(ctx):
 @click.argument("name")
 @click.pass_context
 def select_player(ctx, name: str):
-    """Select MPRIS player by D-Bus bus name (e.g. org.mpris.MediaPlayer2.mpd)"""
+    """Pin a source by id (an MPRIS bus name, "mpd", or "auto")"""
     _pp(_call(ctx.obj["socket"], "select_player", {"name": name}))
 
 
@@ -194,7 +194,7 @@ def _resolve_menu_program(override: str | None) -> str:
         from .config import get_config
 
         program = get_config().dmenu.program
-    except (ImportError, OSError, ValueError):
+    except ImportError, OSError, ValueError:
         return "dmenu"
     return program or "dmenu"
 
@@ -233,9 +233,7 @@ def _run_menu(program: str, prompt: str, items: list[str]) -> str | None:
     return picked or None
 
 
-def _menu_select(
-    program: str, prompt: str, items: list[tuple[str, str]]
-) -> str | None:
+def _menu_select(program: str, prompt: str, items: list[tuple[str, str]]) -> str | None:
     """items: [(label, action)]，展示带序号菜单并返回选中项的 action；取消返回 None。
 
     菜单行只含 label（`N) label`），action 通过行首序号反查，避免 action 显示在菜单中。
@@ -267,7 +265,7 @@ def _menu_song(sock: str, prog: str) -> None:
     if status.get("type") == "error":
         _pp(status)
         return
-    track = status.get("data", {}).get("mpris_player", {}).get("track")
+    track = status.get("data", {}).get("player", {}).get("track")
     if not track:
         click.echo("No current track", err=True)
         return
@@ -308,7 +306,7 @@ def _menu_song(sock: str, prog: str) -> None:
         items.append((label, f"song:{c['id']}"))
     picked = _menu_select(prog, "Select lyrics", items)
     if picked and picked.startswith("song:"):
-        song_id = picked[len("song:"):]
+        song_id = picked[len("song:") :]
         _call(sock, "cache_set", {"song_id": song_id})
 
 
@@ -322,26 +320,23 @@ def _menu_fps(sock: str, prog: str) -> None:
     ]
     picked = _menu_select(prog, "Select FPS", items)
     if picked and picked.startswith("fps:"):
-        _call(sock, "set_fps", {"fps": int(picked[len("fps:"):])})
+        _call(sock, "set_fps", {"fps": int(picked[len("fps:") :])})
 
 
 def _menu_player(sock: str, prog: str) -> None:
-    """子菜单：选择 MPRIS 播放器。"""
+    """子菜单：选择跟随的播放源。"""
     resp = _call(sock, "list_players")
     if resp.get("type") == "error":
         _pp(resp)
         return
     players = resp.get("data", [])
-    if not players:
-        click.echo("No MPRIS players available", err=True)
-        return
-    items = []
+    items = [("Auto (follow the playing source)", "player:auto")]
     for p in players:
-        identity = p.get("identity") or p.get("bus_name") or "?"
-        items.append((f"{identity} ({p['bus_name']})", f"player:{p['bus_name']}"))
-    picked = _menu_select(prog, "Select player", items)
+        identity = p.get("identity") or p.get("id") or "?"
+        items.append((f"{identity} ({p['id']})", f"player:{p['id']}"))
+    picked = _menu_select(prog, "Select source", items)
     if picked and picked.startswith("player:"):
-        _call(sock, "select_player", {"name": picked[len("player:"):]})
+        _call(sock, "select_player", {"name": picked[len("player:") :]})
 
 
 def _notify(body: str, title: str = "layrics") -> None:
@@ -406,14 +401,17 @@ def _print_status(sock: str, status: dict | None = None) -> None:
         _pp(status)
         return
     data = status.get("data", {})
-    player = data.get("mpris_player") or {}
+    player = data.get("player") or {}
     overlay = data.get("overlay", {})
     lines = []
     if not player:
         lines.append("Player: none")
+    elif player.get("error"):
+        lines.append("Player: disconnected")
     else:
+        pinned = " pinned" if player.get("pinned") else ""
         lines.append(
-            f"Player: {player.get('identity', '?')} ({player.get('bus_name', '?')})"
+            f"Player: {player.get('identity', '?')} ({player.get('id', '?')}){pinned}"
         )
         lines.append(f"Status: {player.get('playback_status', '?')}")
         pos = player.get("position_ms")
@@ -452,7 +450,7 @@ def dmenu(ctx, program: str | None):
         return
     data = status.get("data", {})
     overlay = data.get("overlay", {})
-    player = data.get("mpris_player") or {}
+    player = data.get("player") or {}
 
     ass_cfg = _call(sock, "ass_get")
     ass = ass_cfg.get("data", {}) if ass_cfg.get("type") == "result" else {}
@@ -466,7 +464,7 @@ def dmenu(ctx, program: str | None):
     secondary = True if secondary is None else bool(secondary)
     fps = overlay.get("target_fps", -1)
     fps_str = "vsync" if fps == -1 else f"{fps} FPS"
-    player_name = player.get("identity") or player.get("bus_name") or "none"
+    player_name = player.get("identity") or player.get("id") or "none"
 
     items = [
         ("Search & set lyrics", "song"),

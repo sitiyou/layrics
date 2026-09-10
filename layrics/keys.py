@@ -20,18 +20,18 @@ MOD_CTRL = 0x04
 MOD_ALT = 0x08
 MOD_NUM = 0x10
 MOD_SUPER = 0x40
-_MOD_MASK = MOD_SHIFT | MOD_CTRL | MOD_ALT | MOD_SUPER
+MOD_MASK = MOD_SHIFT | MOD_CTRL | MOD_ALT | MOD_SUPER
 
 # key states (wl_keyboard key_state)
 KEY_STATE_PRESSED = 0
 KEY_STATE_RELEASED = 1
 
 # Modifier keycodes (evdev KEY_*), invalid as a hotkey's main key.
-_MOD_KEYCODES = frozenset((29, 42, 54, 56, 97, 100, 125, 126))
+MOD_KEYCODES = frozenset((29, 42, 54, 56, 97, 100, 125, 126))
 
 # evdev keycodes (linux/input-event-codes.h KEY_*) -> friendly name.
 # Letters/digits map to themselves; special keys use semantic names.
-_KEYCODES: dict[int, str] = {
+KEYCODES: dict[int, str] = {
     1: "ESC",
     2: "1", 3: "2", 4: "3", 5: "4", 6: "5",
     7: "6", 8: "7", 9: "8", 10: "9", 11: "0",
@@ -76,10 +76,10 @@ _KEYCODES: dict[int, str] = {
     163: "NEXT", 164: "PLAYPAUSE", 165: "PREVIOUS", 166: "STOP",
 }
 
-_NAME_TO_KEYCODE = {name: code for code, name in _KEYCODES.items()}
+NAME_TO_KEYCODE = {name: code for code, name in KEYCODES.items()}
 
 # Modifier aliases accepted in hotkey specs.
-_MOD_ALIASES = {
+MOD_ALIASES = {
     "CTRL": MOD_CTRL, "CONTROL": MOD_CTRL,
     "SHIFT": MOD_SHIFT,
     "ALT": MOD_ALT, "OPT": MOD_ALT,
@@ -98,7 +98,7 @@ class KeyEvent:
 
     @property
     def name(self) -> str:
-        return _KEYCODES.get(self.keycode, f"KEY_{self.keycode}")
+        return KEYCODES.get(self.keycode, f"KEY_{self.keycode}")
 
     @property
     def is_pressed(self) -> bool:
@@ -115,8 +115,8 @@ class Hotkey:
         mods = 0
         key = None
         for part in parts:
-            if part in _MOD_ALIASES:
-                mods |= _MOD_ALIASES[part]
+            if part in MOD_ALIASES:
+                mods |= MOD_ALIASES[part]
             elif key is None:
                 key = part
             else:
@@ -125,10 +125,10 @@ class Hotkey:
                 )
         if key is None:
             raise ValueError(f"hotkey '{spec}': no main key")
-        keycode = _NAME_TO_KEYCODE.get(key)
+        keycode = NAME_TO_KEYCODE.get(key)
         if keycode is None:
             raise ValueError(f"hotkey '{spec}': unknown key '{key}'")
-        if keycode in _MOD_KEYCODES:
+        if keycode in MOD_KEYCODES:
             raise ValueError(f"hotkey '{spec}': '{key}' is a modifier key")
         self.spec = spec
         self.mods = mods
@@ -144,7 +144,7 @@ class Hotkey:
         return (
             event.is_pressed
             and event.keycode == self.keycode
-            and (event.mods & _MOD_MASK) == self.mods
+            and (event.mods & MOD_MASK) == self.mods
         )
 
 

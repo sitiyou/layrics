@@ -20,56 +20,17 @@ layrics 是一款桌面歌词软件：从 MPRIS 兼容的播放器（Spotify、m
 
 ## 功能
 
-- **MPRIS 集成**：自动发现并同步 MPRIS 兼容播放器（spotify、mpd 等），跟随播放状态自动切换歌词
+- **MPRIS 集成**：自动发现并同步 MPRIS 兼容播放器（spotify、mpd 等），跟随播放状态自动切换歌词；(同时也提供对mpd的第一方支持)
 - **多源歌词搜索**：跨 QQ 音乐（QM）、网易云音乐（NE）、酷狗（KG）、LRCLIB 多源并行搜索，自动匹配歌曲
 - **Layer Shell 覆盖层**：基于 wlr-layer-shell 协议自动悬浮，无需在窗口管理器额外设置规则
 - **libass 渲染**：支持 ASS 字幕全部特性，包括卡拉 OK（`\k`）、样式、字体和特效
 - **硬件加速**：基于 Vulkan 提供 GPU 硬件加速
 - **Aegisub 卡拉 OK 模板**：可选用 aegisub-cli 的 kara-templater 处理逐字歌词，实现高级卡拉 OK 效果
-- **歌曲-歌词缓存**：SQLite 匹配结果缓存
+- **歌曲-歌词缓存**：匹配结果本地缓存
 - **拖拽支持**：点击拖拽覆盖层重新定位字幕位置
-- **右键菜单**：悬停字幕时右键弹出菜单（搜索歌词/显示/锁定/ASS 配置/帧率/播放器/缓存等，基于 imgui 渲染进覆盖层；菜单内容与动作处理在 Python 侧，参考 `layctl dmenu`）
-- **IPC 控制**：Unix domain socket JSON 协议，支持程序化控制
+- **右键菜单**：悬停字幕时右键弹出菜单（搜索歌词/显示/锁定/ASS 配置/帧率/播放器/缓存等）
+- **IPC控制**：通过 `layctl` 命令行或脚本控制
 - **可配置输出**：TOML 配置字体、颜色、定位、渲染模式、歌词轨道选择
-
-## 架构
-
-```
-layrics (Python)                    
-├── main.py          IPC 服务端     
-│   ├── MPRIS 同步  MPRIS 轮询      
-│   ├── 歌词获取    LDDC 适配器     
-│   └── IPC 服务端  Unix socket     
-├── lyricsource.py  搜索/获取       
-├── LDDC/           内置歌词源库（精简子包）
-├── matching.py     歌曲匹配        
-├── cache.py        歌曲-歌词缓存   
-├── layctl.py       控制 CLI        
-├── mpris.py        D-Bus 信号      
-├── assprovider/    ASS 生成        
-├── karaoke/        Aegisub kara-templater 头部生成
-└── config.py       TOML 配置       
-                                    
-                                    
-C++ overlay (core/)                            
-├── Application      事件循环、帧调度          
-├── ApplicationController  线程安全命令队列    
-├── RenderManager    渲染流程编排 + 拖拽偏移   
-├── AssRenderer      libass -> R8 纹理图集     
-├── LayerSurface     wlr-layer-shell surface   
-├── VulkanContext    Vulkan 实现   
-├── FrameRateLimiter 目标帧率限制              
-├── InputManager     wl_pointer 事件           
-├── DragManager      拖拽状态机                
-├── RegionManager    input region              
-├── DamageGrid       逐区域 damage 追踪         
-├── CursorTracker    全局光标（Hyprland）      
-├── CursorManager    悬停/拖拽光标切换          
-├── UIManager        imgui 右键菜单（渲染/输入/状态机）
-├── WaylandContext   display、全局对象、事件循 
-└── binding.cpp      pybind11 绑定              
-
-```
 
 ## 安装
 
@@ -82,11 +43,6 @@ C++ overlay (core/)
 - `libass`
 - `fontconfig`
 - `uv`
-
-### Python 依赖（pip 自动安装）
-
-- `meson-python`、`pybind11`（构建时）
-- `httpx[brotli,http2]`、`dbus-python`、`PyGObject`、`click`、`diskcache`、`pyaes`、`appdirs`（运行时）
 
 ### 安装
 
@@ -115,7 +71,7 @@ layrics
 
 守护进程会：
 1. 连接 Wayland 并创建覆盖层 surface
-2. 自动选择 MPRIS 兼容播放器
+2. 同时监测本机所有播放器，跟随正在播放的源
 3. 轮询曲目变化并自动获取歌词
 
 可选参数：
@@ -124,11 +80,12 @@ layrics
 ### 使用 layctl 控制
 
 ```bash
-# 列出可用 MPRIS 播放器
+# 列出可用播放源
 layctl players
 
-# 选择播放器
+# 固定跟随某个播放源（bus name 或 "mpd"），传 auto 恢复自动
 layctl set-player org.mpris.MediaPlayer2.mpd
+layctl set-player auto
 
 # 搜索歌曲
 layctl search "Eternal Feather"
@@ -188,7 +145,7 @@ layctl ass-get
 
 #### overlay 内建快捷键（悬停歌词时捕获键盘）
 
-> **WIP**：开发中，暂无用户接口（自定义绑定尚不可用）。
+> **WIP**：暂不支持自定义按键绑定。
 
 悬停歌词时 overlay 捕获键盘，当前可用的内建快捷键：
 
@@ -198,7 +155,7 @@ layctl ass-get
 | `X` | 歌词提前 100ms |
 | `C` | 重置延迟（重新对齐播放器当前位置） |
 
-> 延迟按歌曲持久化（SQLite `lyrics_config` 表），再次播放同一首歌时自动恢复，且 seek / 暂停 / 播放切换后保持。
+> 延迟按歌曲保存，再次播放同一首歌时自动恢复，且 seek / 暂停 / 播放切换后保持。
 
 仅当指针悬停在歌词区域时按键才生效，移出歌词区域后按键恢复正常。
 
@@ -211,18 +168,6 @@ hl.bind("Control_L", hl.dsp.exec_cmd [[layctl lock toggle]], { long_press = true
 hl.bind("Alt_L", hl.dsp.exec_cmd [[layctl hide toggle]], { long_press = true })
 hl.bind("SUPER + SHIFT + M", hl.dsp.exec_cmd [[layctl dmenu]])
 ```
-
-###
- IPC 协议
-
-守护进程监听 Unix domain socket。请求和响应均为 JSON 行格式：
-
-```
-{"id": 1, "method": "list_players"}
-{"id": 1, "type": "result", "data": [{"bus_name": "...", "identity": "..."}]}
-```
-
-可用方法：`list_players`、`select_player`、`search_songs`、`fetch_lyrics`、`load_ass`、`hide`、`unhide`、`lock`、`unlock`、`set_fps`、`stop`、`start`、`get_status`、`cache_list`、`cache_set`、`cache_remove`、`ass_get`、`ass_set`。
 
 ## 配置
 
@@ -239,39 +184,22 @@ hl.bind("SUPER + SHIFT + M", hl.dsp.exec_cmd [[layctl dmenu]])
 | `LAYRICS_SOCK` | IPC socket 路径 | `$XDG_RUNTIME_DIR/layrics.sock` |
 | `LAYRICS_DMENU` | `layctl dmenu` 使用的菜单程序（覆盖 `[dmenu] program`） | `dmenu` |
 
-## ASS 提供者系统
+## 歌词渲染
 
-`assprovider` 包负责将 LRC 歌词转换为 ASS 字幕格式。
+- **卡拉 OK**（`karaoke=true`）：逐字填色，`PrimaryColour` 为已唱色、`SecondaryColour` 为未唱色
+- **单行模式**（`line_mode="single"`）：一行居中，可附带翻译/罗马音
+- **双行模式**（`line_mode="double"`）：两行左右交替显示；启用 `advance_ms` 时提前显示为暗色，到播放时间点亮
 
-### 渲染模式
+歌词语言（日语/韩语/中文/英语）自动识别，并从 `[fonts]` 选择对应字体。
 
-- **卡拉 OK**（`karaoke=true`）：生成 `\kf` 标签实现逐音节填色。`PrimaryColour` 为填充色，`SecondaryColour` 为等待色。
-- **单行模式**（`line_mode="single"`）：一次显示一行，居中，可选择显示翻译/罗马音（第二语言）。
-- **双行模式**（`line_mode="double"`）：两行同时显示（左右交替）。启用 `advance_ms` 时，歌词在预显示窗口期内显示为暗淡色，到播放时间后切换为高亮色。
-
-### 语言检测
-
-提供者通过字符集分析自动检测歌词语言（假名 -> 日语、谚文 -> 韩语、CJK -> 中文、拉丁字母 -> 英语），并从配置中选择对应字体。
-
-### 歌曲匹配
-
-获取当前曲目歌词时，系统：
-1. 在所有可用源中搜索歌曲
-2. 按标题相似度、时长差异、歌手相似度打分
-3. 使用级联评分系统选择最佳匹配
+获取歌词时在所有配置的歌词源中搜索，按标题、时长、歌手相似度选出最佳匹配。
 
 ## 路线图
 
-- [ ] **Python 输入事件接口** — 将 overlay 接收到的键盘/鼠标事件封装为 Python 接口，支持在 Python 层面处理输入事件
-- [ ] **延迟控制** — 字幕延迟偏移功能（offset）
-- [x] **Aegisub CLI 集成** — 调用 aegisub-cli 处理 kara-templater 模板（`aegisub_karaoke` 配置，双行模式 + 逐字歌词时生效）
-
-## 仅编译 C++ 部分
-
-```bash
-meson setup build
-meson compile -C build
-```
+- [x] **Python 输入事件接口** — 将 overlay 接收到的键盘/鼠标事件封装为 Python 接口，支持在 Python 层面处理输入事件
+- [x] **延迟控制** — 字幕延迟偏移功能（offset）
+- [ ] **Aegisub CLI 集成** — 调用 aegisub-cli 处理 kara-templater 模板（`aegisub_karaoke` 配置，双行模式 + 逐字歌词时生效）
+- [ ] **自定义配置快捷键支持** — 支持用户自定义快捷键绑定（当前为内置快捷键）
 
 ---
 
@@ -297,43 +225,19 @@ layrics is a desktop lyrics overlay: it fetches playback state from MPRIS-compat
 
 ## Features
 
-- **MPRIS integration**: auto-detects and syncs with MPRIS-compatible players (spotify, mpv, mpd, etc.), following play/pause/track changes
+- **MPRIS integration**: auto-detects and syncs with MPRIS-compatible players (spotify, mpv, mpd, etc.), following play/pause/track changes (also provides first-party MPD support)
 - **Multi-source lyric fetching**: parallel search across QQ Music (QM), NetEase (NE), Kugou (KG), LRCLIB with automatic song matching
 - **Layer Shell overlay**: auto-floating layer based on `wlr-layer-shell`, no compositor-specific setup required
 - **libass rendering**: supports ASS subtitle features including karaoke (`\k`), styling, fonts, and effects
 - **Vulkan hardware acceleration**: GPU-accelerated rendering
 - **Aegisub karaoke templating**: optionally processes word-timed lyrics through aegisub-cli's kara-templater for advanced karaoke effects
-- **Song-to-lyrics cache**: SQLite song match cache
+- **Song-to-lyrics cache**: local song match cache
 - **Drag support**: click and drag the overlay to reposition subtitles
-- **IPC control**: Unix domain socket JSON protocol for programmatic control
+- **Right-click menu**: right-click the lyrics to open a menu (search songs / show / lock / ASS config / FPS / player / cache, etc.)
+- **IPC control**: control via the `layctl` CLI or scripts
 - **Configurable output**: TOML configuration for fonts, colors, positioning, render modes, and lyric track selection
 
-## Architecture
-
-```
-layrics (Python)                    C++ overlay (core/)
-├── main.py          IPC server     ├── Application      event loop, frame scheduling
-│   ├── MPRIS sync  MPRIS polling  ├── ApplicationController  thread-safe command queue
-│   ├── lyric fetch LDDC adapter   ├── RenderManager     render flow + drag offset
-│   └── IPC server  Unix socket    ├── AssRenderer       libass -> R8 texture atlas
-├── lyricsource.py  search/fetch   ├── LayerSurface      wlr-layer-shell surface
-├── LDDC/           bundled slimmed lyric library
-├── matching.py     song matching  ├── VulkanContext     instance/swapchain/present
-├── cache.py        song cache     ├── FrameRateLimiter  target FPS limiting
-├── layctl.py       control CLI    ├── DamageGrid        per-tile damage tracking
-├── mpris.py        D-Bus signals  ├── InputManager      wl_pointer events
-├── assprovider/    ASS generation ├── DragManager       drag state machine
-├── karaoke/        Aegisub kara-templater headers
-├── config.py       TOML config     ├── RegionManager     input region
-                                    ├── CursorTracker     global cursor (Hyprland)
-                                    ├── CursorManager     hover/drag cursor
-                                    ├── WaylandContext   display, globals, event loop
-                                    └── binding.cpp      pybind11 bindings
-```
-
 ## Installation
-
-### System dependencies
 
 ### System dependencies
 
@@ -343,11 +247,6 @@ layrics (Python)                    C++ overlay (core/)
 - `shaderc`
 - `libass`
 - `uv`
-
-### Python dependencies (installed automatically via pip)
-
-- `meson-python`, `pybind11` (build)
-- `httpx[brotli,http2]`, `dbus-python`, `PyGObject`, `click`, `diskcache`, `pyaes`, `appdirs` (runtime)
 
 ### Install
 
@@ -376,7 +275,7 @@ layrics
 
 The daemon:
 1. Connects to Wayland and creates an overlay surface
-2. Auto-selects an MPRIS-compatible player
+2. Watches all players on the machine, following the playing source
 3. Polls for track changes and fetches lyrics automatically
 
 Optional arguments:
@@ -385,11 +284,12 @@ Optional arguments:
 ### Control with layctl
 
 ```bash
-# List available MPRIS players
+# List available sources
 layctl players
 
-# Select a specific player
+# Pin a source (a bus name or "mpd"); pass auto to follow the playing one
 layctl set-player org.mpris.MediaPlayer2.mpd
+layctl set-player auto
 
 # Search for songs
 layctl search "Eternal Feather"
@@ -447,6 +347,22 @@ layctl ass-get
 
 ### Hotkeys
 
+#### Built-in hotkeys (the overlay captures the keyboard while hovering lyrics)
+
+> **WIP**: custom key bindings are not supported yet.
+
+| Key | Action |
+|---|---|
+| `Z` | delay lyrics by 100ms |
+| `X` | advance lyrics by 100ms |
+| `C` | reset the delay (re-align to the player's position) |
+
+> The delay is saved per song and restored when the song plays again, and survives seeking / pausing / play-pause switching.
+
+The keys only apply while the pointer hovers the lyrics; they return to normal after the pointer leaves.
+
+#### Desktop keybindings (Hyprland example)
+
 Example Hyprland keybindings:
 
 ```lua
@@ -455,17 +371,6 @@ hl.bind("Control_L", hl.dsp.exec_cmd [[layctl lock toggle]], { long_press = true
 hl.bind("Alt_L", hl.dsp.exec_cmd [[layctl hide toggle]], { long_press = true })
 hl.bind("SUPER + SHIFT + M", hl.dsp.exec_cmd [[layctl dmenu]])
 ```
-
-### IPC Protocol
-
-The daemon listens on a Unix domain socket. Requests and responses are JSON lines:
-
-```
-{"id": 1, "method": "list_players"}
-{"id": 1, "type": "result", "data": [{"bus_name": "...", "identity": "..."}]}
-```
-
-Available methods: `list_players`, `select_player`, `search_songs`, `fetch_lyrics`, `load_ass`, `hide`, `unhide`, `lock`, `unlock`, `set_fps`, `stop`, `start`, `get_status`, `cache_list`, `cache_set`, `cache_remove`, `ass_get`, `ass_set`.
 
 ## Configuration
 
@@ -482,41 +387,24 @@ Configuration is loaded from `~/.config/layrics/config.toml` (or `$LAYRICS_CONFI
 | `LAYRICS_SOCK` | IPC socket path | `$XDG_RUNTIME_DIR/layrics.sock` |
 | `LAYRICS_DMENU` | menu program used by `layctl dmenu` (overrides `[dmenu] program`) | `dmenu` |
 
-## ASS Provider System
+## Lyrics rendering
 
-The `assprovider` package handles converting LRC lyrics to ASS subtitle format.
+- **Karaoke** (`karaoke=true`): syllable-by-syllable colour fill; `PrimaryColour` is the sung colour, `SecondaryColour` the upcoming one
+- **Single line** (`line_mode="single"`): one centered line, optionally with a translation/romaji second line
+- **Double line** (`line_mode="double"`): two lines shown side by side; with `advance_ms` they appear dimmed before their play time and light up when it starts
 
-### Modes
+Lyrics language (Japanese/Korean/Chinese/English) is detected automatically and the matching font is picked from `[fonts]`.
 
-- **Karaoke** (`karaoke=true`): generates `\kf` tags for syllable-by-syllable color fill. `PrimaryColour` is the fill/overlay colour, `SecondaryColour` is the dim/waiting colour.
-- **Single line** (`line_mode="single"`): one line at a time, centered, with optional secondary language (translation/romaji) below.
-- **Double line** (`line_mode="double"`): two lines displayed simultaneously (left/right alternating). With `advance_ms`, lines appear dimmed during the pre-display window and switch to full brightness when their play time begins.
-
-### Language detection
-
-The provider auto-detects lyrics language by character set analysis (kana -> Japanese, hangul -> Korean, CJK -> Chinese, Latin -> English) and selects the appropriate font from the configuration.
-
-### Song matching
-
-When fetching lyrics for the current track, the system:
-1. Searches for the song across all available sources
-2. Scores candidates by title similarity, duration difference, and artist similarity
-3. Selects the best match using a cascade scoring system
+When fetching, all configured lyric sources are searched and the best match is chosen by title, duration and artist similarity.
 
 ## Roadmap
 
-- [ ] **Python input event interface** — expose keyboard/mouse events from the overlay as Python interfaces for Python-level input handling
-- [ ] **Delay control** — subtitle delay offset
-- [x] **Aegisub CLI integration** — invoke aegisub-cli for kara-templater processing (`aegisub_karaoke` config, active in double-line mode with word-timed lyrics)
+- [x] **Python input event interface** — expose keyboard/mouse events from the overlay as Python interfaces for Python-level input handling
+- [x] **Delay control** — subtitle delay offset
+- [ ] **Aegisub CLI integration** — invoke aegisub-cli for kara-templater processing (`aegisub_karaoke` config, active in double-line mode with word-timed lyrics)
+- [ ] **Configurable custom hotkeys** — user-configurable key bindings (currently built-in only)
 
-## Building from source (C++ only)
-
-```bash
-meson setup build
-meson compile -C build
-```
-
- ## License
+## License
 
 GNU General Public License v3.0 only
 
