@@ -29,6 +29,7 @@ layrics 是一款桌面歌词软件：从 MPRIS 兼容的播放器（Spotify、m
 - **歌曲-歌词缓存**：匹配结果本地缓存
 - **拖拽支持**：点击拖拽覆盖层重新定位字幕位置
 - **右键菜单**：悬停字幕时右键弹出菜单（搜索歌词/显示/锁定/ASS 配置/帧率/播放器/缓存等）
+- **系统托盘**：托盘图标（StatusNotifierItem）左键切换歌词显隐，右键菜单与歌词右键一致
 - **歌词显隐动画**：显示/隐藏覆盖层时播放转场动画（淡入淡出、上浮、缩放、逐字错峰等 11 种）
 - **IPC控制**：通过 `layctl` 命令行或脚本控制
 - **可配置输出**：TOML 配置字体、颜色、定位、渲染模式、歌词轨道选择
@@ -74,6 +75,7 @@ layrics
 1. 连接 Wayland 并创建覆盖层 surface
 2. 同时监测本机所有播放器，跟随正在播放的源
 3. 轮询曲目变化并自动获取歌词
+4. 在系统托盘显示图标：左键切换歌词显隐，右键打开操作菜单
 
 可选参数：
 - `--socket, -s PATH`  — 自定义 IPC socket 路径（默认：`$XDG_RUNTIME_DIR/layrics.sock`）
@@ -235,6 +237,7 @@ layrics is a desktop lyrics overlay: it fetches playback state from MPRIS-compat
 - **Song-to-lyrics cache**: local song match cache
 - **Drag support**: click and drag the overlay to reposition subtitles
 - **Right-click menu**: right-click the lyrics to open a menu (search songs / show / lock / ASS config / FPS / player / cache, etc.)
+- **System tray**: tray icon (StatusNotifierItem); left click toggles the overlay, right click opens the same menu as the in-overlay right click
 - **Show/hide animation**: transition effects when the overlay appears or disappears (fade, rise, zoom, per-glyph stagger, 11 effects in total)
 - **IPC control**: control via the `layctl` CLI or scripts
 - **Configurable output**: TOML configuration for fonts, colors, positioning, render modes, and lyric track selection
@@ -279,6 +282,7 @@ The daemon:
 1. Connects to Wayland and creates an overlay surface
 2. Watches all players on the machine, following the playing source
 3. Polls for track changes and fetches lyrics automatically
+4. Shows a system tray icon: left click toggles the overlay, right click opens the menu
 
 Optional arguments:
 - `--socket, -s PATH`  — custom IPC socket path (default: `$XDG_RUNTIME_DIR/layrics.sock`)

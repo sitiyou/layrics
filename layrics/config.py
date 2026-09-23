@@ -116,6 +116,14 @@ class DmenuConfig:
     program: str = "dmenu"
 
 
+@dataclass
+class TrayConfig:
+    """系统托盘（StatusNotifierItem）图标。"""
+
+    enabled: bool = True
+    icon: str = ""
+
+
 class Config:
     def __init__(self):
         self.search = SearchConfig()
@@ -126,6 +134,7 @@ class Config:
         self.style = StyleConfig()
         self.lyrics = LyricsConfig()
         self.dmenu = DmenuConfig()
+        self.tray = TrayConfig()
         self._provider_config: dict[str, dict[str, Any]] = {}
         self._load()
         self._provider_config.setdefault(
@@ -240,6 +249,16 @@ class Config:
             raw_program = raw_dmenu.get("program")
             if isinstance(raw_program, str) and raw_program.strip():
                 self.dmenu.program = raw_program.strip()
+
+        # [tray]
+        raw_tray = data.get("tray", {})
+        if isinstance(raw_tray, dict):
+            raw_enabled = raw_tray.get("enabled")
+            if isinstance(raw_enabled, bool):
+                self.tray.enabled = raw_enabled
+            raw_icon = raw_tray.get("icon")
+            if isinstance(raw_icon, str) and raw_icon.strip():
+                self.tray.icon = raw_icon.strip()
 
         # [assprovider.*]
         raw_assprovider = data.get("assprovider", {})

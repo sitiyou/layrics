@@ -55,6 +55,8 @@ PYBIND11_MODULE(core, m) {
                 ctrl.setUiMenu(parseMenuItems(items));
             },
             py::arg("items"))
+        .def("open_ui_menu", &ApplicationController::openUiMenu,
+             py::arg("x"), py::arg("y"))
         .def(
             "set_animation",
             [](ApplicationController &ctrl, const std::string &effect,

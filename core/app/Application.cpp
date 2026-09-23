@@ -239,6 +239,11 @@ void Application::processState() {
         m_processCommands();
     }
 
+    if (m_openMenuRequested) {
+        m_openMenuRequested = false;
+        m_uiMgr.openAt(m_openMenuX, m_openMenuY);
+    }
+
     if (m_state.hidden && !prevHidden) {
         // Entering hidden: close the menu, stop accepting pointer input at
         // once, then play the hide animation. The surface keeps its last
@@ -256,7 +261,10 @@ void Application::processState() {
         m_introPlayed = true;
     }
     m_transition.update(nowMs());
-    if (m_state.hidden && !m_hideFinalized && !m_transition.isActive()) {
+    if (m_state.hidden && !m_hideFinalized && !m_transition.isActive() &&
+        !m_uiMgr.isActive()) {
+        // Defer the teardown while a menu (e.g. from the tray) is up: the
+        // transparent present would wipe its pixels.
         hideDisplay();
         m_hideFinalized = true;
     }
@@ -287,7 +295,8 @@ void Application::processState() {
     // Restart the frame chain when needed (unhide, unpause, drag, menu) with
     // no frame in flight.
     bool needsFrame = !m_frameCallback && m_vk.isReady() &&
-                      (!m_state.hidden || m_transition.isActive()) &&
+                      (!m_state.hidden || m_transition.isActive() ||
+                       m_uiMgr.isActive()) &&
                       (!m_state.paused || m_dragMgr.isDragging() ||
                        m_uiMgr.isActive() || m_transition.isActive());
     if (needsFrame) {
@@ -315,7 +324,8 @@ void Application::onFrame(uint32_t time) {
 
     // Hidden/paused: frozen frame stays unless dragging or the menu is open.
     // Returning without requestFrame() stops the frame chain.
-    if ((m_state.hidden && !m_transition.isActive()) ||
+    if ((m_state.hidden && !m_transition.isActive() &&
+         !m_uiMgr.isActive()) ||
         (m_state.paused && !m_dragMgr.isDragging() && !m_uiMgr.isActive() &&
          !m_transition.isActive())) {
         return;
@@ -329,7 +339,11 @@ void Application::onFrame(uint32_t time) {
 }
 
 void Application::produceFrame(int64_t timestampMs) {
-    m_renderMgr.prepare(timestampMs);
+    // While hidden the ASS input stays loaded, so prepare() would re-render the
+    // lyrics; only the menu (if any) may be painted on a hidden frame.
+    if (!m_state.hidden || m_transition.isActive()) {
+        m_renderMgr.prepare(timestampMs);
+    }
     // Glyphs appearing for the first time animate in; this must be decided
     // after prepare() so it sees this frame's real content.
     if (!m_introPlayed && !m_state.hidden && !m_transition.isActive() &&
@@ -405,7 +419,14 @@ void Application::produceFrame(int64_t timestampMs) {
 }
 
 void Application::updateInputRegion() {
-    if (m_state.locked || !m_surface.isConfigured()) {
+    if (!m_surface.isConfigured()) {
+        return;
+    }
+    // Locked makes the overlay click-through; an open menu (e.g. opened from
+    // the tray) is the only area that stays interactive, so the region is
+    // cleared once it is gone.
+    if (m_state.locked && !m_uiMgr.isMenuOpen()) {
+        m_regionMgr.clear(m_waylandCtx.compositor, m_surface.surface());
         return;
     }
     if (m_transition.isActive()) {
@@ -417,11 +438,13 @@ void Application::updateInputRegion() {
     }
 
     std::vector<RenderRect> regions;
-    if (m_renderMgr.hasContentChanged()) {
-        // Grid cells were populated in produceFrame (before the present).
-        regions = m_damageGrid.buildRegions();
-    } else {
-        regions = m_renderMgr.regions();
+    if (!m_state.locked) {
+        if (m_renderMgr.hasContentChanged()) {
+            // Grid cells were populated in produceFrame (before the present).
+            regions = m_damageGrid.buildRegions();
+        } else {
+            regions = m_renderMgr.regions();
+        }
     }
     // The menu must stay interactive: merge its rect into the input region.
     if (m_uiMgr.isMenuOpen()) {
@@ -498,6 +521,12 @@ void Application::setUiMenuItems(std::vector<UiMenuItem> items) {
     LAY_DEBUG("UI menu items updated");
 }
 
+void Application::openUiMenu(double x, double y) {
+    m_openMenuX = x;
+    m_openMenuY = y;
+    m_openMenuRequested = true;
+}
+
 void Application::onUiAction(const std::string &action) {
     if (action == "reset_drag") {
         resetDrag();
@@ -563,11 +592,12 @@ void Application::updateCursor() {
         return;
     }
 
-    if (m_state.locked) {
-        m_cursorMgr.restoreCursor(pointer, serial); // locked: hidden cursor
-    } else if (m_uiMgr.isMenuOpen()) {
-        // Menu open: show the default arrow instead of the hover hand.
+    if (m_uiMgr.isMenuOpen()) {
+        // Menu open: show the default arrow instead of the hover hand (also
+        // while locked, otherwise the menu would be unusable).
         m_cursorMgr.setDefaultCursor(pointer, serial);
+    } else if (m_state.locked) {
+        m_cursorMgr.restoreCursor(pointer, serial); // locked: hidden cursor
     } else if (m_dragMgr.isDragging()) {
         m_cursorMgr.setGrabbingCursor(pointer, serial);
     } else {

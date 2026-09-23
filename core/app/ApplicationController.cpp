@@ -52,6 +52,13 @@ void ApplicationController::setUiMenu(std::vector<UiMenuItem> items) {
     m_hasPendingUiMenu = true;
 }
 
+void ApplicationController::openUiMenu(double x, double y) {
+    std::lock_guard<std::mutex> lock(m_mutex);
+    m_pendingMenuX = x;
+    m_pendingMenuY = y;
+    m_hasPendingOpenMenu = true;
+}
+
 void ApplicationController::setStatus(const PendingUpdate &update) {
     std::lock_guard<std::mutex> lock(m_mutex);
     if (update.mask & PendingUpdate::PAUSED)
@@ -87,6 +94,9 @@ void ApplicationController::processPendingCommands() {
     std::string assContent;
     std::vector<UiMenuItem> uiMenu;
     bool hasUiMenu = false;
+    double menuX = 0.0;
+    double menuY = 0.0;
+    bool hasOpenMenu = false;
     {
         std::lock_guard<std::mutex> lock(m_mutex);
         pending = m_pending;
@@ -95,6 +105,10 @@ void ApplicationController::processPendingCommands() {
         hasUiMenu = m_hasPendingUiMenu;
         m_hasPendingUiMenu = false;
         uiMenu = std::move(m_pendingUiMenu);
+        hasOpenMenu = m_hasPendingOpenMenu;
+        m_hasPendingOpenMenu = false;
+        menuX = m_pendingMenuX;
+        menuY = m_pendingMenuY;
     }
 
     if (pending.mask & PendingUpdate::PAUSED)
@@ -115,6 +129,8 @@ void ApplicationController::processPendingCommands() {
         m_app.loadAssContent(std::move(assContent));
     if (hasUiMenu)
         m_app.setUiMenuItems(std::move(uiMenu));
+    if (hasOpenMenu)
+        m_app.openUiMenu(menuX, menuY);
 }
 
 void ApplicationController::pushKeyEvent(const KeyEvent &event) {

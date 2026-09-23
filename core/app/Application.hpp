@@ -41,6 +41,9 @@ class Application {
     void loadAssContent(const std::string &content);
     void requestStop();
     void setUiMenuItems(std::vector<UiMenuItem> items);
+    // Queue a menu open at surface coordinates (tray ContextMenu); consumed by
+    // processState().
+    void openUiMenu(double x, double y);
 
     // Pure state setters — no side-effects
     void setPaused(bool v) { m_state.paused = v; }
@@ -93,6 +96,9 @@ class Application {
     std::function<void(const KeyEvent &)> m_keyEventSink;
     std::function<void(const std::string &)> m_uiEventSink;
     bool m_uiMenuWasOpen = false;
+    bool m_openMenuRequested = false;
+    double m_openMenuX = 0.0;
+    double m_openMenuY = 0.0;
 
     // Frozen rendering timestamp (CLOCK_MONOTONIC ms) while paused; captured
     // in mainLoop() when the pause command is processed.

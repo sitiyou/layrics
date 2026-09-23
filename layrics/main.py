@@ -65,6 +65,7 @@ from .player import (
     open_source,
     pick_active_source,
 )
+from .tray import TrayIcon
 from .uimanager import UIManager
 
 logging.basicConfig(
@@ -137,6 +138,7 @@ class LayricsApp:
         self.key_manager = KeyManager(self)
         self.ui_manager = UIManager(self)
         self._config = get_config()
+        self._tray = TrayIcon(self, icon_path=self._config.tray.icon)
         self._sources: dict[str, PlayerSource] = {}
         self._monitors: dict[str, Any] = {}  # source id -> change monitor (has an fd)
         self._active_id: str | None = None
@@ -192,6 +194,19 @@ class LayricsApp:
     async def ui_action(self, action: str) -> None:
         """Dispatch a right-click menu action (handling lives in menu.py)."""
         await menu.handle_action(self, action)
+
+    async def toggle_visibility(self) -> None:
+        """Toggle the overlay's visibility (tray left click)."""
+        self.ctrl.set_status(hidden=not self.ctrl.state.hidden)
+
+    async def open_menu_at(self, x: int, y: int) -> None:
+        """Open the right-click menu at screen coordinates (tray context menu).
+
+        The core shows its cached items immediately, then they are rebuilt
+        with fresh state, mirroring the in-overlay right-click path.
+        """
+        self.ctrl.open_ui_menu(x, y)
+        await self.refresh_menu()
 
     async def refresh_menu(self) -> None:
         """Rebuild the menu items from current state and push them to the core.
@@ -1012,6 +1027,8 @@ class LayricsApp:
         poller_task = asyncio.create_task(self._player_poller())
         key_poller_task = asyncio.create_task(self.key_manager.poller())
         ui_poller_task = asyncio.create_task(self.ui_manager.poller())
+        if self._config.tray.enabled:
+            self._tray.start(asyncio.get_running_loop())
 
         try:
             await self._server.serve_forever()
@@ -1025,6 +1042,7 @@ class LayricsApp:
             await self._server.wait_closed()
 
     def cleanup(self):
+        self._tray.stop()
         for source_id in list(self._sources):
             self._detach_source(source_id)
         try:

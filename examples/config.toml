@@ -117,6 +117,13 @@ secondary = true
 [dmenu]
 program = "dmenu"
 
+# 系统托盘图标（StatusNotifierItem）
+# enabled: 是否显示托盘图标（左键切换歌词显隐，右键打开操作菜单）
+# icon: 自定义图标路径，留空使用内置图标
+[tray]
+enabled = true
+# icon = "/path/to/icon.png"
+
 # 单行模式设置
 # margin_v_bottom: 副歌词不存在时主歌词的底部边距
 [assprovider.default.single]
