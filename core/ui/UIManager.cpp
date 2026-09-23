@@ -169,7 +169,11 @@ void UIManager::build() {
 
 void UIManager::renderItems(const std::vector<UiMenuItem> &items,
                             std::string &action) {
-    for (const auto &item : items) {
+    // Labels alone are the ID: search results can repeat the same
+    // title/artist/album string, so index the ID stack to disambiguate.
+    for (size_t i = 0; i < items.size(); i++) {
+        const UiMenuItem &item = items[i];
+        ImGui::PushID(static_cast<int>(i));
         if (!item.children.empty()) {
             if (ImGui::BeginMenu(item.label.c_str())) {
                 renderItems(item.children, action);
@@ -181,6 +185,7 @@ void UIManager::renderItems(const std::vector<UiMenuItem> &items,
                 action = item.action;
             }
         }
+        ImGui::PopID();
     }
 }
 
