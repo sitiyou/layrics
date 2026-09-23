@@ -11,10 +11,44 @@
 
 #include <algorithm>
 #include <climits>
+#include <cmath>
 #include <unistd.h>
 #include <utility>
 
 #include <fontconfig/fontconfig.h>
+
+namespace {
+
+// Horizontal room reserved for a menu row beyond its label: checkmark and
+// arrow columns plus window padding.
+constexpr float kLabelReserve = 4.0f;
+
+// Menu popups autosize to their content. An over-wide child menu has no room
+// left on either side of its parent, so FindBestWindowPosForPopupEx drops it on
+// top of the parent, whose items can then never be hovered again.
+std::string ellipsizeLabel(const std::string &text, float maxWidth) {
+    if (text.empty() || maxWidth <= 0.0f ||
+        ImGui::CalcTextSize(text.c_str()).x <= maxWidth) {
+        return text;
+    }
+    static const char kEllipsis[] = "\xE2\x80\xA6";
+    const float ellipsisWidth = ImGui::CalcTextSize(kEllipsis).x;
+    const char *begin = text.c_str();
+    const char *end = begin + text.size();
+    const char *fit = begin;
+    for (const char *cursor = begin; cursor < end;) {
+        unsigned int codepoint = 0;
+        const char *next = cursor + ImTextCharFromUtf8(&codepoint, cursor, end);
+        if (ImGui::CalcTextSize(begin, next).x + ellipsisWidth > maxWidth) {
+            break;
+        }
+        fit = next;
+        cursor = next;
+    }
+    return text.substr(0, static_cast<size_t>(fit - begin)) + kEllipsis;
+}
+
+} // namespace
 
 UIManager::~UIManager() { shutdown(); }
 
@@ -117,6 +151,8 @@ void UIManager::shutdown() {
     m_closeRequested = false;
     m_needsClear = false;
     m_menuRect = {};
+    m_scrollItemId = 0;
+    m_scrollStartTime = 0.0;
 }
 
 void UIManager::newFrame() {
@@ -150,7 +186,9 @@ void UIManager::build() {
         }
         // Content is defined on the Python side (rendered as-is, submenus
         // for items with children; disabled entries have an empty action).
-        renderItems(m_items, action);
+        const float labelWidth =
+            ImGui::GetIO().DisplaySize.x - kLabelReserve * ImGui::GetFontSize();
+        renderItems(m_items, action, labelWidth);
         ImGui::EndPopup();
         m_menuOpen = true;
     } else if (m_menuOpen) {
@@ -168,18 +206,46 @@ void UIManager::build() {
 }
 
 void UIManager::renderItems(const std::vector<UiMenuItem> &items,
-                            std::string &action) {
+                            std::string &action, float maxLabelWidth) {
     // Labels alone are the ID: search results can repeat the same
     // title/artist/album string, so index the ID stack to disambiguate.
     for (size_t i = 0; i < items.size(); i++) {
         const UiMenuItem &item = items[i];
         ImGui::PushID(static_cast<int>(i));
+        const std::string label = ellipsizeLabel(item.label, maxLabelWidth);
         if (!item.children.empty()) {
-            if (ImGui::BeginMenu(item.label.c_str())) {
-                renderItems(item.children, action);
+            // Budget the child labels from this window's free space on either
+            // side; the side with more room is where ImGui will place the
+            // child menu, so keeping its content within that budget guarantees
+            // a side-by-side placement instead of an overlapping fallback.
+            const ImGuiWindow *win = ImGui::GetCurrentWindow();
+            const ImVec2 displaySize = ImGui::GetIO().DisplaySize;
+            const float reserve = kLabelReserve * ImGui::GetFontSize();
+            const float sideRoom =
+                ImMax(win->Pos.x, displaySize.x - (win->Pos.x + win->Size.x));
+            const float childMaxLabel = ImMax(sideRoom - reserve, reserve);
+            ImGui::SetNextWindowSizeConstraints(
+                ImVec2(0.0f, 0.0f),
+                ImVec2(childMaxLabel + reserve, displaySize.y));
+            if (ImGui::BeginMenu(label.c_str())) {
+                renderItems(item.children, action, childMaxLabel);
                 ImGui::EndMenu();
             }
-        } else if (ImGui::MenuItem(item.label.c_str(), nullptr, false,
+        } else if (label != item.label) {
+            // Hide MenuItem()'s own (ellipsized) text; the label is redrawn
+            // below so a hover marquee can scroll it inside its column.
+            const ImVec2 itemPos = ImGui::GetCursorScreenPos();
+            ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(0, 0, 0, 0));
+            const bool clicked =
+                ImGui::MenuItem(label.c_str(), nullptr, false,
+                                !item.action.empty());
+            ImGui::PopStyleColor();
+            if (clicked && !item.action.empty()) {
+                action = item.action;
+            }
+            renderScrollingLabel(itemPos.x, itemPos.y, label, item.label,
+                                 !item.action.empty());
+        } else if (ImGui::MenuItem(label.c_str(), nullptr, false,
                                    !item.action.empty())) {
             if (!item.action.empty()) {
                 action = item.action;
@@ -187,6 +253,62 @@ void UIManager::renderItems(const std::vector<UiMenuItem> &items,
         }
         ImGui::PopID();
     }
+}
+
+// Draws a menu label inside its label column, scrolled on hover (hold, scroll
+// to the end, hold, restart) so the full text stays readable without widening
+// the menu. Falls back to the ellipsized text when the item is not hovered.
+void UIManager::renderScrollingLabel(float posX, float posY,
+                                     const std::string &base,
+                                     const std::string &full, bool enabled) {
+    ImGuiWindow *window = ImGui::GetCurrentWindow();
+    const ImGuiMenuColumns &columns = window->DC.MenuColumns;
+    const float fontSize = ImGui::GetFontSize();
+    const float x0 = posX + columns.OffsetLabel;
+    const float x1 = x0 + columns.Widths[1];
+    const float y0 = posY + window->DC.CurrLineTextBaseOffset;
+    const float visible = x1 - x0;
+    if (visible <= 0.0f) {
+        return;
+    }
+
+    ImDrawList *drawList = window->DrawList;
+    const ImU32 color =
+        ImGui::GetColorU32(enabled ? ImGuiCol_Text : ImGuiCol_TextDisabled);
+    const unsigned int itemId = ImGui::GetItemID();
+    const float maxOffset =
+        ImMax(0.0f, ImGui::CalcTextSize(full.c_str()).x - visible);
+    if (!ImGui::IsItemHovered() || maxOffset <= 0.0f) {
+        if (itemId == m_scrollItemId) {
+            m_scrollItemId = 0;
+        }
+        drawList->PushClipRect(ImVec2(x0, y0), ImVec2(x1, y0 + fontSize),
+                               true);
+        drawList->AddText(ImVec2(x0, y0), color, base.c_str());
+        drawList->PopClipRect();
+        return;
+    }
+
+    const double now = ImGui::GetTime();
+    if (itemId != m_scrollItemId) {
+        m_scrollItemId = itemId;
+        m_scrollStartTime = now;
+    }
+    const float hold = 0.8f;
+    const float endHold = 1.2f;
+    const float speed = 60.0f * (fontSize / 20.0f);
+    const float scrollTime = maxOffset / speed;
+    const float elapsed = static_cast<float>(now - m_scrollStartTime);
+    const float phase = std::fmod(elapsed, hold + scrollTime + endHold);
+    float offset = maxOffset;
+    if (phase < hold) {
+        offset = 0.0f;
+    } else if (phase < hold + scrollTime) {
+        offset = (phase - hold) * speed;
+    }
+    drawList->PushClipRect(ImVec2(x0, y0), ImVec2(x1, y0 + fontSize), true);
+    drawList->AddText(ImVec2(x0 - offset, y0), color, full.c_str());
+    drawList->PopClipRect();
 }
 
 // Captures the menu rect from the rendered draw data: window rect queries

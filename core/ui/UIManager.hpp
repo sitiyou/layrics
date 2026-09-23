@@ -61,8 +61,10 @@ class UIManager {
 
   private:
     void build();
-    void renderItems(const std::vector<UiMenuItem> &items,
-                     std::string &action);
+    void renderItems(const std::vector<UiMenuItem> &items, std::string &action,
+                     float maxLabelWidth);
+    void renderScrollingLabel(float posX, float posY, const std::string &base,
+                              const std::string &full, bool enabled);
 
     VulkanContext *m_vk = nullptr;
     bool m_initialized = false;
@@ -74,6 +76,8 @@ class UIManager {
     RenderRect m_menuRect{};
     std::vector<UiMenuItem> m_items;
     std::function<void(const std::string &)> m_actionCb;
+    unsigned int m_scrollItemId = 0;
+    double m_scrollStartTime = 0.0;
 
     void updateMenuRect();
 };
