@@ -292,13 +292,14 @@ void Application::processState() {
         m_renderMgr.setSize(m_vk.width(), m_vk.height());
     }
 
-    // Restart the frame chain when needed (unhide, unpause, drag, menu) with
-    // no frame in flight.
+    // Restart the frame chain when needed (unhide, unpause, drag/menu,
+    // offset reset) with no frame in flight.
     bool needsFrame = !m_frameCallback && m_vk.isReady() &&
                       (!m_state.hidden || m_transition.isActive() ||
                        m_uiMgr.isActive()) &&
                       (!m_state.paused || m_dragMgr.isDragging() ||
-                       m_uiMgr.isActive() || m_transition.isActive());
+                       m_uiMgr.isActive() || m_transition.isActive() ||
+                       m_renderMgr.hasOffsetChanged());
     if (needsFrame) {
         int64_t ts = m_state.paused ? m_freezeTimestampMs
                                     : nowMs() - m_state.startTimeMs;
@@ -364,10 +365,11 @@ void Application::produceFrame(int64_t timestampMs) {
     }
 
     // Nothing changed: stop the frame chain (static lyrics cost ~0 GFX).
-    // needsFrame restarts it when libass or the menu reports new content.
+    // needsFrame restarts it when libass, the menu or the drag offset reports
+    // a change.
     if (!m_renderMgr.hasContentChanged() && !m_dragMgr.isDragging() &&
-        !m_uiMgr.isActive() && m_renderMgr.hasRendered() &&
-        !m_transition.isActive()) {
+        !m_renderMgr.hasOffsetChanged() && !m_uiMgr.isActive() &&
+        m_renderMgr.hasRendered() && !m_transition.isActive()) {
         return;
     }
 
@@ -528,10 +530,6 @@ void Application::openUiMenu(double x, double y) {
 }
 
 void Application::onUiAction(const std::string &action) {
-    if (action == "reset_drag") {
-        resetDrag();
-        return;
-    }
     if (m_uiEventSink) {
         m_uiEventSink(action);
     }

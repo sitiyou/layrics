@@ -163,7 +163,8 @@ class KeyManager:
 
     def _register_defaults(self):
         """Built-in bindings; business logic lives here, not in main.py."""
-        # Z: lyrics later, X: lyrics earlier, C: reset to player position.
+        # Z: lyrics later, X: lyrics earlier, C: reset to player position,
+        # R: reset the drag offset.
         self.register(
             "Z", lambda ev: self._app.adjust_lyrics_delay(self.LYRICS_DELAY_STEP_MS)
         )
@@ -171,6 +172,7 @@ class KeyManager:
             "X", lambda ev: self._app.adjust_lyrics_delay(-self.LYRICS_DELAY_STEP_MS)
         )
         self.register("C", self._reset_lyrics_delay)
+        self.register("R", lambda ev: self._app.reset_drag())
 
     def _reset_lyrics_delay(self, ev) -> None:
         """Reset the lyrics delay and re-align to the player's position."""

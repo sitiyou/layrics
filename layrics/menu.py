@@ -101,6 +101,7 @@ async def build_menu(app) -> list[dict]:
             "label": f"锁定（当前：{'已锁定' if s.locked else '未锁定'}）",
             "action": "lock",
         },
+        {"label": "复位拖拽", "action": "reset_drag"},
         {"label": f"卡拉OK（{'开' if karaoke else '关'}）", "action": "karaoke"},
         {
             "label": f"歌词模式（{'双行' if line_mode == 'double' else '单行'}）",
@@ -217,6 +218,8 @@ async def handle_action(app, action: str) -> None:
             app.ctrl.set_status(hidden=not app.ctrl.state.hidden)
         elif action == "lock":
             app.ctrl.set_status(locked=not app.ctrl.state.locked)
+        elif action == "reset_drag":
+            app.reset_drag()
         elif action in ("karaoke", "line_mode", "secondary"):
             await app.apply_ass_config(action, "toggle")
         elif action.startswith("fps:"):

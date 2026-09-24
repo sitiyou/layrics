@@ -44,6 +44,6 @@ void DragManager::onMotion(double x, double y) {
 void DragManager::reset() {
     m_state.offsetX = 0.0;
     m_state.offsetY = 0.0;
-    m_dragPrevX = 0.0;
-    m_dragPrevY = 0.0;
+    // If a drag is in flight, keep m_dragPrevX/Y at the cursor: the next
+    // motion rebases the offset to zero instead of jumping by (x - 0).
 }

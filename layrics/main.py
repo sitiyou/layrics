@@ -224,6 +224,10 @@ class LayricsApp:
         self.ctrl.set_status(target_fps=fps)
         self._config.overlay.target_fps = fps
 
+    def reset_drag(self) -> None:
+        """Reset the overlay's drag offset back to the origin."""
+        self.ctrl.reset_drag()
+
     async def apply_ass_config(self, key: str, raw_value: str) -> tuple[str, Any]:
         """Apply an ASS renderer config update; reloads lyrics when available.
 
@@ -758,6 +762,10 @@ class LayricsApp:
             elif method == "unlock":
                 self.ctrl.set_status(locked=False)
                 return {"id": req_id, "type": "result", "data": {"locked": False}}
+
+            elif method == "reset_drag":
+                self.reset_drag()
+                return {"id": req_id, "type": "result", "data": {"reset": True}}
 
             elif method == "set_fps":
                 fps = params.get("fps", -1)

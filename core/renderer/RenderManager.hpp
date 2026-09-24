@@ -26,6 +26,8 @@ class RenderManager {
 
     const std::vector<RenderRect> &regions() const { return m_regions; }
     bool hasContentChanged() const { return m_contentChanged; }
+    // A different offset than the last recorded frame still needs a repaint.
+    bool hasOffsetChanged() const { return m_offsetChanged; }
     bool hasRendered() const { return m_everRendered; }
 
     void reset();
@@ -40,5 +42,6 @@ class RenderManager {
 
     std::vector<RenderRect> m_regions;
     bool m_contentChanged = false;
+    bool m_offsetChanged = false;
     bool m_everRendered = false;
 };

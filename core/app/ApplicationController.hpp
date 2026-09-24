@@ -57,6 +57,9 @@ class ApplicationController {
     // Open the menu at surface coordinates, e.g. from the tray's ContextMenu.
     void openUiMenu(double x, double y);
 
+    // Reset the drag offset back to the origin.
+    void resetDrag();
+
     // Keyboard events captured on the render thread, drained from Python.
     void pushKeyEvent(const KeyEvent &event);
     std::vector<KeyEvent> pollKeyEvents();
@@ -80,6 +83,7 @@ class ApplicationController {
     double m_pendingMenuX = 0.0;
     double m_pendingMenuY = 0.0;
     bool m_hasPendingOpenMenu = false;
+    bool m_hasPendingResetDrag = false;
 
     std::deque<KeyEvent> m_keyEvents;
     static constexpr size_t kMaxKeyEvents = 128;

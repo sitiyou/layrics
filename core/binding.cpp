@@ -57,6 +57,7 @@ PYBIND11_MODULE(core, m) {
             py::arg("items"))
         .def("open_ui_menu", &ApplicationController::openUiMenu,
              py::arg("x"), py::arg("y"))
+        .def("reset_drag", &ApplicationController::resetDrag)
         .def(
             "set_animation",
             [](ApplicationController &ctrl, const std::string &effect,

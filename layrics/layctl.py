@@ -153,6 +153,13 @@ def unlock(ctx):
     _pp(_call(ctx.obj["socket"], "unlock"))
 
 
+@cli.command()
+@click.pass_context
+def reset(ctx):
+    """Reset the overlay's drag offset"""
+    _pp(_call(ctx.obj["socket"], "reset_drag"))
+
+
 @cli.command(name="set-fps", context_settings={"ignore_unknown_options": True})
 @click.argument("fps", type=int)
 @click.pass_context
@@ -440,7 +447,7 @@ def _print_status(sock: str, status: dict | None = None) -> None:
 )
 @click.pass_context
 def dmenu(ctx, program: str | None):
-    """Interactive menu: songs / visibility / lock / ASS config / FPS / player / cache / status"""
+    """Interactive menu: songs / visibility / lock / reset / ASS config / FPS / player / cache / status"""
     sock = ctx.obj["socket"]
     prog = _resolve_menu_program(program)
 
@@ -470,6 +477,7 @@ def dmenu(ctx, program: str | None):
         ("Search & set lyrics", "song"),
         (f"Toggle visibility ({'hidden' if hidden else 'shown'})", "hide"),
         (f"Toggle lock ({'on' if locked else 'off'})", "lock"),
+        ("Reset drag offset", "reset"),
         (f"Toggle karaoke ({'on' if karaoke else 'off'})", "karaoke"),
         (
             f"Toggle line mode ({'double' if line_mode == 'double' else 'single'})",
@@ -491,6 +499,8 @@ def dmenu(ctx, program: str | None):
         _call(sock, "hide", {"value": "toggle"})
     elif action == "lock":
         _call(sock, "lock", {"value": "toggle"})
+    elif action == "reset":
+        _call(sock, "reset_drag")
     elif action in ("karaoke", "line_mode", "secondary"):
         _call(sock, "ass_set", {"key": action, "value": "toggle"})
     elif action == "fps":

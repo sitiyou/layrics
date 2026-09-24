@@ -21,6 +21,9 @@ void RenderManager::setSize(int width, int height) {
 }
 
 void RenderManager::setOffset(double offsetX, double offsetY) {
+    if (offsetX != m_offsetX || offsetY != m_offsetY) {
+        m_offsetChanged = true;
+    }
     m_offsetX = offsetX;
     m_offsetY = offsetY;
 }
@@ -58,5 +61,6 @@ void RenderManager::recordDraws(VkCommandBuffer cmd) {
                        static_cast<float>(m_offsetY), m_width, m_height,
                        m_transition);
     }
+    m_offsetChanged = false;
     m_everRendered = true;
 }

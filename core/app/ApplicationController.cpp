@@ -59,6 +59,11 @@ void ApplicationController::openUiMenu(double x, double y) {
     m_hasPendingOpenMenu = true;
 }
 
+void ApplicationController::resetDrag() {
+    std::lock_guard<std::mutex> lock(m_mutex);
+    m_hasPendingResetDrag = true;
+}
+
 void ApplicationController::setStatus(const PendingUpdate &update) {
     std::lock_guard<std::mutex> lock(m_mutex);
     if (update.mask & PendingUpdate::PAUSED)
@@ -97,6 +102,7 @@ void ApplicationController::processPendingCommands() {
     double menuX = 0.0;
     double menuY = 0.0;
     bool hasOpenMenu = false;
+    bool hasResetDrag = false;
     {
         std::lock_guard<std::mutex> lock(m_mutex);
         pending = m_pending;
@@ -109,6 +115,8 @@ void ApplicationController::processPendingCommands() {
         m_hasPendingOpenMenu = false;
         menuX = m_pendingMenuX;
         menuY = m_pendingMenuY;
+        hasResetDrag = m_hasPendingResetDrag;
+        m_hasPendingResetDrag = false;
     }
 
     if (pending.mask & PendingUpdate::PAUSED)
@@ -131,6 +139,8 @@ void ApplicationController::processPendingCommands() {
         m_app.setUiMenuItems(std::move(uiMenu));
     if (hasOpenMenu)
         m_app.openUiMenu(menuX, menuY);
+    if (hasResetDrag)
+        m_app.resetDrag();
 }
 
 void ApplicationController::pushKeyEvent(const KeyEvent &event) {

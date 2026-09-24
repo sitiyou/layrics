@@ -102,7 +102,7 @@ layctl fetch
 # 设置当前曲目的歌词并更新缓存
 layctl set-lrc QM248672467
 
-# 交互式菜单：搜索歌曲 / 切换显示、锁定 / 修改 ASS 配置、帧率、播放器、缓存、状态
+# 交互式菜单：搜索歌曲 / 切换显示、锁定 / 复位拖拽 / 修改 ASS 配置、帧率、播放器、缓存、状态
 layctl dmenu
 
 # 显示/隐藏覆盖层
@@ -118,6 +118,9 @@ layctl lock true         # 锁定
 layctl lock false        # 解锁
 layctl lock toggle       # 切换锁定状态
 layctl unlock            # 等同于 lock false
+
+# 复位拖拽偏移
+layctl reset
 
 # 设置目标帧率
 layctl set-fps 30
@@ -157,6 +160,7 @@ layctl ass-get
 | `Z` | 歌词推迟 100ms |
 | `X` | 歌词提前 100ms |
 | `C` | 重置延迟（重新对齐播放器当前位置） |
+| `R` | 复位拖拽偏移 |
 
 > 延迟按歌曲保存，再次播放同一首歌时自动恢复，且 seek / 暂停 / 播放切换后保持。
 
@@ -309,7 +313,7 @@ layctl fetch
 # Set lyrics for current track and update cache
 layctl set-lrc QM248672467
 
-# Interactive menu: search songs / toggle visibility, lock / change ASS config, FPS, player, cache, status
+# Interactive menu: search songs / toggle visibility, lock / reset drag / change ASS config, FPS, player, cache, status
 layctl dmenu
 
 # Show/hide overlay
@@ -325,6 +329,9 @@ layctl lock true         # lock
 layctl lock false        # unlock
 layctl lock toggle       # toggle lock
 layctl unlock            # alias for lock false
+
+# Reset the drag offset
+layctl reset
 
 # Set target frame rate
 layctl set-fps 30
@@ -362,6 +369,7 @@ layctl ass-get
 | `Z` | delay lyrics by 100ms |
 | `X` | advance lyrics by 100ms |
 | `C` | reset the delay (re-align to the player's position) |
+| `R` | reset the drag offset |
 
 > The delay is saved per song and restored when the song plays again, and survives seeking / pausing / play-pause switching.
 
