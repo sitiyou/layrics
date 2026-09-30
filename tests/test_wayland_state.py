@@ -33,8 +33,10 @@ Style: Default,Noto Sans CJK JP,48,&H00FCDD1C,&H00FFFFFF,&H005C3317,&H4C000000,0
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-Dialogue: 0,0:00:00.00,0:00:30.00,Default,,0,0,0,,{\\kf80}千{\\kf80}本{\\kf80}桜
+Dialogue: 0,0:00:00.00,0:00:30.00,Default,,0,0,0,,{\\t(0,30000,\\fscx150\\fscy150)}千本桜
 """
+# The line must animate for the whole 30s dialogue: the frame chain stops
+# while content is static, so every phase has to keep changing.
 
 
 def wayland_available() -> bool:
@@ -162,6 +164,9 @@ def mark(tag):
 ctrl = ApplicationController()
 ctrl.start()
 ctrl.set_ass_input(ASS)
+# Driven directly here (no layrics.main), so seed the playback clock as
+# main.py does; otherwise the ASS timeline sits at the compositor time.
+ctrl.set_status(start_time_ms=int(time.monotonic() * 1000))
 time.sleep(2.0)
 mark("M1")
 ctrl.set_status(paused=True)
