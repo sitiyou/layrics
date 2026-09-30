@@ -24,7 +24,12 @@ layctl = "layrics.layctl:cli"
 
 [dependency-groups]
 # the build tools are here because build isolation is disabled for layrics (see tool.uv)
-dev = ["meson-python>=0.15", "pybind11>=2.12", "meson>=1.2.3"]
+dev = [
+    "meson-python>=0.15",
+    "pybind11>=2.12",
+    "meson>=1.2.3",
+    "pytest>=9.1.1",
+]
 
 [tool.uv]
 # meson-python rebuilds the extension on import, and meson bakes its own path into build.ninja: under
