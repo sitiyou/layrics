@@ -22,6 +22,16 @@ dependencies = [
 layrics = "layrics.main:main"
 layctl = "layrics.layctl:cli"
 
+[dependency-groups]
+# the build tools are here because build isolation is disabled for layrics (see tool.uv)
+dev = ["meson-python>=0.15", "pybind11>=2.12", "meson>=1.2.3"]
+
+[tool.uv]
+# meson-python rebuilds the extension on import, and meson bakes its own path into build.ninja: under
+# build isolation that path points into a temporary build environment that is deleted by then, so the
+# build tools have to come from this venv instead
+no-build-isolation-package = ["layrics"]
+
 [tool.meson-python.args]
 setup = ["-Dbuildtype=release"]
 
