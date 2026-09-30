@@ -1,0 +1,5 @@
+option('core_module_name', type: 'string', value: 'core',
+  description: 'Name of the compiled extension (the .so filename and PyInit_<name> symbol)')
+
+option('core_install_subdir', type: 'string', value: 'layrics',
+  description: 'Python package directory the extension is installed into')

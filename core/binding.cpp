@@ -28,7 +28,17 @@ static std::vector<UiMenuItem> parseMenuItems(const py::list &items) {
     return out;
 }
 
-PYBIND11_MODULE(core, m) {
+// The extension module name is a build option, so the token has to be expanded
+// before PYBIND11_MODULE concatenates it; it must match the extension target
+// name and the .so filename set in meson.build.
+#define LAYRICS_MODULE_IMPL_2(name) PYBIND11_MODULE(name, m)
+#define LAYRICS_MODULE_IMPL(name) LAYRICS_MODULE_IMPL_2(name)
+
+#ifndef LAYRICS_CORE_MODULE_NAME
+#define LAYRICS_CORE_MODULE_NAME core
+#endif
+
+LAYRICS_MODULE_IMPL(LAYRICS_CORE_MODULE_NAME) {
     m.doc() = "layrics - ASS subtitle overlay on wlr-layer-shell";
 
     py::class_<AppState>(m, "StateView")

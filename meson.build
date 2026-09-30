@@ -170,71 +170,81 @@ if pybind11_dep.found()
     imgui_frag_h,
   ]
 
+  core_module_name = get_option('core_module_name')
+
   py.extension_module(
-    'core',
+    core_module_name,
     [binding_sources, all_core_sources],
     include_directories : [inc, imgui_inc],
     dependencies : [py_dep, pybind11_dep, dependencies],
-    # Vulkan structs use designated initializers that omit zero-filled fields.
-    cpp_args : ['-Wno-missing-field-initializers'],
+    cpp_args : [
+      # Vulkan structs use designated initializers that omit zero-filled fields.
+      '-Wno-missing-field-initializers',
+      '-DLAYRICS_CORE_MODULE_NAME=' + core_module_name,
+    ],
     install : true,
-    subdir : 'layrics',
+    subdir : get_option('core_install_subdir'),
   )
 
-  install_subdir(
-    'layrics',
-    install_dir : py.get_install_dir(),
-    strip_directory : false,
-    exclude_directories : ['__pycache__'],
-    exclude_files : ['*.pyc'],
-  )
-
+  # A project that pulls this repo in as a meson subproject builds only the
+  # extension; the app package and the C++ tests belong to the standalone build.
+  if not meson.is_subproject()
+    install_subdir(
+      'layrics',
+      install_dir : py.get_install_dir(),
+      strip_directory : false,
+      exclude_directories : ['__pycache__'],
+      exclude_files : ['*.pyc'],
+    )
+  endif
 
 endif
 
-# Headless unit test: renders an ASS frame offscreen (no Wayland surface, no
-# presentation) and compares the GPU pixels against a CPU libass composite.
-test_render_sources = files(
-  'tests/ass_render_test.cpp',
-  'core/renderer/AssRenderer.cpp',
-  'core/renderer/RenderManager.cpp',
-  'core/renderer/VulkanContext.cpp',
-)
+if not meson.is_subproject()
+  # Headless unit test: renders an ASS frame offscreen (no Wayland surface, no
+  # presentation) and compares the GPU pixels against a CPU libass composite.
+  test_render_sources = files(
+    'tests/ass_render_test.cpp',
+    'core/renderer/AssRenderer.cpp',
+    'core/renderer/RenderManager.cpp',
+    'core/renderer/VulkanContext.cpp',
+  )
 
-test_render_exe = executable('ass-render-test',
-  [test_render_sources, subtitle_vert_h, subtitle_frag_h],
-  include_directories : inc,
-  dependencies : dependencies,
-  # Vulkan structs use designated initializers that omit zero-filled fields.
-  cpp_args : ['-Wno-missing-field-initializers'],
-)
+  test_render_exe = executable('ass-render-test',
+    [test_render_sources, subtitle_vert_h, subtitle_frag_h],
+    include_directories : inc,
+    dependencies : dependencies,
+    # Vulkan structs use designated initializers that omit zero-filled fields.
+    cpp_args : ['-Wno-missing-field-initializers'],
+  )
 
-test('ass-render', test_render_exe)
+  test('ass-render', test_render_exe)
 
-# Headless unit test for the show/hide transition clock (no GPU needed).
-test_transition_exe = executable('transition-test',
-  files('tests/transition_test.cpp', 'core/renderer/Transition.cpp'),
-  include_directories : inc,
-  dependencies : dependencies,
-)
+  # Headless unit test for the show/hide transition clock (no GPU needed).
+  test_transition_exe = executable('transition-test',
+    files('tests/transition_test.cpp', 'core/renderer/Transition.cpp'),
+    include_directories : inc,
+    dependencies : dependencies,
+  )
 
-test('transition', test_transition_exe)
+  test('transition', test_transition_exe)
 
-# Headless UI test: imgui menu pipeline (init + premultiplied blend + clamp)
-# on the offscreen Vulkan target.
-test_ui_sources = files(
-  'tests/ui_menu_test.cpp',
-  'core/renderer/VulkanContext.cpp',
-  'core/ui/UIManager.cpp',
-)
+  # Headless UI test: imgui menu pipeline (init + premultiplied blend + clamp)
+  # on the offscreen Vulkan target.
+  test_ui_sources = files(
+    'tests/ui_menu_test.cpp',
+    'core/renderer/VulkanContext.cpp',
+    'core/ui/UIManager.cpp',
+  )
 
-test_ui_exe = executable('ui-menu-test',
-  [test_ui_sources, imgui_sources, imgui_frag_h],
-  include_directories : [inc, imgui_inc],
-  dependencies : dependencies,
-  # Vulkan structs use designated initializers that omit zero-filled fields.
-  cpp_args : ['-Wno-missing-field-initializers'],
-)
+  test_ui_exe = executable('ui-menu-test',
+    [test_ui_sources, imgui_sources, imgui_frag_h],
+    include_directories : [inc, imgui_inc],
+    dependencies : dependencies,
+    # Vulkan structs use designated initializers that omit zero-filled fields.
+    cpp_args : ['-Wno-missing-field-initializers'],
+  )
 
-test('ui-menu', test_ui_exe)
+  test('ui-menu', test_ui_exe)
+endif
 
