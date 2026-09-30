@@ -1,4 +1,4 @@
-.PHONY: all build dev install clean format lint check dist
+.PHONY: all build dev install clean format lint check test-wayland dist
 
 all: dev
 
@@ -27,6 +27,9 @@ lint:
 	clang-format --dry-run --Werror $$(find core -name '*.cpp' -o -name '*.hpp')
 
 check: lint
+
+test-wayland:
+	scripts/test-wayland.sh
 
 dist:
 	uv build --wheel
