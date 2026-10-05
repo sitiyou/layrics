@@ -198,9 +198,20 @@ class QMAPI(CloudAPI):
             Lyrics: the lyrics
 
         """
-        if info.title is None or info.album is None or not info.id or info.duration is None:
+        if not info.id:
             msg = "missing required parameters"
             raise APIParamsError(msg)
+        if info.title is None or info.album is None or info.duration is None:
+            data = await self.request(
+                "get_song_detail_yqq",
+                "music.pf_song_detail_svr",
+                {"song_id": int(info.id)},
+            )
+            track = data.get("track_info")
+            if not track or str(track.get("id")) != info.id:
+                msg = f"qm song not found: {info.id}"
+                raise APIRequestError(msg)
+            info = self.format_songinfos([track])[0]
 
         param = {
             "albumName": b64encode(info.album.encode()).decode(),

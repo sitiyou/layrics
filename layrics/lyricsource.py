@@ -133,6 +133,7 @@ async def fetch_lyrics(
         song_info.duration,
     )
     lddc_lyrics = await _lddc_get_lyrics(song_info)
+    song_info = lddc_lyrics.info.songinfo
 
     _convert_japanese(lddc_lyrics)
 
