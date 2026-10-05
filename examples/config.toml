@@ -114,11 +114,20 @@ secondary = true
 
 # Built-in karaoke template effects
 [assprovider.kara-templater.template]
+spacing = 5
 bord = 5
 bord_furi = 3
 fade_in_ms = 800
 fade_out_ms = 200
+blur = 3
+blur_scale = 1.5
+clip_size = 24
+base_outline_color = "222222"
+overlay_outline_color = "EFEFEF"
 # overlay_color = "FCDD1C"
+# Glow colours follow overlay_color unless overridden
+# overlay_blur_color = "FFEC77"
+# base_blur_color = "6A719E"
 ruby_offset = "+10"
 
 # layctl dmenu 使用的菜单程序

@@ -190,6 +190,7 @@ provider = "kara-templater"
 ```
 
 修改后重启 layrics。`kara-templater` 随应用安装，支持单行和双行模式；非逐字歌词或关闭 `karaoke` 时使用普通 ASS 输出。
+默认模板包含四层光晕／轮廓、音节缩放脉冲和变速扫光；主色取主歌词的 `PrimaryColour`，光晕颜色自动派生。单行模式的副歌词配色沿用 `[style.secondary]`，字间距、描边和模糊按字号比例缩放，保留自身字体、字号及位置，不带动画。模板的 `spacing` 控制字间距，默认为 `5`。
 它继承 `[assprovider.default]` 的渲染设置，可在 `[assprovider.kara-templater]` 中覆盖；特效参数放在 `[assprovider.kara-templater.template]`。`layctl ass` 和右键菜单修改当前 provider 的设置。
 
 ## 环境变量
@@ -410,6 +411,7 @@ provider = "kara-templater"
 ```
 
 Restart layrics after changing the provider. `kara-templater` is installed with the application and supports single- and double-line modes. Non-word-timed lyrics, or disabling `karaoke`, use ordinary ASS output.
+The default template combines four glow/outline layers, syllable scale pulses, and a variable-speed highlight sweep. Its main colour follows the primary lyric style's `PrimaryColour`, with glow colours derived automatically. In single-line mode, secondary lyrics use the colours from `[style.secondary]`, with spacing, border widths, and blur scaled to their font size. They retain their own font, size, and position, without animation. The template's `spacing` controls character spacing and defaults to `5`.
 It inherits rendering settings from `[assprovider.default]`; override them in `[assprovider.kara-templater]` and configure effects in `[assprovider.kara-templater.template]`. `layctl ass` and the context menu update the current provider's settings.
 
 ## Environment Variables

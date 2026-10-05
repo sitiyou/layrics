@@ -33,13 +33,26 @@ class KaraTemplaterProvider(DefaultProvider):
             "OVERLAY_COLOR": primary.primary_colour.removeprefix("&H")[-6:],
             **{key.upper(): value for key, value in self.template_config.items()},
         }
-        templates = Document.parse(render_karaoke_header(**overrides))
         document = Document.parse(ass)
-        style_names = {"Primary": "K1", "PrimaryLeft": "K1", "PrimaryRight": "K2"}
+        secondary = document.styles.get("Secondary")
+        secondary_scale = secondary.fontsize / primary.font_size if secondary else 1
+        templates = Document.parse(
+            render_karaoke_header(secondary_scale=secondary_scale, **overrides)
+        )
+        style_names = {
+            "Primary": "K1",
+            "PrimaryLeft": "K1",
+            "PrimaryRight": "K2",
+            "Secondary": "Secondary",
+        }
         for record in document.records:
             if isinstance(record, Style) and record.name in style_names:
                 record.name = style_names[record.name]
-                record.fields["PrimaryColour"] = record.fields["SecondaryColour"]
+                record.spacing = templates.styles["K1"].spacing * (
+                    secondary_scale if record.name == "Secondary" else 1
+                )
+                if record.name != "Secondary":
+                    record.fields["PrimaryColour"] = record.fields["SecondaryColour"]
             elif isinstance(record, Line):
                 record.style = style_names.get(record.style, record.style)
         document.records.extend(templates.lines)
