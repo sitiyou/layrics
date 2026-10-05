@@ -35,9 +35,13 @@ def _send(socket_path: str, body: dict) -> dict:
     try:
         s.connect(socket_path)
         s.sendall((json.dumps(body) + "\n").encode())
-        resp = s.recv(65536)
+        s.settimeout(None)
+        with s.makefile("rb") as reader:
+            resp = reader.readline()
     finally:
         s.close()
+    if not resp.endswith(b"\n"):
+        raise click.ClickException("IPC connection closed before a complete response")
     return json.loads(resp.decode())
 
 

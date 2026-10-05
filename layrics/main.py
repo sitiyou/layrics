@@ -971,7 +971,7 @@ class LayricsApp:
             }
             writer.write((json.dumps(err) + "\n").encode())
             await writer.drain()
-        except TimeoutError:
+        except TimeoutError, ConnectionError:
             pass
         except Exception as e:
             req_id = req.get("id") if isinstance(req, dict) else None

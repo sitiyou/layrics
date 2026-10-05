@@ -147,6 +147,8 @@ layctl ass secondary toggle
 layctl ass-get
 ```
 
+`layctl` 等待命令完成后返回，搜索或获取歌词较慢时可按 Ctrl+C 取消等待。保存 ASS 文件可用 `layctl fetch > lyrics.ass`。
+
 ### 快捷键控制
 
 #### overlay 内建快捷键（悬停歌词时捕获键盘）
@@ -368,6 +370,8 @@ layctl ass secondary toggle
 # Show current ASS renderer config
 layctl ass-get
 ```
+
+`layctl` waits for commands to complete; press Ctrl+C to stop waiting if a search or lyric fetch takes too long. Use `layctl fetch > lyrics.ass` to save the ASS output.
 
 ### Hotkeys
 
