@@ -54,9 +54,6 @@ class Application {
     void setTransitionConfig(TransitionEffect effect, int durationMs,
                              int amplitude);
 
-    // Explicit actions — must be called explicitly
-    void hideDisplay();
-    void applyLockedInputRegion();
     void updateCursor();
 
     const AppState &state() const { return m_state; }
@@ -89,7 +86,7 @@ class Application {
     // pointer is inside the input region, NONE otherwise.
     bool m_keyboardInteractive = false;
 
-    std::atomic<bool> m_running{true};
+    std::atomic<bool> m_running{false};
     wl_callback *m_frameCallback = nullptr;
     AssRenderer *m_assRenderer = nullptr;
     std::function<void()> m_processCommands;
@@ -113,9 +110,12 @@ class Application {
 
     void mainLoop();
     void processState();
+    bool isFrameNeeded() const;
     void produceFrame(int64_t timestampMs);
     void updateInputRegion();
     void requestFrame();
+    void cancelFrameCallback();
+    bool clearDisplay();
 
     void onFrame(uint32_t time);
     void onPointerMotion(double x, double y);

@@ -96,3 +96,37 @@ def test_handle_client_accepts_disconnect(stage, error):
     writer.close.assert_called_once_with()
     writer.wait_closed.assert_awaited_once_with()
     assert writer.write.call_count == (0 if stage == "readline" else 1)
+
+
+@pytest.mark.parametrize("command", ["stop", "start"])
+def test_lifecycle_commands_are_not_exposed_by_cli(command):
+    result = CliRunner().invoke(cli, [command])
+    assert result.exit_code == 2
+    assert f"No such command '{command}'." in result.output
+    assert command not in cli.commands
+
+
+@pytest.mark.parametrize("method", ["stop", "start"])
+def test_lifecycle_commands_are_not_exposed_by_ipc(method):
+    app = object.__new__(LayricsApp)
+    app.ctrl = Mock()
+    response = asyncio.run(app._execute({"id": 1, "method": method}))
+    assert response == {
+        "id": 1,
+        "type": "error",
+        "data": {"code": -2, "message": f"unknown method: {method}"},
+    }
+    assert app.ctrl.mock_calls == []
+
+
+@pytest.mark.parametrize(
+    ("method", "params", "hidden"),
+    [("hide", {}, True), ("hide", {"value": False}, False), ("unhide", {}, False)],
+)
+def test_visibility_commands_reach_controller(method, params, hidden):
+    app = object.__new__(LayricsApp)
+    app.ctrl = Mock()
+    response = asyncio.run(app._execute({"id": 1, "method": method, "params": params}))
+    assert response == {"id": 1, "type": "result", "data": {"hidden": hidden}}
+    app.ctrl.set_status.assert_called_once_with(hidden=hidden)
+    assert app.ctrl.mock_calls == [call.set_status(hidden=hidden)]

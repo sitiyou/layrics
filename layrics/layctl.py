@@ -172,20 +172,6 @@ def set_fps(ctx, fps: int):
     _pp(_call(ctx.obj["socket"], "set_fps", {"fps": fps}))
 
 
-@cli.command()
-@click.pass_context
-def stop(ctx):
-    """Stop the overlay process"""
-    _pp(_call(ctx.obj["socket"], "stop"))
-
-
-@cli.command()
-@click.pass_context
-def start(ctx):
-    """Start the overlay process"""
-    _pp(_call(ctx.obj["socket"], "start"))
-
-
 @cli.command(name="set-lrc")
 @click.argument("song_id")
 @click.pass_context

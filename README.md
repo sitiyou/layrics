@@ -134,10 +134,6 @@ layctl cache list
 layctl cache set QM248672467   # 为当前曲目绑定歌词
 layctl cache remove            # 删除当前曲目缓存
 
-# 停止/重启 overlay 渲染（IPC 服务保持运行）
-layctl stop
-layctl start
-
 # 运行时修改 ASS 渲染配置
 layctl ass karaoke false
 layctl ass line_mode single
@@ -357,10 +353,6 @@ layctl status
 layctl cache list
 layctl cache set QM248672467   # bind lyrics for current track
 layctl cache remove            # remove current track's cache entry
-
-# Stop/restart overlay rendering (IPC server keeps running)
-layctl stop
-layctl start
 
 # Change ASS renderer config at runtime
 layctl ass karaoke false

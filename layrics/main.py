@@ -18,8 +18,6 @@ Methods:
    lock                                 -> {locked}
    unlock                               -> {locked}
    set_fps      {fps}                   -> {target_fps}
-   stop                                 -> {status}
-   start                                -> {status}
    get_status                           -> {player, overlay}
    cache_list                           -> [{key, song_id, lyrics_title, lyrics_artists, updated_at}]
    cache_set     {song_id, key?}       -> {cached}  (key defaults to current track)
@@ -180,14 +178,6 @@ class LayricsApp:
             self._server.close()
 
     # ── overlay control ───────────────────────────────────────────
-
-    def start_overlay(self):
-        self.ctrl.start()
-        logger.info("overlay started")
-
-    def stop_overlay(self):
-        self.ctrl.stop()
-        logger.info("overlay stopped")
 
     def load_ass(self, path: str):
         with open(path, "r", encoding="utf-8") as f:
@@ -785,29 +775,6 @@ class LayricsApp:
                 self.apply_target_fps(fps)
                 return {"id": req_id, "type": "result", "data": {"target_fps": fps}}
 
-            elif method == "stop":
-                self.stop_overlay()
-                return {
-                    "id": req_id,
-                    "type": "result",
-                    "data": {"status": "stopped"},
-                }
-
-            elif method == "start":
-                self.start_overlay()
-                if (
-                    self._last_track is not None
-                    and self.player is not None
-                    and self._sync_with_delay()
-                ):
-                    self.ctrl.set_status(hidden=False)
-                    logger.info("re-synced start_time on start")
-                return {
-                    "id": req_id,
-                    "type": "result",
-                    "data": {"status": "started"},
-                }
-
             elif method == "get_status":
                 player_info = None
                 source = self.player
@@ -1003,7 +970,7 @@ class LayricsApp:
     # ── Run ───────────────────────────────────────────────────────
 
     async def run(self):
-        self.start_overlay()
+        self.ctrl.start()
 
         overlay = self._config.overlay
         if overlay.target_fps > 0:

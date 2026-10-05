@@ -764,8 +764,10 @@ bool VulkanContext::beginFrame() {
         return false;
     }
 
-    vkWaitForFences(m_device, 1, &m_fence, VK_TRUE, UINT64_MAX);
-    vkResetFences(m_device, 1, &m_fence);
+    if (vkWaitForFences(m_device, 1, &m_fence, VK_TRUE, kFrameTimeoutNs) !=
+        VK_SUCCESS) {
+        return false;
+    }
 
     // Fence wait: frames older than kFramesInFlight are complete, so their
     // staging buffers can be freed.
@@ -774,15 +776,19 @@ bool VulkanContext::beginFrame() {
     // Bounded acquire: an UINT64_MAX wait would wedge the render thread when
     // the compositor stops consuming images (locked screen, suspended output).
     VkResult r =
-        vkAcquireNextImageKHR(m_device, m_swapchain, 100'000'000 /* 100ms */,
+        vkAcquireNextImageKHR(m_device, m_swapchain, kFrameTimeoutNs,
                               m_acquireSems[m_frameIndex % kFramesInFlight],
                               VK_NULL_HANDLE, &m_imageIndex);
-    if (r == VK_ERROR_OUT_OF_DATE_KHR || r == VK_SUBOPTIMAL_KHR) {
+    if (r == VK_ERROR_OUT_OF_DATE_KHR) {
         m_swapchainDirty = true;
         return false;
     }
-    if (r == VK_TIMEOUT) {
-        // No image available: bail so the main loop can poll for stop.
+    if (r == VK_SUBOPTIMAL_KHR) {
+        m_swapchainDirty = true;
+    } else if (r != VK_SUCCESS) {
+        if (r != VK_TIMEOUT) {
+            LAY_ERR("vkAcquireNextImageKHR failed: %d", r);
+        }
         return false;
     }
     m_frameIndex++;
@@ -825,11 +831,11 @@ void VulkanContext::beginRenderPass() {
     vkCmdSetScissor(m_cmd, 0, 1, &scissor);
 }
 
-void VulkanContext::endFrame(const std::vector<RenderRect> &damage) {
+bool VulkanContext::endFrame(const std::vector<RenderRect> &damage) {
     vkCmdEndRenderPass(m_cmd);
     if (vkEndCommandBuffer(m_cmd) != VK_SUCCESS) {
         LAY_ERR("vkEndCommandBuffer failed");
-        return;
+        return false;
     }
 
     uint32_t f = (m_frameIndex - 1) % kFramesInFlight;
@@ -845,9 +851,10 @@ void VulkanContext::endFrame(const std::vector<RenderRect> &damage) {
         .signalSemaphoreCount = 1,
         .pSignalSemaphores = &m_renderSems[f],
     };
+    vkResetFences(m_device, 1, &m_fence);
     if (vkQueueSubmit(m_queue, 1, &submit, m_fence) != VK_SUCCESS) {
         LAY_ERR("vkQueueSubmit failed");
-        return;
+        return false;
     }
 
     // VK_KHR_incremental_present: re-composite only the changed regions
@@ -890,14 +897,15 @@ void VulkanContext::endFrame(const std::vector<RenderRect> &damage) {
     if (r == VK_ERROR_OUT_OF_DATE_KHR || r == VK_SUBOPTIMAL_KHR) {
         m_swapchainDirty = true;
     }
+    return r == VK_SUCCESS;
 }
 
-void VulkanContext::presentTransparent() {
+bool VulkanContext::presentTransparent() {
     if (!beginFrame()) {
-        return;
+        return false;
     }
     beginRenderPass();
-    endFrame();
+    return endFrame();
 }
 
 // ---------------------------------------------------------------------------

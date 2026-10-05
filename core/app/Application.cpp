@@ -41,20 +41,16 @@ Application::Application() {
 
 Application::~Application() {
     LAY_LOG("application shutting down");
-    if (m_frameCallback) {
-        wl_callback_destroy(m_frameCallback);
-        m_frameCallback = nullptr;
-    }
+    cancelFrameCallback();
 }
 
 void Application::run() {
     LAY_LOG("starting application");
-    m_running = true;
 
     while (m_running) {
         if (!m_surface.isConfigured()) {
             LAY_LOG("layer surface re-initializing");
-            m_frameCallback = nullptr;
+            cancelFrameCallback();
             if (!initWayland()) {
                 LAY_ERR("failed to re-initialize layer surface");
                 m_running = false;
@@ -66,19 +62,13 @@ void Application::run() {
         }
 
         mainLoop();
-
-        if (!m_running) {
-            LAY_DEBUG("clean up for stop");
-            if (m_surface.isConfigured()) {
-                m_regionMgr.clear(m_waylandCtx.compositor, m_surface.surface());
-                m_surface.commit();
-                // Non-blocking: the compositor replies nothing after this
-                // commit.
-                m_waylandCtx.flush();
-                m_waylandCtx.dispatchPending();
-            }
-        }
     }
+
+    m_uiMgr.closeNow();
+    setInputInteractive(false);
+    clearDisplay();
+    m_waylandCtx.flush();
+    LAY_LOG("application stopped");
 }
 
 bool Application::initWayland() {
@@ -203,6 +193,7 @@ void Application::mainLoop() {
             }
             LAY_ERR("poll failed: %s", strerror(errno));
             m_waylandCtx.cancelRead();
+            m_running = false;
             break;
         }
 
@@ -244,33 +235,17 @@ void Application::processState() {
         m_uiMgr.openAt(m_openMenuX, m_openMenuY);
     }
 
-    if (m_state.hidden && !prevHidden) {
-        // Entering hidden: close the menu, stop accepting pointer input at
-        // once, then play the hide animation. The surface keeps its last
-        // content until the animation settles (see below).
-        m_uiMgr.closeNow();
-        setInputInteractive(false);
-        m_regionMgr.clear(m_waylandCtx.compositor, m_surface.surface());
-        m_transition.start(false, nowMs());
+    if (m_state.hidden != prevHidden) {
+        if (m_state.hidden) {
+            m_uiMgr.closeNow();
+            setInputInteractive(false);
+            m_regionMgr.clear(m_waylandCtx.compositor, m_surface.surface());
+        } else {
+            m_renderMgr.reset();
+        }
+        m_transition.start(!m_state.hidden, nowMs());
         m_hideFinalized = false;
         m_introPlayed = true;
-    }
-    if (!m_state.hidden && prevHidden) {
-        m_transition.start(true, nowMs());
-        m_hideFinalized = false;
-        m_introPlayed = true;
-    }
-    m_transition.update(nowMs());
-    if (m_state.hidden && !m_hideFinalized && !m_transition.isActive() &&
-        !m_uiMgr.isActive()) {
-        // Defer the teardown while a menu (e.g. from the tray) is up: the
-        // transparent present would wipe its pixels.
-        hideDisplay();
-        m_hideFinalized = true;
-    }
-    if (!m_state.hidden && prevHidden && m_state.paused) {
-        // Unhiding while paused: re-present the frozen frame once.
-        produceFrame(m_freezeTimestampMs);
     }
     if (m_state.paused && !prevPaused) {
         m_freezeTimestampMs = nowMs() - m_state.startTimeMs;
@@ -281,57 +256,39 @@ void Application::processState() {
         }
         updateCursor();
         if (m_state.locked && m_surface.isConfigured()) {
-            applyLockedInputRegion();
+            m_regionMgr.clear(m_waylandCtx.compositor, m_surface.surface());
             setInputInteractive(false);
         }
     }
 
     // Swapchain recreation on layer configure (safe here, outside dispatch).
     if (m_vk.isDirty() && m_surface.isConfigured()) {
+        cancelFrameCallback();
         m_vk.resize(m_surface.width(), m_surface.height());
         m_renderMgr.setSize(m_vk.width(), m_vk.height());
+        m_renderMgr.reset();
     }
 
-    // Restart the frame chain when needed (unhide, unpause, drag/menu,
-    // offset reset) with no frame in flight.
-    bool needsFrame = !m_frameCallback && m_vk.isReady() &&
-                      (!m_state.hidden || m_transition.isActive() ||
-                       m_uiMgr.isActive()) &&
-                      (!m_state.paused || m_dragMgr.isDragging() ||
-                       m_uiMgr.isActive() || m_transition.isActive() ||
-                       m_renderMgr.hasOffsetChanged());
-    if (needsFrame) {
+    m_transition.update(nowMs());
+    if (m_state.hidden && !m_hideFinalized && !m_transition.isActive() &&
+        !m_uiMgr.isActive()) {
+        m_hideFinalized = clearDisplay();
+    }
+
+    if (!m_frameCallback) {
         int64_t ts = m_state.paused ? m_freezeTimestampMs
                                     : nowMs() - m_state.startTimeMs;
         produceFrame(ts);
     }
 }
 
-void Application::frameDone(void *data, wl_callback * /*cb*/, uint32_t time) {
+void Application::frameDone(void *data, wl_callback *, uint32_t time) {
     auto *self = static_cast<Application *>(data);
-    self->m_frameCallback = nullptr;
+    self->cancelFrameCallback();
     self->onFrame(time);
 }
 
 void Application::onFrame(uint32_t time) {
-    if (!m_surface.isConfigured() || !m_vk.isReady()) {
-        return;
-    }
-
-    auto dragState = m_dragMgr.state();
-    m_state.dragOffsetX = dragState.offsetX;
-    m_state.dragOffsetY = dragState.offsetY;
-    m_renderMgr.setOffset(dragState.offsetX, dragState.offsetY);
-
-    // Hidden/paused: frozen frame stays unless dragging or the menu is open.
-    // Returning without requestFrame() stops the frame chain.
-    if ((m_state.hidden && !m_transition.isActive() &&
-         !m_uiMgr.isActive()) ||
-        (m_state.paused && !m_dragMgr.isDragging() && !m_uiMgr.isActive() &&
-         !m_transition.isActive())) {
-        return;
-    }
-
     int64_t timestampMs =
         m_state.paused ? m_freezeTimestampMs
                        : static_cast<int64_t>(time) - m_state.startTimeMs;
@@ -339,10 +296,26 @@ void Application::onFrame(uint32_t time) {
     produceFrame(timestampMs);
 }
 
+bool Application::isFrameNeeded() const {
+    return m_running && m_surface.isConfigured() && m_vk.isReady() &&
+           (!m_state.hidden || m_transition.isActive() || m_uiMgr.isActive()) &&
+           (!m_state.paused || !m_renderMgr.hasRendered() ||
+            m_dragMgr.isDragging() || m_renderMgr.hasOffsetChanged() ||
+            m_uiMgr.isActive() || m_transition.isActive());
+}
+
 void Application::produceFrame(int64_t timestampMs) {
-    // While hidden the ASS input stays loaded, so prepare() would re-render the
-    // lyrics; only the menu (if any) may be painted on a hidden frame.
-    if (!m_state.hidden || m_transition.isActive()) {
+    auto dragState = m_dragMgr.state();
+    m_state.dragOffsetX = dragState.offsetX;
+    m_state.dragOffsetY = dragState.offsetY;
+    m_renderMgr.setOffset(dragState.offsetX, dragState.offsetY);
+
+    if (!isFrameNeeded()) {
+        return;
+    }
+
+    bool showLyrics = !m_state.hidden || m_transition.isActive();
+    if (showLyrics) {
         m_renderMgr.prepare(timestampMs);
     }
     // Glyphs appearing for the first time animate in; this must be decided
@@ -364,9 +337,6 @@ void Application::produceFrame(int64_t timestampMs) {
         updateCursor();
     }
 
-    // Nothing changed: stop the frame chain (static lyrics cost ~0 GFX).
-    // needsFrame restarts it when libass, the menu or the drag offset reports
-    // a change.
     if (!m_renderMgr.hasContentChanged() && !m_dragMgr.isDragging() &&
         !m_renderMgr.hasOffsetChanged() && !m_uiMgr.isActive() &&
         m_renderMgr.hasRendered() && !m_transition.isActive()) {
@@ -378,18 +348,18 @@ void Application::produceFrame(int64_t timestampMs) {
     requestFrame();
 
     if (!m_vk.beginFrame()) {
-        // Swapchain out of date; drop the callback so processState can
-        // recreate the swapchain and restart the chain.
-        if (m_frameCallback) {
-            wl_callback_destroy(m_frameCallback);
-            m_frameCallback = nullptr;
-        }
+        cancelFrameCallback();
+        m_renderMgr.reset();
         return;
     }
 
-    m_renderMgr.recordUploads(m_vk.commandBuffer());
+    if (showLyrics) {
+        m_renderMgr.recordUploads(m_vk.commandBuffer());
+    }
     m_vk.beginRenderPass();
-    m_renderMgr.recordDraws(m_vk.commandBuffer());
+    if (showLyrics) {
+        m_renderMgr.recordDraws(m_vk.commandBuffer());
+    }
     // Menu is drawn in surface coordinates (no drag offset), so it stays put
     // while the subtitles are dragged.
     m_uiMgr.render(m_vk.commandBuffer());
@@ -397,8 +367,10 @@ void Application::produceFrame(int64_t timestampMs) {
     // Damage grid (current+previous cells) so moved-away content is
     // re-composited too.
     m_damageGrid.beginFrame();
-    for (const auto &rect : m_renderMgr.regions()) {
-        m_damageGrid.addRegion(rect.x, rect.y, rect.w, rect.h);
+    if (showLyrics) {
+        for (const auto &rect : m_renderMgr.regions()) {
+            m_damageGrid.addRegion(rect.x, rect.y, rect.w, rect.h);
+        }
     }
     if (m_uiMgr.isMenuOpen()) {
         m_damageGrid.addRegion(m_uiMgr.menuRect().x, m_uiMgr.menuRect().y,
@@ -407,14 +379,13 @@ void Application::produceFrame(int64_t timestampMs) {
     updateInputRegion();
     // Glyphs move outside their resting regions while animating, which the
     // damage grid does not cover; present full-surface damage until settled.
-    m_vk.endFrame(m_transition.isActive() ? std::vector<RenderRect>{}
-                                          : m_damageGrid.buildDamage());
+    bool presented =
+        m_vk.endFrame(m_transition.isActive() ? std::vector<RenderRect>{}
+                                              : m_damageGrid.buildDamage());
 
-    if (m_vk.isDirty() && m_frameCallback) {
-        // Present failed: no commit happened, so the frame callback never
-        // fires; drop it and let processState restart after resize.
-        wl_callback_destroy(m_frameCallback);
-        m_frameCallback = nullptr;
+    if (!presented || m_vk.isDirty()) {
+        cancelFrameCallback();
+        m_renderMgr.reset();
     }
 
     m_frameRateLimiter.wait();
@@ -440,7 +411,7 @@ void Application::updateInputRegion() {
     }
 
     std::vector<RenderRect> regions;
-    if (!m_state.locked) {
+    if (!m_state.locked && !m_state.hidden) {
         if (m_renderMgr.hasContentChanged()) {
             // Grid cells were populated in produceFrame (before the present).
             regions = m_damageGrid.buildRegions();
@@ -515,6 +486,7 @@ void Application::setInputInteractive(bool on) {
 
 void Application::loadAssContent(const std::string &content) {
     m_assRenderer->loadContent(content);
+    m_renderMgr.reset();
     LAY_LOG("Loaded ASS content (%zu bytes)", content.size());
 }
 
@@ -557,26 +529,29 @@ void Application::setTransitionConfig(TransitionEffect effect, int durationMs,
 }
 
 void Application::requestFrame() {
+    cancelFrameCallback();
     m_frameCallback = wl_surface_frame(m_surface.surface());
     wl_callback_add_listener(m_frameCallback, &frameListener, this);
 }
 
-void Application::hideDisplay() {
-    m_regionMgr.clear(m_waylandCtx.compositor, m_surface.surface());
-    m_renderMgr.reset();
-    // Present one fully transparent frame so the overlay clears; if the
-    // swapchain is not ready, drop the callback (chain restarts on unhide).
-    requestFrame();
-    if (m_vk.isReady()) {
-        m_vk.presentTransparent();
-    } else if (m_frameCallback) {
+void Application::cancelFrameCallback() {
+    if (m_frameCallback) {
         wl_callback_destroy(m_frameCallback);
         m_frameCallback = nullptr;
     }
 }
 
-void Application::applyLockedInputRegion() {
+bool Application::clearDisplay() {
+    cancelFrameCallback();
+    if (!m_surface.isConfigured()) {
+        return false;
+    }
     m_regionMgr.clear(m_waylandCtx.compositor, m_surface.surface());
+    if (!m_vk.presentTransparent()) {
+        return false;
+    }
+    m_renderMgr.reset();
+    return true;
 }
 
 void Application::updateCursor() {

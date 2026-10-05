@@ -3,14 +3,15 @@
 
 ApplicationController::~ApplicationController() {
     stop();
-    if (m_thread.joinable()) {
-        m_thread.detach();
-    }
+    join();
 }
 
 void ApplicationController::start() {
     if (m_thread.joinable()) {
-        m_thread.join();
+        if (m_app.m_running) {
+            return;
+        }
+        join();
     }
 
     m_app.m_processCommands = [this]() { processPendingCommands(); };
@@ -21,6 +22,7 @@ void ApplicationController::start() {
         pushUiEvent(event);
     };
 
+    m_app.m_running = true;
     m_thread = std::thread([this]() {
         LAY_LOG("ApplicationController: thread started");
         m_app.run();
@@ -29,7 +31,7 @@ void ApplicationController::start() {
 }
 
 void ApplicationController::stop() {
-    LAY_LOG("ApplicationController: clear and stop");
+    LAY_LOG("ApplicationController: stop requested");
     m_app.requestStop();
 }
 

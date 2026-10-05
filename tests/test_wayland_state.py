@@ -44,6 +44,30 @@ def wayland_available() -> bool:
 
 
 @unittest.skipUnless(wayland_available(), "no Wayland display available")
+class LifecycleTest(unittest.TestCase):
+    def test_immediate_stop_repeated_start_and_destruction(self):
+        probe = """\
+from layrics.core import ApplicationController
+
+for _ in range(3):
+    ctrl = ApplicationController()
+    ctrl.start()
+    ctrl.stop()
+    ctrl.join()
+    ctrl.start()
+    ctrl.start()
+    del ctrl
+"""
+        result = subprocess.run(
+            [sys.executable, "-c", probe],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+
+@unittest.skipUnless(wayland_available(), "no Wayland display available")
 class StateMachineTest(unittest.TestCase):
     """Paused/hidden/locked transitions against a live compositor."""
 

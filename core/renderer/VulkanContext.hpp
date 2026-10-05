@@ -49,11 +49,11 @@ class VulkanContext {
     void beginRenderPass();
     // Present the frame. damage = buffer-space rects that changed since the
     // last commit (sent via VK_KHR_incremental_present); empty = full damage.
-    void endFrame(const std::vector<RenderRect> &damage = {});
+    bool endFrame(const std::vector<RenderRect> &damage = {});
     VkCommandBuffer commandBuffer() const { return m_cmd; }
 
     // Present a fully transparent frame (used when hiding the overlay).
-    void presentTransparent();
+    bool presentTransparent();
 
     // --- renderer helpers ------------------------------------------------
 
@@ -105,6 +105,7 @@ class VulkanContext {
     };
 
     static constexpr uint32_t kFramesInFlight = 2;
+    static constexpr uint64_t kFrameTimeoutNs = 100'000'000;
 
     wl_display *m_display = nullptr;
     wl_surface *m_wlSurface = nullptr;
