@@ -25,7 +25,7 @@ layrics 是一款桌面歌词软件：从 MPRIS 兼容的播放器（Spotify、m
 - **Layer Shell 覆盖层**：基于 wlr-layer-shell 协议自动悬浮，无需在窗口管理器额外设置规则
 - **libass 渲染**：支持 ASS 字幕全部特性，包括卡拉 OK（`\k`）、样式、字体和特效
 - **硬件加速**：基于 Vulkan 提供 GPU 硬件加速
-- **Aegisub 卡拉 OK 模板**：可选用 aegisub-cli 的 kara-templater 处理逐字歌词，实现高级卡拉 OK 效果
+- **卡拉 OK 模板**：可选用 kara-templater provider 处理逐字歌词，实现高级卡拉 OK 效果，无需 Aegisub
 - **歌曲-歌词缓存**：匹配结果本地缓存
 - **拖拽支持**：点击拖拽覆盖层重新定位字幕位置
 - **右键菜单**：悬停字幕时右键弹出菜单（搜索歌词/显示/锁定/ASS 配置/帧率/播放器/缓存等）
@@ -182,6 +182,16 @@ hl.bind("SUPER + SHIFT + M", hl.dsp.exec_cmd [[layctl dmenu]])
 
 > 详细配置请参考 [examples/config.toml](https://github.com/sitiyou/layrics/blob/main/examples/config.toml)。
 
+默认使用 `default` provider。启用内置卡拉 OK 模板：
+
+```toml
+[assprovider]
+provider = "kara-templater"
+```
+
+修改后重启 layrics。`kara-templater` 随应用安装，支持单行和双行模式；非逐字歌词或关闭 `karaoke` 时使用普通 ASS 输出。
+它继承 `[assprovider.default]` 的渲染设置，可在 `[assprovider.kara-templater]` 中覆盖；特效参数放在 `[assprovider.kara-templater.template]`。`layctl ass` 和右键菜单修改当前 provider 的设置。
+
 ## 环境变量
 
 | 变量 | 说明 | 默认值 |
@@ -205,7 +215,7 @@ hl.bind("SUPER + SHIFT + M", hl.dsp.exec_cmd [[layctl dmenu]])
 
 - [x] **Python 输入事件接口** — 将 overlay 接收到的键盘/鼠标事件封装为 Python 接口，支持在 Python 层面处理输入事件
 - [x] **延迟控制** — 字幕延迟偏移功能（offset）
-- [ ] **Aegisub CLI 集成** — 调用 aegisub-cli 处理 kara-templater 模板（`aegisub_karaoke` 配置，双行模式 + 逐字歌词时生效）
+- [x] **卡拉 OK 模板 provider** — 使用 kara-templater 生成模板特效字幕
 - [ ] **自定义配置快捷键支持** — 支持用户自定义快捷键绑定（当前为内置快捷键）
 
 ---
@@ -237,7 +247,7 @@ layrics is a desktop lyrics overlay: it fetches playback state from MPRIS-compat
 - **Layer Shell overlay**: auto-floating layer based on `wlr-layer-shell`, no compositor-specific setup required
 - **libass rendering**: supports ASS subtitle features including karaoke (`\k`), styling, fonts, and effects
 - **Vulkan hardware acceleration**: GPU-accelerated rendering
-- **Aegisub karaoke templating**: optionally processes word-timed lyrics through aegisub-cli's kara-templater for advanced karaoke effects
+- **Karaoke templates**: an optional kara-templater provider processes word-timed lyrics for advanced karaoke effects without Aegisub
 - **Song-to-lyrics cache**: local song match cache
 - **Drag support**: click and drag the overlay to reposition subtitles
 - **Right-click menu**: right-click the lyrics to open a menu (search songs / show / lock / ASS config / FPS / player / cache, etc.)
@@ -392,6 +402,16 @@ Configuration is loaded from `~/.config/layrics/config.toml` (or `$LAYRICS_CONFI
 
 > See [examples/config.toml](https://github.com/sitiyou/layrics/blob/main/examples/config.toml) for the full configuration reference.
 
+The default provider is `default`. To enable the built-in karaoke templates:
+
+```toml
+[assprovider]
+provider = "kara-templater"
+```
+
+Restart layrics after changing the provider. `kara-templater` is installed with the application and supports single- and double-line modes. Non-word-timed lyrics, or disabling `karaoke`, use ordinary ASS output.
+It inherits rendering settings from `[assprovider.default]`; override them in `[assprovider.kara-templater]` and configure effects in `[assprovider.kara-templater.template]`. `layctl ass` and the context menu update the current provider's settings.
+
 ## Environment Variables
 
 | Variable | Description | Default |
@@ -415,7 +435,7 @@ When fetching, all configured lyric sources are searched and the best match is c
 
 - [x] **Python input event interface** — expose keyboard/mouse events from the overlay as Python interfaces for Python-level input handling
 - [x] **Delay control** — subtitle delay offset
-- [ ] **Aegisub CLI integration** — invoke aegisub-cli for kara-templater processing (`aegisub_karaoke` config, active in double-line mode with word-timed lyrics)
+- [x] **Karaoke template provider** — generate template effects with kara-templater
 - [ ] **Configurable custom hotkeys** — user-configurable key bindings (currently built-in only)
 
 ## License

@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.14"
 resolution-markers = [
     "sys_platform != 'ios'",
@@ -266,6 +266,16 @@ wheels = [
 ]
 
 [[package]]
+name = "kara-templater"
+version = "0.1.0"
+source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple" }
+sdist = { url = "https://pypi.tuna.tsinghua.edu.cn/packages/e8/80/8be4e5b0792ce36368f34350eb29ccf5077d1b41957cc5e6275e9a704799/kara_templater-0.1.0.tar.gz", hash = "sha256:4741910d0b278ef42f6147dfd9cd72194fbc905b4c842db96590ada136a10251", size = 390152, upload-time = "2026-10-05T06:56:26.492Z" }
+wheels = [
+    { url = "https://pypi.tuna.tsinghua.edu.cn/packages/4d/05/8787e07be427f3643e3e18bc860758110711826d8d5822b9e0b6c8ecef13/kara_templater-0.1.0-cp314-cp314-manylinux_2_28_x86_64.whl", hash = "sha256:521407906410ce0d452556a39ec8a414f7c12eba5b21b43111b853686605d1bd", size = 3428347, upload-time = "2026-10-05T06:56:22.844Z" },
+    { url = "https://pypi.tuna.tsinghua.edu.cn/packages/fd/c6/a7ead473d276a5c75d2817deef2ee4157efcb3db08ca84e459164c203e5f/kara_templater-0.1.0-cp314-cp314-win_amd64.whl", hash = "sha256:6d1fb9959e1b5f2d5ad981c27a02a25d07c6c626af6eb6d70034acd21fac1242", size = 5510493, upload-time = "2026-10-05T06:56:25.034Z" },
+]
+
+[[package]]
 name = "layrics"
 version = "0.1.0"
 source = { editable = "." }
@@ -275,6 +285,7 @@ dependencies = [
     { name = "dbus-python" },
     { name = "diskcache" },
     { name = "httpx", extra = ["brotli", "http2"] },
+    { name = "kara-templater" },
     { name = "pyaes" },
     { name = "pygobject" },
 ]
@@ -294,6 +305,7 @@ requires-dist = [
     { name = "dbus-python" },
     { name = "diskcache" },
     { name = "httpx", extras = ["brotli", "http2"] },
+    { name = "kara-templater", specifier = ">=0.1.0" },
     { name = "pyaes" },
     { name = "pygobject" },
 ]

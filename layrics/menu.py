@@ -28,10 +28,6 @@ def notify(body: str, title: str = "layrics") -> None:
     logger.info("%s: %s", title, body)
 
 
-def _ass_config(app) -> dict:
-    return app._config.get_provider_config("default")
-
-
 def _fps_label(fps: int) -> str:
     return "跟随显示器" if fps == -1 else f"{fps} FPS"
 
@@ -72,7 +68,7 @@ async def _song_items(app) -> list[dict]:
 
 async def build_menu(app) -> list[dict]:
     """Build the menu tree with current state baked into the labels."""
-    prov = _ass_config(app)
+    prov = app.ass_config
     karaoke = prov.get("karaoke", True)
     line_mode = prov.get("line_mode") or "single"
     secondary = prov.get("secondary", True)

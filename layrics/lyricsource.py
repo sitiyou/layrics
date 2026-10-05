@@ -3,10 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import os
 import re
-import subprocess
-import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -15,7 +12,6 @@ from layrics.LDDC.common.models import (
 )
 from layrics.LDDC.common.models import (
     LyricsLine,
-    LyricsType,
     LyricsWord,
     SongInfo,
     Source,
@@ -23,7 +19,7 @@ from layrics.LDDC.common.models import (
 from layrics.LDDC.core.api.lyrics import get_lyrics as _lddc_get_lyrics
 from layrics.LDDC.core.api.lyrics import search as _lddc_search
 
-from .assprovider import AssProvider, DefaultProvider, Lyrics, match_provider
+from .assprovider import Lyrics, match_provider
 from .config import get_config
 
 logger = logging.getLogger("layrics.lyrics")
@@ -92,61 +88,6 @@ async def search_songs(keyword: str, limit: int = 10) -> list[dict[str, Any]]:
     return items
 
 
-def _postprocess_aegisub(
-    ass: str,
-    cli_path: str,
-    automation: str = "kara-templater.lua",
-    header_overrides: dict[str, str | int] | None = None,
-) -> str:
-    from .karaoke.header import render_karaoke_header
-
-    karaoke_header = render_karaoke_header(**(header_overrides or {}))
-
-    dialog_lines = []
-    for line in ass.splitlines():
-        if line.startswith("Dialogue:"):
-            line = line.replace(",PrimaryLeft,", ",K1,")
-            line = line.replace(",PrimaryRight,", ",K2,")
-            line = line.replace(",Primary,", ",K1,")
-            line = line.replace(",Secondary,", ",K2,")
-            dialog_lines.append(line)
-
-    inter_ass = karaoke_header.rstrip("\n") + "\n" + "\n".join(dialog_lines) + "\n"
-
-    try:
-        with tempfile.NamedTemporaryFile(
-            suffix=".ass", mode="w", delete=False, prefix="layrics_aegisub_"
-        ) as f:
-            f.write(inter_ass)
-            tmp_path = f.name
-
-        subprocess.run(
-            [
-                cli_path,
-                "--automation",
-                automation,
-                tmp_path,
-                tmp_path,
-                "Apply karaoke template",
-            ],
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-        with open(tmp_path) as f:
-            result = f.read()
-    except Exception as e:
-        logger.warning("aegisub-cli failed: %s, using intermediate ass", e)
-        result = inter_ass
-    finally:
-        try:
-            os.unlink(tmp_path)
-        except OSError:
-            pass
-
-    return result
-
-
 KANA_RE = re.compile(r"[\u3040-\u309f\u30a0-\u30ff]")
 
 S2S_JSON = Path(__file__).resolve().parent / "data" / "simplified_to_shinjitai.json"
@@ -202,7 +143,6 @@ async def fetch_lyrics(
         len(lddc_lyrics),
     )
 
-    provider_cls = match_provider(player_name, lddc_lyrics) or DefaultProvider
     cfg = get_config()
     lyrics = Lyrics(
         lddc_lyrics,
@@ -213,44 +153,9 @@ async def fetch_lyrics(
         secondary_override=cfg.get_style_config("secondary"),
     )
     lyrics.strip_ruby(track=lyrics.primary_track)
-    provider: AssProvider = provider_cls(
-        config=cfg.get_provider_config(getattr(provider_cls, "PROVIDER", "")),  # type: ignore[call-arg]
-    )
-    dur_ms = song_info.duration
-    ass = provider.generate(lyrics, duration_ms=dur_ms)
-
-    if provider_cls is DefaultProvider:
-        provider_cfg = cfg.get_provider_config("default")
-        if (
-            provider_cfg.get("aegisub_karaoke")
-            and provider_cfg.get("line_mode") == "double"
-        ):
-            orig_type = lyrics.types.get(lyrics.primary_track)
-            if provider_cfg.get("karaoke", True) and orig_type == LyricsType.VERBATIM:
-                cli = provider_cfg.get("aegisub_cli", "") or "aegisub-cli"
-                automation = (
-                    provider_cfg.get("aegisub_automation", "") or "kara-templater.lua"
-                )
-
-                primary_style = lyrics.primary_style
-                overrides: dict[str, str | int] = {
-                    "FONTNAME": primary_style.font_name,
-                }
-                pc = primary_style.primary_colour
-                pc = pc.removeprefix("&H")
-                overrides["OVERLAY_COLOR"] = pc[-6:]
-
-                ass = await asyncio.to_thread(
-                    _postprocess_aegisub,
-                    ass,
-                    cli,
-                    automation,
-                    header_overrides=overrides,
-                )
-            else:
-                logger.info(
-                    "aegisub_karaoke: lyrics lack word timing (type=%s), skipping",
-                    orig_type,
-                )
-
-    return ass
+    provider_cls = match_provider(player_name, lyrics, name=cfg.ass_provider)
+    if provider_cls is None:
+        raise ValueError("no matching ASS provider")
+    provider = provider_cls(config=cfg.get_provider_config(provider_cls.PROVIDER))
+    logger.debug("fetch: ASS provider=%s", provider_cls.PROVIDER)
+    return await asyncio.to_thread(provider.generate, lyrics, song_info.duration)

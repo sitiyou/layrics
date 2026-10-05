@@ -24,18 +24,16 @@ Style: LEAD,sans-serif,__FONTSIZE__,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-Comment: 0,0:00:00.00,0:00:00.00,K1,,0,0,0,code syl all,fxgroup.kara=syl.inline_fx==""
-Comment: 1,0:00:00.00,0:00:00.00,K1,overlay,0,0,0,template syl noblank all fxgroup kara,!retime("line",-100,500)!{\pos($center,$middle)\an5\shad0\fad(__FADE_IN_MS__,__FADE_OUT_MS__)\1c&H__OVERLAY_COLOR__&\3c&HFFFFFF&\clip(!$sleft-3!,0,!$sleft-3!,1080)\t($sstart,$send,\clip(!$sleft-3!,0,!$sright+3!,1080))\bord__BORD__}
-Comment: 0,0:00:00.00,0:00:00.00,K1,,0,0,0,template syl all fxgroup kara,!retime("line",-500,500)!{\pos($center,$middle)\an5\fad(__FADE_IN_MS__,__FADE_OUT_MS__)}
-Comment: 1,0:00:18.65,0:00:20.65,K1,overlay,0,0,0,template furi all,!retime("line",-100,500)!{\pos($center,!$middle__RUBY_OFFSET__!)\an5\shad0\fad(__FADE_IN_MS__,__FADE_OUT_MS__)\1c&H__OVERLAY_COLOR__&\3c&HFFFFFF&\clip(!$sleft-3!,0,!$sleft-3!,1080)\t($sstart,$send,\clip(!$sleft-3!,0,!$sright+3!,1080))\bord__BORD_FURI__}
-Comment: 0,0:00:00.00,0:00:00.00,K1,,0,0,0,template furi all,!retime("line",-500,500)!{\pos($center,!$middle__RUBY_OFFSET__!)\an5\fad(__FADE_IN_MS__,__FADE_OUT_MS__)}
-Comment: 0,0:00:00.00,0:00:00.00,K1,music,0,0,0,template fx no_k,!retime("line",-500,500)!{\pos($center,!$middle!)\an5\1c&H505050&\3c&HFFFFFFF&}
-Comment: 0,0:00:00.00,0:00:00.00,K2,,0,0,0,code syl all,fxgroup.kara=syl.inline_fx==""
-Comment: 1,0:00:00.00,0:00:00.00,K2,overlay,0,0,0,template syl noblank all fxgroup kara,!retime("line",-100,500)!{\pos($center,$middle)\an5\shad0\fad(__FADE_IN_MS__,__FADE_OUT_MS__)\1c&H__OVERLAY_COLOR__&\3c&HFFFFFF&\clip(!$sleft-3!,0,!$sleft-3!,1080)\t($sstart,$send,\clip(!$sleft-3!,0,!$sright+3!,1080))\bord__BORD__}
-Comment: 0,0:00:00.00,0:00:00.00,K2,,0,0,0,template syl all fxgroup kara,!retime("line",-500,500)!{\pos($center,$middle)\an5\fad(__FADE_IN_MS__,__FADE_OUT_MS__)}
-Comment: 1,0:00:18.65,0:00:20.65,K2,overlay,0,0,0,template furi all,!retime("line",-100,500)!{\pos($center,!$middle__RUBY_OFFSET__!)\an5\shad0\fad(__FADE_IN_MS__,__FADE_OUT_MS__)\1c&H__OVERLAY_COLOR__&\3c&HFFFFFF&\clip(!$sleft-3!,0,!$sleft-3!,1080)\t($sstart,$send,\clip(!$sleft-3!,0,!$sright+3!,1080))\bord__BORD_FURI__}
-Comment: 0,0:00:00.00,0:00:00.00,K2,,0,0,0,template furi all,!retime("line",-500,500)!{\pos($center,!$middle__RUBY_OFFSET__!)\an5\fad(__FADE_IN_MS__,__FADE_OUT_MS__)}
-Comment: 0,0:00:00.00,0:00:00.00,K2,music,0,0,0,template fx no_k,!retime("line",-500,500)!{\pos($center,!$middle!)\an5\1c&H505050&\3c&HFFFFFFF&}
+Comment: 0,0:00:00.00,0:00:00.00,K1,,0,0,0,code syl,fxgroup["kara"] = syl.inline_fx == ""
+Comment: 1,0:00:00.00,0:00:00.00,K1,overlay,0,0,0,template syl noblank fxgroup kara,!retime("line",-min(100,orgline.start_time),500)!{\pos($center,$middle)\an5\shad0\fad(__FADE_IN_MS__,__FADE_OUT_MS__)\1c&H__OVERLAY_COLOR__&\3c&HFFFFFF&\clip(!$sleft-3!,0,!$sleft-3!,1080)\t(!$sstart+min(100,orgline.start_time)!,!$send+min(100,orgline.start_time)!,\clip(!$sleft-3!,0,!$sright+3!,1080))\bord__BORD__}
+Comment: 0,0:00:00.00,0:00:00.00,K1,,0,0,0,template syl noblank fxgroup kara,!retime("line",-500,500)!{\pos($center,$middle)\an5\fad(__FADE_IN_MS__,__FADE_OUT_MS__)}
+Comment: 1,0:00:00.00,0:00:00.00,K1,overlay,0,0,0,template furi noblank,!retime("line",-min(100,orgline.start_time),500)!{\pos($center,!$middle__RUBY_OFFSET__!)\an5\shad0\fad(__FADE_IN_MS__,__FADE_OUT_MS__)\1c&H__OVERLAY_COLOR__&\3c&HFFFFFF&\clip(!$sleft-3!,0,!$sleft-3!,1080)\t(!$sstart+min(100,orgline.start_time)!,!$send+min(100,orgline.start_time)!,\clip(!$sleft-3!,0,!$sright+3!,1080))\bord__BORD_FURI__}
+Comment: 0,0:00:00.00,0:00:00.00,K1,,0,0,0,template furi noblank,!retime("line",-500,500)!{\pos($center,!$middle__RUBY_OFFSET__!)\an5\fad(__FADE_IN_MS__,__FADE_OUT_MS__)}
+Comment: 0,0:00:00.00,0:00:00.00,K2,,0,0,0,code syl,fxgroup["kara"] = syl.inline_fx == ""
+Comment: 1,0:00:00.00,0:00:00.00,K2,overlay,0,0,0,template syl noblank fxgroup kara,!retime("line",-min(100,orgline.start_time),500)!{\pos($center,$middle)\an5\shad0\fad(__FADE_IN_MS__,__FADE_OUT_MS__)\1c&H__OVERLAY_COLOR__&\3c&HFFFFFF&\clip(!$sleft-3!,0,!$sleft-3!,1080)\t(!$sstart+min(100,orgline.start_time)!,!$send+min(100,orgline.start_time)!,\clip(!$sleft-3!,0,!$sright+3!,1080))\bord__BORD__}
+Comment: 0,0:00:00.00,0:00:00.00,K2,,0,0,0,template syl noblank fxgroup kara,!retime("line",-500,500)!{\pos($center,$middle)\an5\fad(__FADE_IN_MS__,__FADE_OUT_MS__)}
+Comment: 1,0:00:00.00,0:00:00.00,K2,overlay,0,0,0,template furi noblank,!retime("line",-min(100,orgline.start_time),500)!{\pos($center,!$middle__RUBY_OFFSET__!)\an5\shad0\fad(__FADE_IN_MS__,__FADE_OUT_MS__)\1c&H__OVERLAY_COLOR__&\3c&HFFFFFF&\clip(!$sleft-3!,0,!$sleft-3!,1080)\t(!$sstart+min(100,orgline.start_time)!,!$send+min(100,orgline.start_time)!,\clip(!$sleft-3!,0,!$sright+3!,1080))\bord__BORD_FURI__}
+Comment: 0,0:00:00.00,0:00:00.00,K2,,0,0,0,template furi noblank,!retime("line",-500,500)!{\pos($center,!$middle__RUBY_OFFSET__!)\an5\fad(__FADE_IN_MS__,__FADE_OUT_MS__)}
 """
 
 

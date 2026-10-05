@@ -253,12 +253,15 @@ class DefaultProvider(AssProvider):
         )
 
     def _karaoke_text(self, line: FSLyricsLine) -> str:
-        if len(line.words) <= 1:
-            return self._plain_text(line)
         parts: list[str] = []
+        cursor = line.start
         for word in line.words:
+            gap = max((word.start - cursor) // 10, 0)
+            if gap:
+                parts.append(f"{{\\k{gap}}}")
             k = max((word.end - word.start) // 10, 1)
             parts.append(f"{{\\kf{k}}}{ass_escape(word.text)}")
+            cursor = word.end
         return "".join(parts)
 
     @staticmethod

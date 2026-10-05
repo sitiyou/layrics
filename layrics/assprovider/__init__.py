@@ -15,6 +15,10 @@ from ._protocol import (
     register_ass_provider,
 )
 from ._style import BottomStyle
+from ._templater import KaraTemplaterProvider
+
+register_ass_provider(DefaultProvider)
+register_ass_provider(KaraTemplaterProvider)
 
 __all__ = [
     "DEFAULT_PRIMARY",
@@ -26,6 +30,7 @@ __all__ = [
     "AssTrigger",
     "BottomStyle",
     "DefaultProvider",
+    "KaraTemplaterProvider",
     "Lyrics",
     "build_ass",
     "match_provider",

@@ -135,8 +135,8 @@ class Config:
         self.lyrics = LyricsConfig()
         self.dmenu = DmenuConfig()
         self.tray = TrayConfig()
+        self.ass_provider = "default"
         self._provider_config: dict[str, dict[str, Any]] = {}
-        self._load()
         self._provider_config.setdefault(
             "default",
             {
@@ -154,6 +154,7 @@ class Config:
                 },
             },
         )
+        self._load()
 
     @staticmethod
     def _parse_sources(raw_sources: list[str]) -> list[Source]:
@@ -263,10 +264,14 @@ class Config:
         # [assprovider.*]
         raw_assprovider = data.get("assprovider", {})
         if isinstance(raw_assprovider, dict):
+            provider = raw_assprovider.get("provider")
+            if isinstance(provider, str) and provider.strip():
+                self.ass_provider = provider.strip()
             for k, v in raw_assprovider.items():
                 if isinstance(v, dict):
                     self._provider_config[str(k)] = {
-                        str(kk): vv for kk, vv in v.items()
+                        **self._provider_config.get(str(k), {}),
+                        **{str(kk): vv for kk, vv in v.items()},
                     }
 
     def get_style_config(self, key: str) -> dict[str, Any]:
@@ -275,8 +280,19 @@ class Config:
             return {}
         return d.to_dict()
 
-    def get_provider_config(self, name: str) -> dict[str, Any]:
-        return dict(self._provider_config.get(name, {}))
+    def get_provider_config(self, name: str | None = None) -> dict[str, Any]:
+        config = dict(self._provider_config.get("default", {}))
+        for key, value in self._provider_config.get(
+            name or self.ass_provider, {}
+        ).items():
+            if isinstance(value, dict) and isinstance(config.get(key), dict):
+                config[key] = {**config[key], **value}
+            else:
+                config[key] = value
+        return config
+
+    def set_provider_option(self, key: str, value: Any) -> None:
+        self._provider_config.setdefault(self.ass_provider, {})[key] = value
 
 
 CONFIG: Config | None = None

@@ -36,7 +36,7 @@ class AssTrigger:
         if self.player_regex is not None and not re.search(self.player_regex, player_name):
             return False
         if self.lyrics_types is not None:
-            t = lyrics.types.get("orig")
+            t = lyrics.types.get(getattr(lyrics, "primary_track", "orig"))
             if t is None or t not in self.lyrics_types:
                 return False
         if self.has_translation is not None:
@@ -46,6 +46,10 @@ class AssTrigger:
         if self.has_romaji is not None:
             has_roma = "roma" in lyrics and len(lyrics["roma"]) > 0
             if has_roma != self.has_romaji:
+                return False
+        if self.source is not None:
+            sources = self.source if isinstance(self.source, list) else [self.source]
+            if lyrics.source not in sources:
                 return False
         return True
 
@@ -228,16 +232,29 @@ class AssProvider(Protocol):
     priority: ClassVar[int]
     trigger: ClassVar[AssTrigger]
 
+    def __init__(self, config: dict[str, Any] | None = None) -> None: ...
+
     def generate(self, lyrics: Lyrics, duration_ms: int | None = None) -> str: ...
 
 
 def register_ass_provider(provider: type[AssProvider]) -> None:
+    if any(p.PROVIDER == provider.PROVIDER for p in _ass_providers):
+        raise ValueError(f"ASS provider already registered: {provider.PROVIDER}")
     _ass_providers.append(provider)
     _ass_providers.sort(key=lambda p: p.priority)
 
 
-def match_provider(player_name: str, lyrics: _LDCLyrics) -> type[AssProvider] | None:
-    for p in _ass_providers:
-        if p.trigger.matches(player_name, lyrics):
-            return p
+def match_provider(
+    player_name: str,
+    lyrics: _LDCLyrics,
+    name: str | None = None,
+) -> type[AssProvider] | None:
+    for provider in _ass_providers:
+        if name is not None:
+            if provider.PROVIDER == name:
+                return provider
+        elif provider.trigger.matches(player_name, lyrics):
+            return provider
+    if name is not None:
+        raise ValueError(f"unknown ASS provider: {name}")
     return None

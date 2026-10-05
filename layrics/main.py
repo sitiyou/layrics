@@ -164,6 +164,10 @@ class LayricsApp:
         return self._last_track
 
     @property
+    def ass_config(self) -> dict[str, Any]:
+        return self._config.get_provider_config()
+
+    @property
     def player(self) -> PlayerSource | None:
         """The source currently being followed (public read for companion modules)."""
         if self._active_id is None:
@@ -251,12 +255,12 @@ class LayricsApp:
         else:
             parsed = _parse_bool(raw_value)
         if parsed is None:
-            current = self._config._provider_config.get("default", {}).get(key)
+            current = self._config.get_provider_config().get(key)
             if key == "line_mode":
                 parsed = "double" if current == "single" else "single"
             else:
                 parsed = not bool(current)
-        self._config._provider_config.setdefault("default", {})[key] = parsed
+        self._config.set_provider_option(key, parsed)
         logger.info("ass config: %s = %r", key, parsed)
 
         if self._last_track is not None:
@@ -893,7 +897,7 @@ class LayricsApp:
                 return {"id": req_id, "type": "result", "data": {"removed": True}}
 
             elif method == "ass_get":
-                prov = self._config._provider_config.get("default", {})
+                prov = self._config.get_provider_config()
                 return {
                     "id": req_id,
                     "type": "result",

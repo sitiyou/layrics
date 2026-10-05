@@ -100,16 +100,26 @@ encoding = 1
 primary = ["orig"]
 secondary = ["ts"]
 
-# ASS 生成器配置
+# ASS provider: default or kara-templater
+[assprovider]
+provider = "default"
+
 [assprovider.default]
 karaoke = true
 line_mode = "single"
 secondary = true
-# aegisub 卡拉OK模板模式（需要 aegisub-cli: https://github.com/Myaamori/aegisub-cli）
-# 仅当歌词带逐字时间轴时生效
-# aegisub_karaoke = false
-# aegisub_cli = ""
-# aegisub_automation = ""
+
+# Provider-specific overrides; other options inherit from assprovider.default
+[assprovider.kara-templater]
+
+# Built-in karaoke template effects
+[assprovider.kara-templater.template]
+bord = 5
+bord_furi = 3
+fade_in_ms = 800
+fade_out_ms = 200
+# overlay_color = "FCDD1C"
+ruby_offset = "+10"
 
 # layctl dmenu 使用的菜单程序
 # 可带参数，如 "rofi -dmenu"、"fuzzel --dmenu"、"bemenu"
