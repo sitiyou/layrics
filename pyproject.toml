@@ -1,6 +1,6 @@
 [build-system]
-requires = ["meson-python>=0.15", "pybind11"]
-build-backend = "mesonpy"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [project]
 name = "layrics"
@@ -9,6 +9,7 @@ description = "Desktop lyrics overlay for Wayland — auto-synced with MPRIS pla
 requires-python = ">=3.14"
 license = {text = "GPL-3.0-only"}
 dependencies = [
+    "asslayer>=0.1.0,<0.2.0",
     "httpx[brotli,http2]",
     "dbus-python",
     "PyGObject",
@@ -24,22 +25,15 @@ layrics = "layrics.main:main"
 layctl = "layrics.layctl:cli"
 
 [dependency-groups]
-# the build tools are here because build isolation is disabled for layrics (see tool.uv)
 dev = [
-    "meson-python>=0.15",
-    "pybind11>=2.12",
-    "meson>=1.2.3",
     "pytest>=9.1.1",
 ]
 
-[tool.uv]
-# meson-python rebuilds the extension on import, and meson bakes its own path into build.ninja: under
-# build isolation that path points into a temporary build environment that is deleted by then, so the
-# build tools have to come from this venv instead
-no-build-isolation-package = ["layrics"]
+[tool.hatch.build.targets.wheel]
+packages = ["layrics"]
 
-[tool.meson-python.args]
-setup = ["-Dbuildtype=release"]
+[tool.hatch.build.targets.sdist]
+include = ["/layrics", "/examples/config.toml", "/layrics.desktop", "/LICENSE", "/README.md"]
 
 [tool.pyright]
 typeCheckingMode = "basic"

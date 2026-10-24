@@ -35,13 +35,14 @@ import time
 from dataclasses import asdict
 from typing import Any
 
+from asslayer import ApplicationController
+
 from layrics.LDDC.common.exceptions import LyricsNotFoundError
 from layrics.LDDC.common.models import SongInfo, Source
 
 from . import menu
 from .cache import SongCache, make_cache_key
 from .config import get_config
-from .core import ApplicationController
 from .keys import KeyManager
 from .lyricsource import (
     fetch_lyrics as _fetch_lyrics,
@@ -132,7 +133,7 @@ class LayricsApp:
     """Orchestrates overlay, playback source, lyric fetching, and IPC."""
 
     def __init__(self, socket_path: str = ""):
-        self.ctrl = ApplicationController()
+        self.ctrl = ApplicationController(namespace="layrics")
         self.key_manager = KeyManager(self)
         self.ui_manager = UIManager(self)
         self._config = get_config()

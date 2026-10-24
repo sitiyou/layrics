@@ -1,4 +1,4 @@
-.PHONY: all build dev install clean format lint check test-wayland dist
+.PHONY: all build dev install clean format lint check dist
 
 all: dev
 
@@ -17,19 +17,13 @@ clean:
 	find . -name '*.pyc' -delete 2>/dev/null || true
 
 format:
-	@echo "Formatting C++ with clang-format..."
-	clang-format -i $$(find core -name '*.cpp' -o -name '*.hpp')
 	@echo "Formatting Python with ruff..."
 	ruff format layrics/
 
 lint:
 	ruff check layrics/
-	clang-format --dry-run --Werror $$(find core -name '*.cpp' -o -name '*.hpp')
 
 check: lint
-
-test-wayland:
-	scripts/test-wayland.sh
 
 dist:
 	uv build --wheel

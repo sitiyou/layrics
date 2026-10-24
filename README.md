@@ -60,8 +60,10 @@ paru -S layrics-git
 # install from source
 git clone https://github.com/sitiyou/layrics
 cd layrics
-uv tool install .
+uv tool install . --with /path/to/asslayer
 ```
+
+叠加引擎由独立依赖 `asslayer>=0.1.0,<0.2.0` 提供。在 asslayer 发布到包索引前，源码安装需要通过 `--with` 指向它的本地仓库；上方直接安装命令需等依赖发布后使用。两个仓库无需相邻。Wayland layer namespace 保持为 `layrics`，已有合成器规则无需修改。
 
 ## 使用
 
@@ -195,7 +197,7 @@ provider = "kara-templater"
 
 | 变量 | 说明 | 默认值 |
 |---|---|---|
-| `LAYRICS_DEBUG` | 启用调试日志。逗号分隔模块名 (`lyrics`, `main`, `match`, `assprovider`)，或 `core` 启用 C++ 调试日志 | 空 |
+| `LAYRICS_DEBUG` | 启用调试日志。逗号分隔模块名 (`lyrics`, `main`, `match`, `assprovider`)；`core` 自动设置 `ASSLAYER_DEBUG=1` 启用叠加引擎日志 | 空 |
 | `LAYRICS_CONFIG_DIR` | 配置文件目录 | `~/.config/layrics/` |
 | `LAYRICS_SOCK` | IPC socket 路径 | `$XDG_RUNTIME_DIR/layrics.sock` |
 | `LAYRICS_DMENU` | `layctl dmenu` 使用的菜单程序（覆盖 `[dmenu] program`） | `dmenu` |
@@ -280,8 +282,10 @@ paru -S layrics-git
 # install from source
 git clone https://github.com/sitiyou/layrics
 cd layrics
-uv tool install .
+uv tool install . --with /path/to/asslayer
 ```
+
+The overlay engine is provided by the independent dependency `asslayer>=0.1.0,<0.2.0`. Until asslayer is published to a package index, point `--with` at its local checkout; the direct installation commands above require the dependency to be published first. The repositories need not be adjacent. The Wayland layer namespace remains `layrics`, so existing compositor rules continue to apply.
 
 ## Usage
 
@@ -414,7 +418,7 @@ It inherits rendering settings from `[assprovider.default]`; override them in `[
 
 | Variable | Description | Default |
 |---|---|---|
-| `LAYRICS_DEBUG` | Enable debug logging. Comma-separated module names (`lyrics`, `main`, `match`, `assprovider`), or `core` for C++ debug | unset |
+| `LAYRICS_DEBUG` | Enable debug logging. Comma-separated module names (`lyrics`, `main`, `match`, `assprovider`); `core` automatically sets `ASSLAYER_DEBUG=1` for engine debug logs | unset |
 | `LAYRICS_CONFIG_DIR` | Config directory | `~/.config/layrics/` |
 | `LAYRICS_SOCK` | IPC socket path | `$XDG_RUNTIME_DIR/layrics.sock` |
 | `LAYRICS_DMENU` | menu program used by `layctl dmenu` (overrides `[dmenu] program`) | `dmenu` |
