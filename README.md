@@ -38,13 +38,15 @@ layrics 是一款桌面歌词软件：从 MPRIS 兼容的播放器（Spotify、m
 
 ### 系统依赖
 
-- `meson`、`pkg-config`
+- C/C++ 编译器、`pkg-config`
 - `wayland`
 - `vulkan`、`vulkan-headers`
 - `shaderc`
 - `libass`
 - `fontconfig`
 - `uv`
+
+`asslayer` 当前以源码包分发，安装时会编译叠加引擎，因此需要上述库的开发头文件。layrics 本身是纯 Python 包。
 
 ### 安装
 
@@ -60,10 +62,10 @@ paru -S layrics-git
 # install from source
 git clone https://github.com/sitiyou/layrics
 cd layrics
-uv tool install . --with /path/to/asslayer
+uv tool install .
 ```
 
-叠加引擎由独立依赖 `asslayer>=0.1.0,<0.2.0` 提供。在 asslayer 发布到包索引前，源码安装需要通过 `--with` 指向它的本地仓库；上方直接安装命令需等依赖发布后使用。两个仓库无需相邻。Wayland layer namespace 保持为 `layrics`，已有合成器规则无需修改。
+叠加引擎由独立依赖 `asslayer>=0.1.0,<0.2.0` 提供，安装时自动从 PyPI 获取，无需单独克隆引擎仓库。Wayland layer namespace 保持为 `layrics`，已有合成器规则无需修改。
 
 ## 使用
 
@@ -261,12 +263,15 @@ layrics is a desktop lyrics overlay: it fetches playback state from MPRIS-compat
 
 ### System dependencies
 
-- `meson`, `pkg-config`
+- A C/C++ compiler, `pkg-config`
 - `wayland`
 - `vulkan`, `vulkan-headers`
 - `shaderc`
 - `libass`
+- `fontconfig`
 - `uv`
+
+`asslayer` currently ships as a source distribution, so installation compiles the overlay engine and requires development headers for the libraries above. Layrics itself is a pure Python package.
 
 ### Install
 
@@ -282,10 +287,10 @@ paru -S layrics-git
 # install from source
 git clone https://github.com/sitiyou/layrics
 cd layrics
-uv tool install . --with /path/to/asslayer
+uv tool install .
 ```
 
-The overlay engine is provided by the independent dependency `asslayer>=0.1.0,<0.2.0`. Until asslayer is published to a package index, point `--with` at its local checkout; the direct installation commands above require the dependency to be published first. The repositories need not be adjacent. The Wayland layer namespace remains `layrics`, so existing compositor rules continue to apply.
+The overlay engine is provided by the independent dependency `asslayer>=0.1.0,<0.2.0`, fetched automatically from PyPI during installation. No separate engine checkout is needed. The Wayland layer namespace remains `layrics`, so existing compositor rules continue to apply.
 
 ## Usage
 
