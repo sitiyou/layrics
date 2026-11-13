@@ -15,7 +15,7 @@
 
 layrics 是一款桌面歌词软件：从 MPRIS 兼容的播放器（Spotify、mpd 等）中获取播放状态，自动搜索并匹配当前歌曲的歌词，以卡拉 OK（逐字）或纯文本形式悬浮显示在桌面上。渲染基于 `wlr-layer-shell` 协议与 libass（ASS 字幕），支持 Sway、Hyprland、KDE Plasma 等 Wayland 合成器。
 
-<video src="https://github.com/user-attachments/assets/6b443cf9-284a-4800-afc5-e7a7fb488092" controls></video>
+https://github.com/user-attachments/assets/6b443cf9-284a-4800-afc5-e7a7fb488092
 
 
 
@@ -247,7 +247,7 @@ provider = "kara-templater"
 
 layrics is a desktop lyrics overlay: it fetches playback state from MPRIS-compatible players (Spotify, mpd, ...), automatically searches and matches lyrics for the current track, and floats karaoke (word-by-word) or plain-text lyrics on your desktop. Rendering is built on `wlr-layer-shell`, libass (ASS subtitles) and Vulkan GPU compositing, supported on Sway, Hyprland, KDE Plasma, etc.
 
-<video src="https://github.com/user-attachments/assets/6b443cf9-284a-4800-afc5-e7a7fb488092" controls></video>
+https://github.com/user-attachments/assets/6b443cf9-284a-4800-afc5-e7a7fb488092
 
 ---
 
