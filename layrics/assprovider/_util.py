@@ -7,4 +7,11 @@ def ms2ass(ms: int) -> str:
 
 
 def ass_escape(text: str) -> str:
-    return text.replace("\\", "\\\\").replace("{", "\\{").replace("}", "\\}")
+    return (
+        text.replace("\\", "\\\\")
+        .replace("{", "\\{")
+        .replace("}", "\\}")
+        .replace("\r\n", "\n")
+        .replace("\r", "\n")
+        .replace("\n", r"\N")
+    )

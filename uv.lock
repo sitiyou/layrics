@@ -283,12 +283,14 @@ wheels = [
 
 [[package]]
 name = "kara-templater"
-version = "0.2.0"
-source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple" }
-sdist = { url = "https://pypi.tuna.tsinghua.edu.cn/packages/9f/64/1ddd989e187603cc0458edd8310fb11b723b99f44d01c63e6579e5619556/kara_templater-0.2.0.tar.gz", hash = "sha256:fa4fe51d729bac776d7db4e2fec52f5669a39f34fd6f60c67ff14d9170c9f4a4", size = 394187, upload-time = "2026-10-24T07:33:41.68Z" }
+version = "1.0.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/56/34/80cfbbc0ee89f96d917927d8bdf2f6fa14f8fd6b511c91f91b66847b2938/kara_templater-1.0.0.tar.gz", hash = "sha256:ea82fb346696f5d0234a1acceafe2df8a2e89f21eb50627439396b1607a368a8", size = 7502277, upload-time = "2026-11-19T17:52:22.608Z" }
 wheels = [
-    { url = "https://pypi.tuna.tsinghua.edu.cn/packages/c2/66/dd605d5cee94cbe76d5303e0166803f843ecea15808d858629c883ef0b16/kara_templater-0.2.0-cp314-cp314-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:f049059e623eef2b6e1dd8cc71550e6e6a2caeb79ac8cac9252a2cc931f62b4e", size = 697259, upload-time = "2026-10-24T07:33:38.333Z" },
-    { url = "https://pypi.tuna.tsinghua.edu.cn/packages/81/b4/d9fc9a63b275869d271d5c84039db5c7b96e48b5481921779d23367cd69a/kara_templater-0.2.0-cp314-cp314-win_amd64.whl", hash = "sha256:6dac321003f1a0765b5936ad8b1b5cd6b5e9a987fef3e8d81c9dc853385b484c", size = 5388297, upload-time = "2026-10-24T07:33:40.007Z" },
+    { url = "https://files.pythonhosted.org/packages/03/bb/a3d988de8629674d7d61ca44d4f0b8103ce1bcd70554e0f7a0a7dfb783f8/kara_templater-1.0.0-cp314-cp314-manylinux_2_28_x86_64.whl", hash = "sha256:43af9ddfcde9769cdca7925dab294f65a01447d82baaf4f7811fe90a6f491a77", size = 981816, upload-time = "2026-11-19T17:52:15.937Z" },
+    { url = "https://files.pythonhosted.org/packages/ae/05/ac33b2db786a340472ecda9d8a573461df0702d058e367b586fbda47fccd/kara_templater-1.0.0-cp314-cp314-win_amd64.whl", hash = "sha256:be48181174ef6965c1512e4b75f2dfd4e9daa7f2e5952ad1d6ce5305d2da86bd", size = 5762047, upload-time = "2026-11-19T17:52:17.641Z" },
+    { url = "https://files.pythonhosted.org/packages/7d/13/e8b48c98a52e8018b7a4a1d58e88abd0356c1054f0c542e69d027af02944/kara_templater-1.0.0-cp315-cp315-manylinux_2_28_x86_64.whl", hash = "sha256:19ea5ea828558ccadedc6ba88ccdc1381c296ec8555f3afa2c41b6a4b067172f", size = 982298, upload-time = "2026-11-19T17:52:19.122Z" },
+    { url = "https://files.pythonhosted.org/packages/8c/99/11e524e39c17b2a725ded461ec4d91098a58070d0678a0f62ef58f999304/kara_templater-1.0.0-cp315-cp315-win_amd64.whl", hash = "sha256:6cbbd30e1b3141302e2a63c67138b1fbc5e6a6858e56aa56402f12188599d255", size = 5762024, upload-time = "2026-11-19T17:52:20.774Z" },
 ]
 
 [[package]]
@@ -320,7 +322,7 @@ requires-dist = [
     { name = "dbus-python" },
     { name = "diskcache" },
     { name = "httpx", extras = ["brotli", "http2"] },
-    { name = "kara-templater", specifier = ">=0.1.0" },
+    { name = "kara-templater", specifier = ">=1.0.0,<2", index = "https://pypi.org/simple" },
     { name = "pyaes" },
     { name = "pygobject" },
 ]

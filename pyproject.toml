@@ -17,7 +17,7 @@ dependencies = [
     "diskcache",
     "pyaes",
     "appdirs",
-    "kara-templater>=0.1.0",
+    "kara-templater>=1.0.0,<2",
 ]
 
 [project.scripts]
@@ -40,3 +40,11 @@ typeCheckingMode = "basic"
 
 [tool.ruff.lint]
 ignore = ["BLE001"]
+
+[[tool.uv.index]]
+name = "pypi"
+url = "https://pypi.org/simple"
+explicit = true
+
+[tool.uv.sources]
+kara-templater = { index = "pypi" }

@@ -135,8 +135,8 @@ def test_template_output(line_mode, word_count):
     assert overlay_edge.start_time == 1000
     assert "\\1c&HFCDD1C&\\3c&HEFEFEF&" in overlay_edge.text
     assert "\\t(-24,0,\\clip(" in overlay_edge.text
-    assert "\\t(0,88.2355,0.5,\\clip(" in overlay_edge.text
-    assert "\\t(88.2355,500,\\clip(" in overlay_edge.text
+    assert "\\t(0,88.2353,0.5,\\clip(" in overlay_edge.text
+    assert "\\t(88.2353,500,\\clip(" in overlay_edge.text
     assert "\\t(500,524,\\clip(" in overlay_edge.text
 
 
@@ -160,7 +160,7 @@ def test_template_timing_at_zero():
     overlays = [line for line in result.lines if not line.comment and line.layer == 3]
     assert len(overlays) == 1
     assert overlays[0].start_time == 0
-    assert "\\t(0,88.2355,0.5,\\clip(" in overlays[0].text
+    assert "\\t(0,88.2353,0.5,\\clip(" in overlays[0].text
 
 
 def test_template_preserves_translation_and_parameters():
@@ -320,6 +320,32 @@ def test_template_furigana_layers():
     assert all("\\bord3" in line.text for line in furigana if line.layer in (2, 3))
 
 
+def test_template_uses_original_word_clocks_across_a_reading_pause():
+    lyrics = make_lyrics()
+    lyrics["orig"] = [
+        LyricsLine(
+            1000,
+            6500,
+            [
+                LyricsWord(1053, 1557, "幸|<しあ"),
+                LyricsWord(3003, 6457, "#|わ"),
+            ],
+        )
+    ]
+    output = Document.parse(KaraTemplaterProvider().generate(lyrics))
+    drawn = [line for line in output.lines if not line.comment]
+    assert len(drawn) == 12
+    body, first, second = [line for line in drawn if line.layer == 3]
+    assert (
+        body.text.endswith("幸")
+        and first.text.endswith("しあ")
+        and second.text.endswith("わ")
+    )
+    assert r"\t(1053,6457,0.5," in body.text
+    assert r"\t(1053,1557,0.5," in first.text
+    assert r"\t(3003,6457,0.5," in second.text
+
+
 def test_template_colours_follow_primary_style():
     lyrics = Lyrics(make_lyrics(), primary_override={"primary_colour": "&H000000FF"})
     result = Document.parse(KaraTemplaterProvider().generate(lyrics))
@@ -357,7 +383,7 @@ def test_template_glow_overrides():
     assert "\\3c&H112233&" in base_edge.text
     overlay_edge = next(line for line in effects if line.layer == 3)
     assert "\\1c&H0000FF&\\3c&H332211&" in overlay_edge.text
-    assert "\\t(-12,0,\\clip(" in overlay_edge.text
+    assert "\\t(988,1000,\\clip(" in overlay_edge.text
 
 
 @pytest.mark.parametrize(

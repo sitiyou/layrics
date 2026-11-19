@@ -5,6 +5,7 @@ from dataclasses import replace
 from typing import Any
 
 from layrics.LDDC.common.models import (
+    FSLyrics,
     FSLyricsLine,
     LyricsType,
 )
@@ -50,13 +51,16 @@ class DefaultProvider(AssProvider):
         self.double_max_length = double.get("max_length", 1280)
 
     def generate(self, lyrics: Lyrics, duration_ms: int | None = None) -> str:
-        orig_type = lyrics.types.get(lyrics.primary_track)
-
-        if orig_type == LyricsType.PlainText:
+        if lyrics.types.get(lyrics.primary_track) == LyricsType.PlainText:
             return self._generate_plaintext(lyrics, duration_ms)
 
-        fslyrics = lyrics.get_fslyrics(duration_ms)
-        use_karaoke = orig_type == LyricsType.VERBATIM and self.karaoke
+        return self._generate_timed(lyrics, lyrics.get_fslyrics(duration_ms))
+
+    def _generate_timed(self, lyrics: Lyrics, fslyrics: FSLyrics) -> str:
+        use_karaoke = (
+            lyrics.types.get(lyrics.primary_track) == LyricsType.VERBATIM
+            and self.karaoke
+        )
 
         orig_data = fslyrics[lyrics.primary_track]
         header = AssHeader(title=lyrics.title or "lyrics")
