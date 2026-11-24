@@ -1,11 +1,31 @@
 """The desktop lyric effect, compiled by kara-templater into standard ASS."""
 
 import colorsys
+from collections.abc import Iterator
 from dataclasses import replace
+from itertools import accumulate
 from math import floor
-from typing import Any
+from typing import Any, Literal
 
-from kara_templater import Document, KaraokeLine, Segment, TextUnit, layout_line
+from kara_templater import (
+    BLACK,
+    WHITE,
+    Box,
+    Document,
+    DocumentLyrics,
+    DocumentText,
+    Lifetime,
+    Line,
+    LyricMapping,
+    LyricSegment,
+    LyricUnit,
+    RubyText,
+    Style,
+    TextAppearance,
+    TextRun,
+    TimedTextSpan,
+    layout_lyrics,
+)
 
 from layrics.assprovider._ass import AssStyle
 from layrics.assprovider._util import ass_escape
@@ -25,32 +45,134 @@ def _glow_colour(
     return "".join(f"{round(channel * 255):02X}" for channel in (blue, green, red))
 
 
-def _lyrics(words: list[FSLyricsWord]) -> KaraokeLine:
-    units = []
+def _lyrics(words: list[FSLyricsWord], style_name: str) -> DocumentLyrics:
+    appearance = TextAppearance(style_name, WHITE, WHITE, BLACK, BLACK)
+    runs: list[TextRun] = []
+    units: list[LyricUnit] = []
+    offset = 0
     for word in words:
         body, sep, ruby = word.text.replace("｜", "|").partition("|")
         if sep:
             reading = ruby.rstrip(" \t")
             body += ruby[len(reading) :]
             ruby = reading
-        spill = ruby.startswith(("<", "＜"))
-        join = bool(sep) and not ruby.startswith(("!", "！", "<", "＜"))
-        if ruby.startswith(("!", "！", "<", "＜")):
-            ruby = ruby[1:]
-        segment = Segment(word.start, word.end, ruby)
-        if body.strip() in ("#", "＃") and units:
-            last = units[-1]
-            units[-1] = replace(
-                last,
-                segments=(*last.segments, segment),
-                ruby_continuation=last.ruby_continuation
-                if any(s.ruby for s in last.segments)
-                else join,
-                ruby_spillback=last.ruby_spillback or spill,
-            )
+        mode: Literal["join", "break", "spill"] = "join"
+        if ruby.startswith(("<", "＜")):
+            mode, ruby = "spill", ruby[1:]
+        elif ruby.startswith(("!", "！")):
+            mode, ruby = "break", ruby[1:]
+        continuation = bool(units) and body.strip() in ("#", "＃")
+        if continuation:
+            start, end = units[-1].start, units[-1].end
         else:
-            units.append(TextUnit(body, (segment,), join, spill))
-    return KaraokeLine(tuple(units))
+            start, end = offset, offset + len(body)
+            if body:
+                runs.append(TextRun(body, start, end, appearance))
+            offset = end
+
+        reading = None
+        if ruby:
+            length = len(ruby)
+            run = TextRun(ruby, 0, length, appearance)
+            reading = RubyText(
+                DocumentText(None, (), (run,), (), (), ()),
+                (LyricMapping(0, length, 0, length),),
+                mode,
+            )
+        timing = TimedTextSpan(start, end, word.start / 1000, word.end / 1000, "kf")
+        segment = LyricSegment(timing, start, end, reading)
+        if continuation:
+            previous = units[-1]
+            units[-1] = replace(previous, segments=(*previous.segments, segment))
+        else:
+            units.append(LyricUnit(start, end, (segment,)))
+
+    body = DocumentText(None, (), tuple(runs), (), (), ())
+    return DocumentLyrics(
+        body, body, (LyricMapping(0, offset, 0, offset),), tuple(units)
+    )
+
+
+def _body_origin(document: Document, style: Style, bounds: Box) -> tuple[float, float]:
+    available = document.meta.res_x - style.margin_l - style.margin_r - bounds.width
+    left = style.margin_l + available * ((style.align - 1) % 3) / 2
+    top = (
+        document.meta.res_y - style.margin_v - bounds.height,
+        (document.meta.res_y - bounds.height) / 2,
+        style.margin_v,
+    )[(style.align - 1) // 3]
+    return left - bounds.left, top - bounds.top
+
+
+def _clock(
+    timing: TimedTextSpan, left: float, right: float
+) -> tuple[int, int, float, float]:
+    return round(timing.start * 1000), round(timing.end * 1000), left, right
+
+
+def _draw_layout(
+    document: Document,
+    line: Line,
+    words: list[FSLyricsWord],
+    style: Style,
+    ruby: Style,
+    options: dict[str, Any],
+) -> Iterator[Line]:
+    lyrics = _lyrics(words, style.name)
+    surface = lyrics.body.text
+    if not surface.strip():
+        return
+    measured = layout_lyrics(
+        document,
+        lyrics,
+        id=f"{line.style}:{line.start_time}",
+        display=Lifetime(line.start_time / 1000, line.end_time / 1000),
+        ruby_gap=0,
+    )
+    x, y = _body_origin(document, style, measured.body.bounds)
+    readings = {
+        (item.unit_index, item.segment_index): item.layout for item in measured.ruby
+    }
+    for index, unit in enumerate(lyrics.units):
+        text = surface[unit.start : unit.end]
+        unit_readings = tuple(
+            readings.get((index, i)) for i in range(len(unit.segments))
+        )
+        if text.strip():
+            box = measured.body.range_bounds(unit.start, unit.end)
+            box = replace(box, left=box.left + x, top=box.top + y)
+            widths = [item.bounds.width if item else 0 for item in unit_readings]
+            total = sum(widths)
+            if not total:
+                widths = [1.0] * len(unit.segments)
+                total = len(widths)
+            edges = tuple(
+                box.left + box.width * width / total
+                for width in accumulate(widths, initial=0)
+            )
+            clocks = [
+                _clock(segment.timing, edges[i], edges[i + 1])
+                for i, segment in enumerate(unit.segments)
+            ]
+            yield from _layers(
+                line, style.name, text, box, clocks, options, options["bord"]
+            )
+        for segment, reading in zip(unit.segments, unit_readings, strict=True):
+            if reading is None:
+                continue
+            box = replace(
+                reading.bounds, left=reading.bounds.left + x, top=reading.bounds.top + y
+            )
+            yield from _layers(
+                line,
+                ruby.name,
+                reading.source.text,
+                box,
+                [_clock(segment.timing, box.left, box.right)],
+                options,
+                options["bord_furi"],
+                float(options["ruby_offset"]),
+            )
 
 
 def _layers(line, style, text, box, clocks, options, border, y_offset=0):
@@ -161,47 +283,11 @@ def render(
             line.style = names.get(line.style, line.style)
             style = styles[line.style]
             ruby = styles[style.name + "-furigana"]
-            layout = layout_line(
-                _lyrics(next(source_rows).words), style=style, ruby_style=ruby
-            )
-            for unit in layout.units:
-                clocks = [
-                    (s.source.start_ms, s.source.end_ms, s.left, s.right)
-                    for s in unit.segments
-                ]
-                document.records.extend(
-                    _layers(
-                        line,
-                        style.name,
-                        unit.source.text,
-                        unit.box,
-                        clocks,
-                        options,
-                        options["bord"],
-                    )
+            document.records.extend(
+                _draw_layout(
+                    document, line, next(source_rows).words, style, ruby, options
                 )
-                for seg in unit.segments:
-                    if seg.ruby is not None:
-                        clocks = [
-                            (
-                                seg.source.start_ms,
-                                seg.source.end_ms,
-                                seg.ruby.left,
-                                seg.ruby.right,
-                            )
-                        ]
-                        document.records.extend(
-                            _layers(
-                                line,
-                                ruby.name,
-                                seg.source.ruby,
-                                seg.ruby,
-                                clocks,
-                                options,
-                                options["bord_furi"],
-                                float(options["ruby_offset"]),
-                            )
-                        )
+            )
         line.comment = True
         line.effect = "karaoke"
     return document.dumps()

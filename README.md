@@ -58,6 +58,8 @@ https://github.com/user-attachments/assets/6b443cf9-284a-4800-afc5-e7a7fb488092
 
 ### 安装
 
+layrics 使用 Python 3.14 或更新版本。源码安装需要能获取 kara-templater 1.1.0 或更新的兼容版本。准备发行时，可先把本地构建的 wheel 安装到开发环境。
+
 ```bash
 # uv / pipx
 uv tool install git+https://github.com/sitiyou/layrics
@@ -199,7 +201,7 @@ hl.bind("SUPER + SHIFT + M", hl.dsp.exec_cmd [[layctl dmenu]])
 provider = "kara-templater"
 ```
 
-修改后重启 layrics。`kara-templater` 随应用安装，支持单行和双行模式；非逐字歌词或关闭 `karaoke` 时使用普通 ASS 输出。
+修改后重启 layrics。`kara-templater` 1.1.0 或更新的兼容版本随应用安装，支持单行和双行模式；非逐字歌词或关闭 `karaoke` 时使用普通 ASS 输出。
 逐词时间直接来自歌词源，排版使用 kara-templater 的结构化字词与注音接口。每个可见词或注音生成四条原生 ASS 事件，数量与音符时长无关。默认模板包含四层光晕／轮廓、音节缩放脉冲和变速扫光；主色取主歌词的 `PrimaryColour`，光晕颜色自动派生。单行模式的副歌词配色沿用 `[style.secondary]`，字间距、描边和模糊按字号比例缩放，保留自身字体、字号及位置，不带动画。模板的 `spacing` 控制字间距，默认为 `5`。
 它继承 `[assprovider.default]` 的渲染设置，可在 `[assprovider.kara-templater]` 中覆盖；特效参数放在 `[assprovider.kara-templater.template]`。`layctl ass` 和右键菜单修改当前 provider 的设置。
 
@@ -214,7 +216,7 @@ provider = "kara-templater"
 
 ## 歌词渲染
 
-- **卡拉 OK**（`karaoke=true`）：逐字填色，`PrimaryColour` 为已唱色、`SecondaryColour` 为未唱色
+- **卡拉 OK**（`karaoke=true`）：逐字扫色，默认 provider 用 `SecondaryColour` 作为扫色前的填充，用 `PrimaryColour` 作为扫色后的填充
 - **单行模式**（`line_mode="single"`）：一行居中，可附带翻译/罗马音
 - **双行模式**（`line_mode="double"`）：两行左右交替显示；启用 `advance_ms` 时提前显示为暗色，到播放时间点亮
 
@@ -282,6 +284,8 @@ https://github.com/user-attachments/assets/6b443cf9-284a-4800-afc5-e7a7fb488092
 `asslayer` currently ships as a source distribution, so installation compiles the overlay engine and requires development headers for the libraries above. Layrics itself is a pure Python package.
 
 ### Install
+
+Layrics uses Python 3.14 or later. Installing from source requires kara-templater 1.1.0 or a compatible newer release. During release preparation, use a locally built wheel in the development environment.
 
 ```bash
 # uv / pipx
@@ -423,7 +427,7 @@ The default provider is `default`. To enable the built-in karaoke templates:
 provider = "kara-templater"
 ```
 
-Restart layrics after changing the provider. `kara-templater` is installed with the application and supports single- and double-line modes. Non-word-timed lyrics, or disabling `karaoke`, use ordinary ASS output.
+Restart layrics after changing the provider. `kara-templater` 1.1.0 or a compatible newer version is installed with the application and supports single- and double-line modes. Non-word-timed lyrics, or disabling `karaoke`, use ordinary ASS output.
 Word clocks come directly from the lyric source. The provider uses kara-templater’s structured word and ruby layout and emits four native ASS events per visible word or reading, independent of note duration. The default template combines four glow/outline layers, syllable scale pulses, and a variable-speed highlight sweep. Its main colour follows the primary lyric style's `PrimaryColour`, with glow colours derived automatically. In single-line mode, secondary lyrics use the colours from `[style.secondary]`, with spacing, border widths, and blur scaled to their font size. They retain their own font, size, and position, without animation. The template's `spacing` controls character spacing and defaults to `5`.
 It inherits rendering settings from `[assprovider.default]`; override them in `[assprovider.kara-templater]` and configure effects in `[assprovider.kara-templater.template]`. `layctl ass` and the context menu update the current provider's settings.
 
@@ -438,7 +442,7 @@ It inherits rendering settings from `[assprovider.default]`; override them in `[
 
 ## Lyrics rendering
 
-- **Karaoke** (`karaoke=true`): syllable-by-syllable colour fill; `PrimaryColour` is the sung colour, `SecondaryColour` the upcoming one
+- **Karaoke** (`karaoke=true`): syllable-by-syllable colour fill. The default provider uses `SecondaryColour` before the wipe and `PrimaryColour` after it
 - **Single line** (`line_mode="single"`): one centered line, optionally with a translation/romaji second line
 - **Double line** (`line_mode="double"`): two lines shown side by side; with `advance_ms` they appear dimmed before their play time and light up when it starts
 
