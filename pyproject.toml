@@ -17,7 +17,7 @@ dependencies = [
     "diskcache",
     "pyaes",
     "appdirs",
-    "kara-templater>=1.1.0,<2",
+    "kara-templater>=1.1.1,<2",
 ]
 
 [project.scripts]
