@@ -109,9 +109,8 @@ class MPRISPlayer:
         )
 
 
-def scan_players() -> list[MPRISPlayer]:
-    """Every MPRIS player currently owning a name on the session bus."""
-    players: list[MPRISPlayer] = []
+def scan_player_names() -> list[str]:
+    """Discover names through the bus daemon without contacting each player."""
     try:
         bus = dbus.SessionBus()
         dbus_obj = bus.get_object("org.freedesktop.DBus", "/org/freedesktop/DBus")
@@ -120,11 +119,13 @@ def scan_players() -> list[MPRISPlayer]:
         ).ListNames()
     except dbus.DBusException as e:
         logger.warning("cannot list D-Bus services: %s", e)
-        return players
+        return []
+    return [str(name) for name in names if name.startswith(MPRIS_PREFIX + ".")]
 
-    for name in names:
-        if not name.startswith(MPRIS_PREFIX + "."):
-            continue
+
+def scan_players() -> list[MPRISPlayer]:
+    players: list[MPRISPlayer] = []
+    for name in scan_player_names():
         try:
             players.append(MPRISPlayer(str(name)))
         except ConnectionError as e:

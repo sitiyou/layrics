@@ -7,6 +7,7 @@ from ._ass import (
     build_ass,
 )
 from ._base import DefaultProvider
+from ._gallery import GradientOutlineProvider
 from ._protocol import (
     AssProvider,
     AssTrigger,
@@ -17,6 +18,7 @@ from ._protocol import (
 from ._style import BottomStyle
 from ._templater import KaraTemplaterProvider
 
+register_ass_provider(GradientOutlineProvider)
 register_ass_provider(DefaultProvider)
 register_ass_provider(KaraTemplaterProvider)
 
@@ -30,6 +32,7 @@ __all__ = [
     "AssTrigger",
     "BottomStyle",
     "DefaultProvider",
+    "GradientOutlineProvider",
     "KaraTemplaterProvider",
     "Lyrics",
     "build_ass",

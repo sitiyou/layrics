@@ -1,5 +1,5 @@
 # layrics 配置文件
-# 路径: $XDG_CONFIG_HOME/layrics/config.toml 或 ~/.config/layrics/config.toml
+# LAYRICS_CONFIG_DIR 可直接指定配置目录。默认路径: $XDG_CONFIG_HOME/layrics/config.toml 或 ~/.config/layrics/config.toml
 # 以下为所有配置项及其默认值。将此文件按需修改后放入配置目录即可生效。
 
 # 歌词搜索源
@@ -45,7 +45,7 @@ zh = "Noto Sans CJK SC"
 
 # ASS 主样式覆盖
 [style.primary]
-font_name = "sans-serif"
+# font_name = "sans-serif"
 font_size = 48
 primary_colour = "&H00FCDD1C"
 secondary_colour = "&H00FFFFFF"
@@ -70,7 +70,7 @@ encoding = 1
 
 # ASS 副样式覆盖
 [style.secondary]
-font_name = "sans-serif"
+# font_name = "sans-serif"
 font_size = 32
 primary_colour = "&H00D5D1CF"
 secondary_colour = "&H00C0C0C0"
@@ -100,16 +100,20 @@ encoding = 1
 primary = ["orig"]
 secondary = ["ts"]
 
-# ASS provider: default or kara-templater
+# gradient-outline：有逐字时间时使用 Hook；不支持 Hook 的引擎使用原生 ASS。
+# default：原生 ASS；kara-templater：光晕 ASS。
 [assprovider]
-provider = "default"
+provider = "gradient-outline"
 
 [assprovider.default]
 karaoke = true
 line_mode = "single"
 secondary = true
 
-# Provider-specific overrides; other options inherit from assprovider.default
+# 每个 provider 的设置继承自 assprovider.default，可按需覆盖
+[assprovider.gradient-outline]
+# line_mode = "double"
+
 [assprovider.kara-templater]
 
 # Built-in karaoke template effects

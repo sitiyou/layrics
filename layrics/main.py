@@ -17,6 +17,8 @@ Methods:
    unhide                               -> {hidden}
    lock                                 -> {locked}
    unlock                               -> {locked}
+   reset_drag                           -> {reset}
+   ass_get                              -> provider settings
    set_fps      {fps}                   -> {target_fps}
    get_status                           -> {player, overlay}
    cache_list                           -> [{key, song_id, lyrics_title, lyrics_artists, updated_at}]
@@ -26,18 +28,23 @@ Methods:
 """
 
 import asyncio
+import errno
 import fcntl
 import json
 import logging
 import os
+import socket
+import stat
 import sys
 import time
 from dataclasses import asdict
+from pathlib import Path
 from typing import Any
 
 from asslayer import ApplicationController
+from httpx import HTTPError
 
-from layrics.LDDC.common.exceptions import LyricsNotFoundError
+from layrics.LDDC.common.exceptions import LDDCError, LyricsNotFoundError
 from layrics.LDDC.common.models import SongInfo, Source
 
 from . import menu
@@ -60,6 +67,7 @@ from .player import (
     PlayerUnavailable,
     SourceSnapshot,
     TrackMeta,
+    discover_source_ids,
     list_sources,
     open_source,
     pick_active_source,
@@ -137,6 +145,12 @@ class LayricsApp:
         self.key_manager = KeyManager(self)
         self.ui_manager = UIManager(self)
         self._config = get_config()
+        if self._config.ass_provider == "gradient-outline" and not hasattr(
+            self.ctrl, "set_hook_input"
+        ):
+            logger.warning(
+                "Installed asslayer has no Hook input. Word-timed lyrics will use native ASS."
+            )
         self._tray = TrayIcon(self, icon_path=self._config.tray.icon)
         self._sources: dict[str, PlayerSource] = {}
         self._monitors: dict[str, Any] = {}  # source id -> change monitor (has an fd)
@@ -155,6 +169,7 @@ class LayricsApp:
         self._server: asyncio.AbstractServer | None = None
         self._last_position_us: int = 0
         self._fetch_gen: int = 0
+        self._pending_bindings: dict[str, object] = {}
         self._lyrics_delay_ms: int = 0
 
     @property
@@ -181,10 +196,30 @@ class LayricsApp:
     # ── overlay control ───────────────────────────────────────────
 
     def load_ass(self, path: str):
-        with open(path, "r", encoding="utf-8") as f:
-            content = f.read()
-        self.ctrl.set_ass_input(content)
-        logger.info("loaded ass: %s", path)
+        source = Path(path)
+        if source.suffix.lower() == ".hook":
+            if not hasattr(self.ctrl, "set_hook_input"):
+                raise RuntimeError(
+                    "Loading a Hook requires asslayer with libplacebo support"
+                )
+            self.ctrl.set_hook_input(source.read_bytes())
+            self._sync_with_delay()
+        else:
+            self.ctrl.set_ass_input(source.read_text(encoding="utf-8"))
+        self._fetch_gen += 1
+        logger.info("loaded lyrics: %s", path)
+
+    def _clear_lyrics(self) -> None:
+        if hasattr(self.ctrl, "clear_input"):
+            self.ctrl.clear_input()
+        else:
+            self.ctrl.set_ass_input(EMPTY_ASS)
+
+    def _present_lyrics(self, content: bytes | str) -> None:
+        if isinstance(content, bytes):
+            self.ctrl.set_hook_input(content)
+        else:
+            self.ctrl.set_ass_input(content)
 
     async def ui_action(self, action: str) -> None:
         """Dispatch a right-click menu action (handling lives in menu.py)."""
@@ -255,11 +290,15 @@ class LayricsApp:
         logger.info("ass config: %s = %r", key, parsed)
 
         if self._last_track is not None:
+            self._fetch_gen += 1
+            gen = self._fetch_gen
             try:
                 ass, ass_key, song_id, source = await self._fetch_ass_for_track(
                     self._last_track
                 )
-                self.ctrl.set_ass_input(ass)
+                if gen != self._fetch_gen:
+                    return key, parsed
+                self._present_lyrics(ass)
                 self._restore_lyrics_delay(ass_key, song_id, source)
                 logger.info("ass config: lyrics reloaded with new %s = %r", key, parsed)
             except Exception as e:
@@ -281,10 +320,25 @@ class LayricsApp:
         src, raw_id = parse_composite_id(song_id)
         si = cache.lookup_song_info(raw_id, src.name)
         song_info = si or SongInfo.from_dict({"source": src.name, "id": raw_id})
-        ass = await _fetch_lyrics(song_info)
-        cache.set(key, raw_id, src.name)
+        current = key == self._last_track_key
+        if current:
+            self._fetch_gen += 1
+        gen = self._fetch_gen
+        binding = self._pending_bindings[key] = object()
+        try:
+            ass = await _fetch_lyrics(
+                song_info, hook=current and hasattr(self.ctrl, "set_hook_input")
+            )
+            if self._pending_bindings.get(key) is not binding:
+                return
+            cache.set(key, raw_id, src.name)
+        finally:
+            if self._pending_bindings.get(key) is binding:
+                del self._pending_bindings[key]
 
-        self.ctrl.set_ass_input(ass)
+        if not current or gen != self._fetch_gen:
+            return
+        self._present_lyrics(ass)
         self._restore_lyrics_delay(key, raw_id, src.name)
         logger.info("cache set: %s -> %s%s", key, src.name, raw_id)
 
@@ -294,13 +348,17 @@ class LayricsApp:
             if self._last_track is None:
                 raise RuntimeError("no current track")
             key = make_cache_key(self._last_track)
+        self._pending_bindings.pop(key, None)
         SongCache().remove(key)
         logger.info("cache removed: %s", key)
 
     # ── auto-fetch ────────────────────────────────────────────────
 
-    async def _fetch_ass_for_track(self, meta: TrackMeta) -> tuple[str, str, str, str]:
-        """Fetch ASS lyrics for the track; returns (ass, cache_key, song_id, source)."""
+    async def _fetch_ass_for_track(
+        self, meta: TrackMeta, *, playback: bool = True
+    ) -> tuple[str | bytes, str, str, str]:
+        """Fetch playback or export content along with the cache key, song ID and source."""
+        hook = playback and hasattr(self.ctrl, "set_hook_input")
         keyword = meta.title or ""
         if meta.artists:
             keyword += " " + " ".join(meta.artists)
@@ -318,29 +376,21 @@ class LayricsApp:
                 cached.lyrics_source,
                 cached.lyrics_song_id,
             )
-            si = cache.lookup_song_info(cached.lyrics_song_id, cached.lyrics_source)
-            if si is None:
+            src = Source.__members__.get(cached.lyrics_source)
+            if src is None or not src.supported_search_types:
+                logger.warning("fetch: invalid source in cache %s", cached.lyrics_source)
+                cache.remove_binding(key, cached.lyrics_song_id, cached.lyrics_source)
+            else:
+                si = cache.lookup_song_info(cached.lyrics_song_id, src.name)
+                if si is None:
+                    si = SongInfo.from_dict({"source": src.name, "id": cached.lyrics_song_id})
                 try:
-                    src = Source[cached.lyrics_source]
-                except KeyError:
-                    logger.warning(
-                        "fetch: invalid source in cache %s", cached.lyrics_source
-                    )
-                    cache.remove(key)
-                    si = None
-                else:
-                    si = SongInfo.from_dict(
-                        {"source": src.name, "id": cached.lyrics_song_id}
-                    )
-            if si is not None:
-                try:
-                    ass = await _fetch_lyrics(si)
+                    ass = await _fetch_lyrics(si, hook=hook)
                     logger.info("fetch: cache hit %s (%d bytes)", keyword, len(ass))
                     return ass, key, cached.lyrics_song_id, cached.lyrics_source
-                except Exception as e:
-                    logger.warning("fetch: error fetch lyrics: %s", e)
-                    logger.warning("fetch: stale cache entry, removing: %s", key)
-                    cache.remove(key)
+                except LyricsNotFoundError:
+                    logger.warning("fetch: bound lyrics no longer available: %s", key)
+                    cache.remove_binding(key, cached.lyrics_song_id, cached.lyrics_source)
 
         logger.info("fetch: searching %s", keyword)
         results = await _search_songs(keyword, 20)
@@ -349,6 +399,14 @@ class LayricsApp:
 
         cache.store_search_results(results)
 
+        # The cached candidate already failed in this request. Another source
+        # can use the same numeric ID for a different recording.
+        if cached is not None:
+            results = [
+                item for item in results
+                if (item["source"], str(item["id"]))
+                != (cached.lyrics_source, cached.lyrics_song_id)
+            ]
         matched = match_song(meta, results)
         if not matched:
             logger.info(
@@ -359,7 +417,7 @@ class LayricsApp:
         src = Source[matched["source"]]
         raw_id = matched["id"]
         song_info = SongInfo.from_dict(matched)
-        ass = await _fetch_lyrics(song_info)
+        ass = await _fetch_lyrics(song_info, hook=hook)
         logger.info("fetch: %s -> %s (%d bytes)", keyword, matched["id"], len(ass))
 
         cache.set_if_missing(key, raw_id, src.name)
@@ -369,13 +427,13 @@ class LayricsApp:
     async def _auto_fetch_lyrics(self, meta: TrackMeta, gen: int) -> None:
         try:
             ass_content, key, song_id, source = await self._fetch_ass_for_track(meta)
-        except (RuntimeError, LyricsNotFoundError, json.JSONDecodeError) as e:
+        except (RuntimeError, LDDCError, HTTPError, json.JSONDecodeError) as e:
             logger.error("auto-fetch: %s", e)
             return
         else:
             if self._fetch_gen != gen:
                 return
-            self.ctrl.set_ass_input(ass_content)
+            self._present_lyrics(ass_content)
 
         if self._fetch_gen != gen:
             return
@@ -409,7 +467,7 @@ class LayricsApp:
         MPD stays attached while its monitor reconnects; it is only dropped
         by shutdown.
         """
-        ids = {s["id"] for s in list_sources(self._config, attached=self._sources)}
+        ids = set(discover_source_ids(self._config, attached=self._sources))
         for sid in ids - self._sources.keys():
             self._attach_source(sid)
         for sid in [s for s, src in self._sources.items() if src.kind != "mpd"]:
@@ -461,9 +519,10 @@ class LayricsApp:
         self._last_track_key = None
         self._last_state = None
         self._last_position_us = 0
+        self._lyrics_delay_ms = 0
         self._fetch_gen += 1
         if clear_screen:
-            self.ctrl.set_ass_input(EMPTY_ASS)
+            self._clear_lyrics()
 
     def _on_source_signal(self, monitor) -> None:
         """A change event arrived on a monitor fd: reconcile once."""
@@ -474,9 +533,18 @@ class LayricsApp:
         """Snapshot every attached source; drop the MPRIS ones that died."""
         snaps: dict[str, SourceSnapshot] = {}
         failed: set[str] = set()
-        for sid, source in list(self._sources.items()):
+        # A live pinned source, or playing native MPD, wins unconditionally.
+        # Read these first so an unrelated D-Bus player cannot delay a cut.
+        for sid in dict.fromkeys((self._pinned_id, "mpd", *self._sources)):
+            source = self._sources.get(sid)
+            if source is None:
+                continue
             try:
-                snaps[sid] = source.snapshot()
+                snap = snaps[sid] = source.snapshot()
+                if (sid == self._pinned_id and snap.state in (PlaybackState.PAUSED, PlaybackState.PLAYING)) or (
+                    sid == "mpd" and snap.state is PlaybackState.PLAYING
+                ):
+                    break
             except PlayerUnavailable as e:
                 failed.add(sid)
                 if source.kind == "mpd":
@@ -502,6 +570,7 @@ class LayricsApp:
 
         if active is None:
             if self._active_id in failed:
+                self._last_state = None  # Rebase the clock on reconnection.
                 if not self.ctrl.state.paused:
                     self.ctrl.set_status(paused=True)
                 return
@@ -517,7 +586,8 @@ class LayricsApp:
             self._last_position_us = 0
             return
 
-        if active != self._active_id:
+        source_changed = active != self._active_id
+        if source_changed:
             logger.info("following: %s", active)
             self._active_id = active
 
@@ -530,38 +600,34 @@ class LayricsApp:
         # the same song can be published by two backends at once (MPD and
         # mpDris2 wrapping it), and switching between them must not re-fetch.
         track_key = make_cache_key(track) if track and track.title else None
-        if track_key != self._last_track_key:
+        previous_key = self._last_track_key
+        if track_key != previous_key:
             self._fetch_gen += 1
             self._last_track_key = track_key
             self._last_track = track
-            self._last_position_us = pos
+            self._lyrics_delay_ms = 0
             if track_key is None:
-                self.ctrl.set_ass_input(EMPTY_ASS)
+                self._clear_lyrics()
                 return
             logger.info("track changed: %s", track.title)
-            self.ctrl.set_ass_input(EMPTY_ASS)
+            self._clear_lyrics()
             asyncio.get_event_loop().create_task(
                 self._auto_fetch_lyrics(track, self._fetch_gen)
             )
 
         now_ms = int(time.monotonic() * 1000)
-        if state is not self._last_state:
-            self._last_state = state
-            if state is PlaybackState.PLAYING:
-                self.ctrl.set_status(
-                    paused=False,
-                    start_time_ms=now_ms - pos // 1000 + self._lyrics_delay_ms,
-                )
-            elif state is PlaybackState.PAUSED:
-                self.ctrl.set_status(paused=True)
-
-        # Seek detection: a position jump while playing means the user seeked.
-        if state is PlaybackState.PLAYING:
-            expected = self._last_position_us + 1_000_000
-            if abs(pos - expected) > 500_000:
-                self.ctrl.set_status(
-                    start_time_ms=now_ms - pos // 1000 + self._lyrics_delay_ms
-                )
+        paused = state is PlaybackState.PAUSED
+        epoch = now_ms - pos // 1000 + self._lyrics_delay_ms
+        if state is not self._last_state or source_changed or track_key != previous_key:
+            self.ctrl.set_status(paused=paused, start_time_ms=epoch)
+        elif paused:
+            if pos != self._last_position_us:
+                self.ctrl.set_status(start_time_ms=epoch)
+        elif abs(epoch - self.ctrl.state.start_time_ms) > 500:
+            # Signals can arrive between polls. Compare against the running
+            # overlay clock regardless of how long ago we polled.
+            self.ctrl.set_status(start_time_ms=epoch)
+        self._last_state = state
         self._last_position_us = pos
 
     def adjust_lyrics_delay(self, delta_ms: int) -> None:
@@ -605,8 +671,7 @@ class LayricsApp:
         self._lyrics_delay_ms = delay if delay is not None else 0
         if delay:
             logger.info("lyrics delay restored: %+dms (%s)", delay, key)
-        if not self.ctrl.state.paused:
-            self._sync_with_delay()
+        self._sync_with_delay()
 
     def _sync_with_delay(self) -> bool:
         """Set start_time_ms = now - pos + lyrics_delay_ms.
@@ -633,6 +698,7 @@ class LayricsApp:
     async def fetch_lyrics(self, song_data: dict) -> str:
         song_info = SongInfo.from_dict(song_data)
         ass_content = await _fetch_lyrics(song_info)
+        assert isinstance(ass_content, str)
         logger.info("lyrics fetched (%d bytes)", len(ass_content))
         return ass_content
 
@@ -695,7 +761,7 @@ class LayricsApp:
                             "data": {"code": 400, "message": "no current track"},
                         }
                     ass_content, _, _, _ = await self._fetch_ass_for_track(
-                        self._last_track
+                        self._last_track, playback=False
                     )
                     return {
                         "id": req_id,
@@ -803,7 +869,11 @@ class LayricsApp:
                     "drag_offset_x": s.drag_offset_x,
                     "drag_offset_y": s.drag_offset_y,
                     "target_fps": s.target_fps,
-                    "position_ms": int(time.monotonic() * 1000) - s.start_time_ms,
+                    "position_ms": (
+                        self._last_position_us // 1000 - self._lyrics_delay_ms
+                        if s.paused
+                        else int(time.monotonic() * 1000) - s.start_time_ms
+                    ),
                 }
                 return {
                     "id": req_id,
@@ -970,6 +1040,32 @@ class LayricsApp:
 
     # ── Run ───────────────────────────────────────────────────────
 
+    async def _start_ipc_server(self):
+        path = Path(self.socket_path)
+        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        try:
+            try:
+                sock.bind(str(path))
+            except OSError as exc:
+                if exc.errno != errno.EADDRINUSE:
+                    raise
+                existing = path.lstat()
+                if not stat.S_ISSOCK(existing.st_mode) or existing.st_uid != os.getuid():
+                    raise
+                with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as probe:
+                    probe.setblocking(False)
+                    if probe.connect_ex(str(path)) != errno.ECONNREFUSED:
+                        raise
+                if not os.path.samestat(existing, path.lstat()):
+                    raise
+                path.unlink()
+                sock.bind(str(path))
+            path.chmod(0o600)
+            return await asyncio.start_unix_server(self._handle_client, sock=sock)
+        except BaseException:
+            sock.close()
+            raise
+
     async def run(self):
         self.ctrl.start()
 
@@ -983,16 +1079,7 @@ class LayricsApp:
             overlay.animation.amplitude,
         )
 
-        try:
-            os.unlink(self.socket_path)
-        except FileNotFoundError:
-            pass
-
-        self._server = await asyncio.start_unix_server(
-            self._handle_client,
-            path=self.socket_path,
-        )
-        os.chmod(self.socket_path, 0o666)
+        self._server = await self._start_ipc_server()
         logger.info("ipc server listening on %s", self.socket_path)
 
         # Seed the menu cache so the first right-click opens with content (the
@@ -1025,10 +1112,8 @@ class LayricsApp:
         self._tray.stop()
         for source_id in list(self._sources):
             self._detach_source(source_id)
-        try:
-            os.unlink(self.socket_path)
-        except FileNotFoundError, OSError:
-            pass
+        if self._server is not None:
+            self._server.close()
         self.ctrl.stop()
         self.ctrl.join()
         logger.info("cleanup done")

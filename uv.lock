@@ -46,9 +46,9 @@ wheels = [
 
 [[package]]
 name = "asslayer"
-version = "0.1.0"
+version = "0.2.0"
 source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple" }
-sdist = { url = "https://pypi.tuna.tsinghua.edu.cn/packages/80/c6/32d62524a3fb108d397797687ae82dd1fe581d61eb2747d8f4df573997c8/asslayer-0.1.0.tar.gz", hash = "sha256:c5cf1d72df9cc962fa78a7d3d25c3600be27175e78a537819fc58716330bc299", size = 934725, upload-time = "2026-10-24T13:28:03.453Z" }
+sdist = { url = "https://pypi.tuna.tsinghua.edu.cn/packages/c1/c8/0f81176bef789eb24f2297cb8ea731c9f745a1d39f94dd8de67e0810d5b8/asslayer-0.2.0.tar.gz", hash = "sha256:de2c428c074ac0c33757175823637f0fbc7aa3bd964b8b121b7092f7ffec1e7c", size = 951837, upload-time = "2026-11-28T17:54:30.425Z" }
 
 [[package]]
 name = "brotli"
@@ -303,18 +303,18 @@ wheels = [
 
 [[package]]
 name = "kara-templater"
-version = "1.1.1"
+version = "1.2.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aggdraw" },
     { name = "pillow" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/7b/b0/cb0b806613bc59410e2d6e9dfc51e4b8ca7942c41536fbb4f8ba537183e4/kara_templater-1.1.1.tar.gz", hash = "sha256:06d92b9d15f2860151953420ed12ca07774d2462712db8b51006f0730b891117", size = 4199422, upload-time = "2026-11-25T06:20:49.071Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/1f/22/b1bfb92f287e37b2aee6772f85dfeb0b0f2853f8291e797ebc0d6bda8def/kara_templater-1.2.2.tar.gz", hash = "sha256:a658a2fe38056eb255a27b933d93b116280557730dfb82a221250aa11a578992", size = 5660038, upload-time = "2026-11-28T18:06:31.797Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/b1/55/c28fd36bb0e412877f7df79908cf578e265bec180f2bbbaecd3cb5c9cbd0/kara_templater-1.1.1-cp314-cp314-manylinux_2_28_x86_64.whl", hash = "sha256:19ebef8c71f8d6888f6ea86b13fdb3c99d3d5b46a7c6156fc3fe68244444d3a9", size = 686862, upload-time = "2026-11-25T06:20:43.482Z" },
-    { url = "https://files.pythonhosted.org/packages/4e/cc/08dda89888103b652f92622ef93dfdc982e07a78143ca41f4af0de3d5536/kara_templater-1.1.1-cp314-cp314-win_amd64.whl", hash = "sha256:6355948d88c687ef517dc77d304f68b6e719a8f749d8f5ba63920a04ea6ea526", size = 5495763, upload-time = "2026-11-25T06:20:44.732Z" },
-    { url = "https://files.pythonhosted.org/packages/bc/e3/2e63abc46a9565e2a51518a3fd626dc554b6a974393f01d3b63c41be3c4d/kara_templater-1.1.1-cp315-cp315-manylinux_2_28_x86_64.whl", hash = "sha256:0b4cf50f8b9a3c21ed5d4fbbea6979dabc7ed181bb4883df13ad0c71e5a9fdaa", size = 686929, upload-time = "2026-11-25T06:20:46.155Z" },
-    { url = "https://files.pythonhosted.org/packages/26/a4/99064f87a895a97d8f15b46ebd31a00e73d1c022f98159db8da01003b671/kara_templater-1.1.1-cp315-cp315-win_amd64.whl", hash = "sha256:24c137e1c2631cd81fdb9fb763940b9c54761a78887a680e25eab8b91ab6234f", size = 5495763, upload-time = "2026-11-25T06:20:47.409Z" },
+    { url = "https://files.pythonhosted.org/packages/a8/05/285efb3a3c136106d2899e07883563d58f46b18fef17178af7ec9db4282d/kara_templater-1.2.2-cp314-cp314-manylinux_2_28_x86_64.whl", hash = "sha256:26127dd3836c32a3e26f8751bb5c912a14c4fe9438292e7311f578f1e04f7dd9", size = 3297238, upload-time = "2026-11-28T18:06:25.601Z" },
+    { url = "https://files.pythonhosted.org/packages/03/be/e9a09c276e791b69c0c99af9c69ff7934478bff87acb19d4b5847c72ed8f/kara_templater-1.2.2-cp314-cp314-win_amd64.whl", hash = "sha256:99661e9afd06c3c5b704cd3b988248c60205e3de82aee5a61f35f63329897c49", size = 8305777, upload-time = "2026-11-28T18:06:27.342Z" },
+    { url = "https://files.pythonhosted.org/packages/53/7a/4f06e125a90ba26d5c41ff94c7fc5f14be37b68900f1f8b04fcf75d43e56/kara_templater-1.2.2-cp315-cp315-manylinux_2_28_x86_64.whl", hash = "sha256:e64c7c006a484163b588dc8cbce296b554ea73a0d18ee8d1d3a511119d15f198", size = 3296941, upload-time = "2026-11-28T18:06:28.749Z" },
+    { url = "https://files.pythonhosted.org/packages/03/15/e68190e8ac3f27347bf103339b1dfab54c167ead0b4e6431906e0a7a07ac/kara_templater-1.2.2-cp315-cp315-win_amd64.whl", hash = "sha256:80d7da765b425acc11f2671f513e4710c971cc3164e1c4468fbfd6f71aae8817", size = 8305791, upload-time = "2026-11-28T18:06:30.146Z" },
 ]
 
 [[package]]
@@ -341,12 +341,12 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "appdirs" },
-    { name = "asslayer", specifier = ">=0.1.0,<0.2.0" },
+    { name = "asslayer", specifier = ">=0.2.0,<0.3.0" },
     { name = "click", specifier = ">=8.4.1" },
     { name = "dbus-python" },
     { name = "diskcache" },
     { name = "httpx", extras = ["brotli", "http2"] },
-    { name = "kara-templater", specifier = ">=1.1.1,<2", index = "https://pypi.org/simple" },
+    { name = "kara-templater", specifier = ">=1.2.2,<2", index = "https://pypi.org/simple" },
     { name = "pyaes" },
     { name = "pygobject" },
 ]

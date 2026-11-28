@@ -36,7 +36,8 @@ class SongCache:
     def __init__(self, db_path: str | None = None):
         if db_path is None:
             db_path = os.path.join(DATA_DIR, "song_cache.db")
-        os.makedirs(os.path.dirname(db_path), exist_ok=True)
+        if directory := os.path.dirname(db_path):
+            os.makedirs(directory, exist_ok=True)
         self._conn = sqlite3.connect(db_path, timeout=5.0)
         # WAL: concurrent readers/writers across SongCache instances
         self._conn.execute("PRAGMA journal_mode=WAL")
@@ -114,6 +115,14 @@ class SongCache:
         self._conn.execute("DELETE FROM song_cache WHERE cache_key = ?", (key,))
         self._conn.execute("DELETE FROM lyrics_config WHERE cache_key = ?", (key,))
         self._conn.commit()
+
+    def remove_binding(self, key: str, song_id: str, source: str) -> None:
+        """Expire the missing lyrics without deleting a concurrent rebind or timing settings."""
+        with self._conn:
+            self._conn.execute(
+                "DELETE FROM song_cache WHERE cache_key = ? AND lyrics_song_id = ? AND lyrics_source = ?",
+                (key, song_id, source),
+            )
 
     def list_all(self) -> list[dict[str, Any]]:
         rows = self._conn.execute(

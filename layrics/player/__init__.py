@@ -31,6 +31,7 @@ from .mpris import (
     MprisSignalMonitor,
     MPRISSource,
     is_excluded,
+    scan_player_names,
     scan_players,
 )
 
@@ -54,6 +55,13 @@ def mpd_reachable(endpoint: Endpoint, timeout: float = 2.0) -> bool:
         return False
     finally:
         conn.close()
+
+
+def discover_source_ids(cfg, *, attached: Iterable[str] = ()) -> list[str]:
+    ids = [name for name in scan_player_names() if not is_excluded(name, cfg.mpris.exclude)]
+    if "mpd" in attached or mpd_reachable(endpoint_from_config(cfg)):
+        ids.append("mpd")
+    return ids
 
 
 def list_sources(cfg, *, attached: Iterable[str] = ()) -> list[dict]:
@@ -141,6 +149,7 @@ __all__ = [
     "PlayerUnavailable",
     "SourceSnapshot",
     "TrackMeta",
+    "discover_source_ids",
     "endpoint_from_config",
     "is_excluded",
     "list_sources",

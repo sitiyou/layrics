@@ -19,7 +19,7 @@ from layrics.LDDC.common.models import (
 from layrics.LDDC.core.api.lyrics import get_lyrics as _lddc_get_lyrics
 from layrics.LDDC.core.api.lyrics import search as _lddc_search
 
-from .assprovider import Lyrics, match_provider
+from .assprovider import GradientOutlineProvider, Lyrics, match_provider
 from .config import get_config
 
 logger = logging.getLogger("layrics.lyrics")
@@ -57,9 +57,7 @@ async def search_songs(keyword: str, limit: int = 10) -> list[dict[str, Any]]:
     )
 
     try:
-        results = await _lddc_search(
-            title=keyword, sources=search_sources, page=1
-        )
+        results = await _lddc_search(title=keyword, sources=search_sources, page=1)
     except Exception as e:
         logger.error("search: error %s", e)
         return []
@@ -123,7 +121,9 @@ def _convert_japanese(lyrics_data: _LDCLyrics) -> None:
 async def fetch_lyrics(
     song_info: SongInfo,
     player_name: str = "",
-) -> str:
+    *,
+    hook: bool = False,
+) -> str | bytes:
     logger.debug(
         "fetch: %s/%s  title=%s  artist=%s  dur=%s",
         song_info.source.name,
@@ -159,4 +159,9 @@ async def fetch_lyrics(
         raise ValueError("no matching ASS provider")
     provider = provider_cls(config=cfg.get_provider_config(provider_cls.PROVIDER))
     logger.debug("fetch: ASS provider=%s", provider_cls.PROVIDER)
-    return await asyncio.to_thread(provider.generate, lyrics, song_info.duration)
+    generate = (
+        provider.generate_overlay
+        if hook and isinstance(provider, GradientOutlineProvider)
+        else provider.generate
+    )
+    return await asyncio.to_thread(generate, lyrics, song_info.duration)

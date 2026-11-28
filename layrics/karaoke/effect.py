@@ -45,7 +45,7 @@ def _glow_colour(
     return "".join(f"{round(channel * 255):02X}" for channel in (blue, green, red))
 
 
-def _lyrics(words: list[FSLyricsWord], style_name: str) -> DocumentLyrics:
+def project_words(words: list[FSLyricsWord], style_name: str) -> DocumentLyrics:
     appearance = TextAppearance(style_name, WHITE, WHITE, BLACK, BLACK)
     runs: list[TextRun] = []
     units: list[LyricUnit] = []
@@ -93,7 +93,7 @@ def _lyrics(words: list[FSLyricsWord], style_name: str) -> DocumentLyrics:
     )
 
 
-def _body_origin(document: Document, style: Style, bounds: Box) -> tuple[float, float]:
+def body_origin(document: Document, style: Style, bounds: Box) -> tuple[float, float]:
     available = document.meta.res_x - style.margin_l - style.margin_r - bounds.width
     left = style.margin_l + available * ((style.align - 1) % 3) / 2
     top = (
@@ -118,7 +118,7 @@ def _draw_layout(
     ruby: Style,
     options: dict[str, Any],
 ) -> Iterator[Line]:
-    lyrics = _lyrics(words, style.name)
+    lyrics = project_words(words, style.name)
     surface = lyrics.body.text
     if not surface.strip():
         return
@@ -129,7 +129,7 @@ def _draw_layout(
         display=Lifetime(line.start_time / 1000, line.end_time / 1000),
         ruby_gap=0,
     )
-    x, y = _body_origin(document, style, measured.body.bounds)
+    x, y = body_origin(document, style, measured.body.bounds)
     readings = {
         (item.unit_index, item.segment_index): item.layout for item in measured.ruby
     }

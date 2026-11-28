@@ -130,3 +130,28 @@ def test_visibility_commands_reach_controller(method, params, hidden):
     assert response == {"id": 1, "type": "result", "data": {"hidden": hidden}}
     app.ctrl.set_status.assert_called_once_with(hidden=hidden)
     assert app.ctrl.mock_calls == [call.set_status(hidden=hidden)]
+
+
+def test_socket_lifecycle_preserves_existing_paths(tmp_path):
+    app = object.__new__(LayricsApp)
+    path = tmp_path / "daemon.sock"
+    app.socket_path = str(path)
+
+    async def check():
+        path.write_text("keep")
+        with pytest.raises(OSError):
+            await app._start_ipc_server()
+        assert path.read_text() == "keep"
+        path.unlink()
+        with socket.socket(socket.AF_UNIX) as stale:
+            stale.bind(str(path))
+        async with await app._start_ipc_server() as server:
+            assert path.stat().st_mode & 0o777 == 0o600
+            with pytest.raises(OSError):
+                await app._start_ipc_server()
+            assert server.is_serving()
+            path.unlink()
+            path.write_text("replacement")
+        assert path.read_text() == "replacement"
+
+    asyncio.run(check())

@@ -121,8 +121,8 @@ def fetch(ctx, song_id: str):
 @click.argument("path")
 @click.pass_context
 def load(ctx, path: str):
-    """Load an ASS file and display on overlay"""
-    _pp(_call(ctx.obj["socket"], "load_ass", {"path": path}))
+    """Load an ASS or .hook file and display on overlay"""
+    _pp(_call(ctx.obj["socket"], "load_ass", {"path": os.path.abspath(path)}))
 
 
 @cli.command()

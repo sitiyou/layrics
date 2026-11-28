@@ -9,6 +9,7 @@ from layrics import lyricsource
 from layrics.assprovider import (
     AssTrigger,
     DefaultProvider,
+    GradientOutlineProvider,
     KaraTemplaterProvider,
     Lyrics,
     _protocol,
@@ -456,3 +457,117 @@ def test_fetch_dispatches_provider_off_event_loop(tmp_path, monkeypatch):
     assert (
         asyncio.run(lyricsource.fetch_lyrics(lyrics.info.songinfo)) == "generated ASS"
     )
+
+
+try:
+    from layrics.karaoke import gradient_outline as gallery_hook
+except ImportError:
+    gallery_hook = None
+
+
+@pytest.mark.parametrize("mode", ["single", "double"])
+@pytest.mark.parametrize(
+    "kind", [LyricsType.VERBATIM, LyricsType.LINEBYLINE, LyricsType.PlainText]
+)
+@pytest.mark.parametrize("karaoke", [True, False])
+def test_gallery_playback_and_ass_export(mode, kind, karaoke, monkeypatch, tmp_path):
+    monkeypatch.setattr(config_module, "CONFIG_PATH", str(tmp_path / "missing.toml"))
+    cfg = config_module.Config()
+    lyrics = make_lyrics(line_count=4, translation=True)
+    lyrics.types["orig"] = kind
+    assert match_provider("", lyrics, name=cfg.ass_provider) is GradientOutlineProvider
+    provider = GradientOutlineProvider({"line_mode": mode, "karaoke": karaoke})
+    ass = provider.generate(lyrics)
+    assert ass == DefaultProvider({"line_mode": mode, "karaoke": karaoke}).generate(
+        lyrics
+    )
+    assert "Dialogue:" in ass
+    overlay = provider.generate_overlay(lyrics, 30000)
+    if karaoke and kind == LyricsType.VERBATIM and gallery_hook is not None:
+        assert isinstance(overlay, bytes)
+        assert b"//!HOOK" in overlay and b"//!PARAM PTS" in overlay
+    else:
+        assert overlay == ass
+
+
+@pytest.mark.parametrize("mode", ["single", "double"])
+@pytest.mark.skipif(gallery_hook is None, reason="requires gallery Hook support")
+def test_gallery_hook_receives_single_layer_source_ass(mode, monkeypatch):
+    lyrics = make_lyrics(line_count=4, translation=True)
+    cfg = {"line_mode": mode, "karaoke": True}
+    timed = lyrics.get_fslyrics(30000)
+    expected_source = DefaultProvider(cfg)._generate_timed(lyrics, timed)
+    expected_scene = gallery_hook.build_scene(expected_source, timed["orig"])
+
+    captured: list[str] = []
+    real_build_scene = gallery_hook.build_scene
+
+    def spy_build_scene(ass, rows):
+        captured.append(ass)
+        return real_build_scene(ass, rows)
+
+    monkeypatch.setattr(gallery_hook, "build_scene", spy_build_scene)
+    provider = GradientOutlineProvider(cfg)
+    overlay = provider.generate_overlay(lyrics, 30000)
+    assert isinstance(overlay, bytes) and b"//!HOOK" in overlay
+    assert captured == [expected_source]
+
+    # Hook input must stay strictly single-layer with unmodified Primary/Secondary styles
+    source_doc = Document.parse(captured[0])
+    assert not any(name.endswith("Rim") for name in source_doc.styles)
+    assert not any("Dim" in name for name in source_doc.styles)
+    assert len(expected_scene.objects) == (8 if mode == "single" else 4)
+
+
+@pytest.mark.parametrize("mode", ["single", "double"])
+@pytest.mark.skipif(gallery_hook is None, reason="requires gallery Hook support")
+def test_gallery_verbatim_export_and_hook_fallback(mode, monkeypatch):
+    from kara_templater import SceneCompileError
+
+    lyrics = make_lyrics(line_count=4, translation=True)
+    provider = GradientOutlineProvider({"line_mode": mode, "karaoke": True})
+    exported = provider.generate(lyrics, 30000)
+    assert exported == DefaultProvider({"line_mode": mode}).generate(lyrics, 30000)
+
+    def fail_compile(ass, rows):
+        raise SceneCompileError("forced failure")
+
+    monkeypatch.setattr(gallery_hook, "build_scene", fail_compile)
+    assert provider.generate_overlay(lyrics, 30000) == exported
+
+
+@pytest.mark.skipif(gallery_hook is None, reason="requires gallery Hook support")
+def test_wavefront_stays_inside_glyph_after_unit_grouping():
+    lyrics = make_lyrics()
+    lyrics["orig"] = [
+        LyricsLine(
+            1000, 2000, [LyricsWord(1000, 1500, "A"), LyricsWord(1500, 2000, "A")]
+        )
+    ]
+    timed = lyrics.get_fslyrics(3000)
+    line = gallery_hook.build_scene(
+        DefaultProvider().generate(lyrics), timed["orig"]
+    ).objects[0]
+    for group, glyph in zip(line.children, line.layout.body.characters, strict=True):
+        paint = group.children[0].shader_paint
+        # The last segment stores t0, t1, left, right in glyph-local coordinates.
+        left, right = paint.parameters[-2:]
+        pen = glyph.object.state.position
+        assert (left + pen.x, right + pen.x) == pytest.approx(
+            (glyph.bounds.left, glyph.bounds.right)
+        )
+        assert paint.parameters[18] + pen.y == pytest.approx(glyph.ink_bounds.top)
+
+
+def test_partial_font_and_source_config(tmp_path, monkeypatch):
+    path = tmp_path / "config.toml"
+    path.write_text('[fonts]\ndefault = "My fallback"\n[search]\nsources = [5, "ne", "NE"]')
+    monkeypatch.setattr(config_module, "CONFIG_PATH", str(path))
+    cfg = config_module.Config()
+    assert cfg.search.sources == [Source.NE]
+    assert cfg.fonts.mapping["ja"] == "Noto Sans CJK JP"
+    raw = make_lyrics()
+    assert Lyrics(raw, cfg.fonts.mapping).primary_style.font_name == "My fallback"
+    override = {"font_name": "Style font"}
+    assert Lyrics(raw, cfg.fonts.mapping, primary_override=override).primary_style.font_name == "Style font"
+    assert Lyrics(raw, {"en": "English"}, primary_override=override).primary_style.font_name == "English"

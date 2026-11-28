@@ -304,21 +304,21 @@ class NEAPI(CloudAPI):
             elif "by" not in tags:
                 tags.update({"by": data["transUser"]["nickname"]})
         lyrics.tags = tags
-        if "yrc" in data and len(data["yrc"]["lyric"]) != 0:
-            mapping_table = [("orig", "yrc"), ("ts", "tlyric"), ("roma", "romalrc"), ("orig_lrc", "lrc")]
-        else:
-            mapping_table = [("orig", "lrc"), ("ts", "tlyric"), ("roma", "romalrc")]
-        for key, value in mapping_table:
-            if value not in data:
+        for field, key in (("yrc", "orig"), ("lrc", "orig"), ("tlyric", "ts"), ("romalrc", "roma")):
+            track = data.get(field)
+            text = track.get("lyric") if isinstance(track, dict) else None
+            if not isinstance(text, str) or not text.strip():
                 continue
-            if isinstance(data[value]["lyric"], str) and len(data[value]["lyric"]) != 0:
-                if value == "yrc":
-                    lyrics[key] = yrc2data(data[value]["lyric"])
-                elif "[" in data[value]["lyric"] and "]" in data[value]["lyric"]:
-                    lyrics[key] = lrc2data(data[value]["lyric"], source=Source.NE)[1]
-                else:
-                    lyrics[key] = plaintext2data(data[value]["lyric"])
-                lyrics.types[key] = judge_lyrics_type(lyrics[key])
+            if field == "yrc":
+                lines = yrc2data(text)
+            elif "[" in text and "]" in text:
+                lines = lrc2data(text, source=Source.NE)[1]
+            else:
+                lines = plaintext2data(text)
+            if lines:
+                track_key = "orig_lrc" if field == "lrc" and "orig" in lyrics else key
+                lyrics[track_key] = lines
+                lyrics.types[track_key] = judge_lyrics_type(lines)
         if not lyrics:
             msg = "no lyrics found"
             raise LyricsNotFoundError(msg, info)

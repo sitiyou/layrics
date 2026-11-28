@@ -138,7 +138,9 @@ class Lyrics(_LDCLyrics):
         else:
             base = replace(base, name=name)
         lang = self.detect_lang(lang_key)
-        f = self._fonts.get(lang)
+        f = self._fonts.get(lang) if lang != "default" else None
+        if not f and not override.get("font_name"):
+            f = self._fonts.get("default")
         if f:
             base = replace(base, font_name=f)
         return base

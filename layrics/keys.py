@@ -8,8 +8,9 @@ and matches them against hotkeys registered through KeyManager.register().
 import asyncio
 import inspect
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -108,7 +109,7 @@ class KeyEvent:
 class Hotkey:
     """A parsed hotkey binding: modifier mask + main keycode + callback."""
 
-    __slots__ = ("spec", "mods", "keycode", "callback")
+    __slots__ = ("callback", "keycode", "mods", "spec")
 
     def __init__(self, spec: str, callback: Callable[[KeyEvent], Any]):
         parts = [p.strip().upper() for p in spec.split("+")]

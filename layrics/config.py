@@ -135,7 +135,7 @@ class Config:
         self.lyrics = LyricsConfig()
         self.dmenu = DmenuConfig()
         self.tray = TrayConfig()
-        self.ass_provider = "default"
+        self.ass_provider = "gradient-outline"
         self._provider_config: dict[str, dict[str, Any]] = {}
         self._provider_config.setdefault(
             "default",
@@ -160,8 +160,10 @@ class Config:
     def _parse_sources(raw_sources: list[str]) -> list[Source]:
         parsed: list[Source] = []
         for name in raw_sources:
+            if not isinstance(name, str):
+                continue
             src = Source.parse(name)
-            if src is not None:
+            if src is not None and src.supported_search_types and src not in parsed:
                 parsed.append(src)
         return parsed
 
@@ -185,7 +187,7 @@ class Config:
         raw_overlay = data.get("overlay", {})
         if isinstance(raw_overlay, dict):
             raw_fps = raw_overlay.get("target_fps", -1)
-            if isinstance(raw_fps, int) and (raw_fps > 0 or raw_fps == -1):
+            if type(raw_fps) is int and (raw_fps > 0 or raw_fps == -1):
                 self.overlay.target_fps = raw_fps
             raw_anim = raw_overlay.get("animation", {})
             if isinstance(raw_anim, dict):
@@ -222,7 +224,9 @@ class Config:
         # [fonts]
         raw_fonts = data.get("fonts", {})
         if isinstance(raw_fonts, dict):
-            self.fonts.mapping = {str(k): str(v) for k, v in raw_fonts.items()}
+            self.fonts.mapping.update(
+                {k: v for k, v in raw_fonts.items() if isinstance(v, str) and v.strip()}
+            )
 
         # [style]
         raw_style = data.get("style", {})

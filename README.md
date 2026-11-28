@@ -1,5 +1,3 @@
-
-
 [English README](#layrics-english) · [中文 README](#layrics)
 
 > [!NOTE]
@@ -13,7 +11,7 @@
 
 # layrics
 
-layrics 是一款桌面歌词软件：从 MPRIS 兼容的播放器（Spotify、mpd 等）中获取播放状态，自动搜索并匹配当前歌曲的歌词，以卡拉 OK（逐字）或纯文本形式悬浮显示在桌面上。渲染基于 `wlr-layer-shell` 协议与 libass（ASS 字幕），支持 Sway、Hyprland、KDE Plasma 等 Wayland 合成器。
+layrics 是一款桌面歌词软件：从 MPRIS 兼容的播放器（Spotify、mpd 等）中获取播放状态，自动搜索并匹配当前歌曲的歌词，以卡拉 OK（逐字）或纯文本形式悬浮显示在桌面上。通过 `wlr-layer-shell` 创建覆盖层，使用 libass 渲染 ASS 字幕，支持 Hook 的引擎通过 libplacebo 渲染逐字特效，支持 Sway、Hyprland、KDE Plasma 等 Wayland 合成器。
 
 https://github.com/user-attachments/assets/6b443cf9-284a-4800-afc5-e7a7fb488092
 
@@ -33,7 +31,7 @@ https://github.com/user-attachments/assets/6b443cf9-284a-4800-afc5-e7a7fb488092
 - **Layer Shell 覆盖层**：基于 wlr-layer-shell 协议自动悬浮，无需在窗口管理器额外设置规则
 - **libass 渲染**：支持 ASS 字幕全部特性，包括卡拉 OK（`\k`）、样式、字体和特效
 - **硬件加速**：基于 Vulkan 提供 GPU 硬件加速
-- **卡拉 OK 模板**：可选用 kara-templater provider 处理逐字歌词，实现高级卡拉 OK 效果，无需 Aegisub
+- **卡拉 OK 模板**：默认在基础歌词样式上逐字扫色，支持切换光晕模板或普通 ASS
 - **歌曲-歌词缓存**：匹配结果本地缓存
 - **拖拽支持**：点击拖拽覆盖层重新定位字幕位置
 - **右键菜单**：悬停字幕时右键弹出菜单（搜索歌词/显示/锁定/ASS 配置/帧率/播放器/缓存等）
@@ -50,6 +48,7 @@ https://github.com/user-attachments/assets/6b443cf9-284a-4800-afc5-e7a7fb488092
 - `wayland`
 - `vulkan`、`vulkan-headers`
 - `shaderc`
+- `libplacebo >= 6.338` (Vulkan)
 - `libass`
 - `fontconfig`
 - `uv`
@@ -58,7 +57,7 @@ https://github.com/user-attachments/assets/6b443cf9-284a-4800-afc5-e7a7fb488092
 
 ### 安装
 
-layrics 使用 Python 3.14 或更新版本。源码安装会从 PyPI 安装 kara-templater 1.1.1 或更新的兼容版本。
+layrics 使用 Python 3.14 或更新版本。源码安装会从 PyPI 安装 kara-templater 1.2.2 或更新的兼容版本。
 
 ```bash
 # uv / pipx
@@ -75,7 +74,7 @@ cd layrics
 uv tool install .
 ```
 
-叠加引擎由独立依赖 `asslayer>=0.1.0,<0.2.0` 提供，安装时自动从 PyPI 获取，无需单独克隆引擎仓库。Wayland layer namespace 保持为 `layrics`，已有合成器规则无需修改。
+叠加引擎由独立依赖 `asslayer>=0.2.0,<0.3.0` 提供，安装时自动从 PyPI 获取，无需单独克隆引擎仓库。Wayland layer namespace 保持为 `layrics`，已有合成器规则无需修改。
 
 ## 使用
 
@@ -92,7 +91,7 @@ layrics
 4. 在系统托盘显示图标：左键切换歌词显隐，右键打开操作菜单
 
 可选参数：
-- `--socket, -s PATH`  — 自定义 IPC socket 路径（默认：`$XDG_RUNTIME_DIR/layrics.sock`）
+- `--socket, -s PATH`  — 自定义当前用户专用的 IPC socket 路径（默认：`$XDG_RUNTIME_DIR/layrics.sock`）
 
 ### 使用 layctl 控制
 
@@ -190,19 +189,31 @@ hl.bind("SUPER + SHIFT + M", hl.dsp.exec_cmd [[layctl dmenu]])
 
 ## 配置
 
-配置文件路径：`~/.config/layrics/config.toml`（或 `$LAYRICS_CONFIG_DIR/config.toml`）。
+配置文件路径：`~/.config/layrics/config.toml`（可通过 `XDG_CONFIG_HOME` 改变配置根目录，或用 `LAYRICS_CONFIG_DIR` 直接指定 layrics 的配置目录）。
 
-> 详细配置请参考 [examples/config.toml](https://github.com/sitiyou/layrics/blob/main/examples/config.toml)。
+> 详细配置请参考 [examples/config.toml](examples/config.toml)。
 
-默认使用 `default` provider。启用内置卡拉 OK 模板：
+默认的 `gradient-outline` 根据逐字时间把字面从基础 ASS 的 `SecondaryColour` 扫到 `PrimaryColour`，扫色前沿略微弯曲，带起一道窄亮边；扫到的字轻轻上浮后落回原位。待唱和唱完时都沿用基础样式的字色和描边。渲染设置继承自 `[assprovider.default]`。
+
+本地开发时，将 layrics、asslayer 和 kara-templater 检出到同一父目录。编译支持 Hook 的本地 asslayer 还需要 libplacebo ≥ 6.338 的开发文件。在 layrics 目录运行：
+
+```sh
+uv sync --locked
+uv pip install --python .venv/bin/python --reinstall --no-deps ../asslayer ../kara-templater
+.venv/bin/layrics
+```
+
+引擎缺少 Hook 输入时，逐字歌词自动使用原生 ASS 扫色。如果重新运行了 `uv sync`，请再执行上面的 `uv pip install`。播放逐字歌词时，日志中的 `Loaded libplacebo Hook` 表示引擎已载入 Hook。
+
+`layctl load song.hook` 可载入外部 Hook，`layctl fetch > lyrics.ass` 导出原生 ASS。逐行歌词、无时间轴提示和关闭扫色时均使用基础 ASS。逐字歌词导出到 ASS 时保留原生扫色。解锁后可按住可见的 Hook 歌词拖动。若要使用原版单层 ASS，可显式设置 `provider = "default"`；若要使用旧版光晕模板，可显式选择：
 
 ```toml
 [assprovider]
 provider = "kara-templater"
 ```
 
-修改后重启 layrics。`kara-templater` 1.1.1 或更新的兼容版本随应用安装，支持单行和双行模式；非逐字歌词或关闭 `karaoke` 时使用普通 ASS 输出。
-逐词时间直接来自歌词源，排版使用 kara-templater 的结构化字词与注音接口。每个可见词或注音生成四条原生 ASS 事件，数量与音符时长无关。默认模板包含四层光晕／轮廓、音节缩放脉冲和变速扫光；主色取主歌词的 `PrimaryColour`，光晕颜色自动派生。单行模式的副歌词配色沿用 `[style.secondary]`，字间距、描边和模糊按字号比例缩放，保留自身字体、字号及位置，不带动画。模板的 `spacing` 控制字间距，默认为 `5`。
+修改后重启 layrics。`kara-templater` 1.2.2 或更新的兼容版本随应用安装，支持单行和双行模式；非逐字歌词或关闭 `karaoke` 时使用普通 ASS 输出。
+逐词时间直接来自歌词源，排版使用 kara-templater 的结构化字词与注音接口。每个可见词或注音生成四条原生 ASS 事件，数量与音符时长无关。光晕模板包含四层光晕／轮廓、音节缩放脉冲和变速扫光；主色取主歌词的 `PrimaryColour`，光晕颜色自动派生。单行模式的副歌词配色沿用 `[style.secondary]`，字间距、描边和模糊按字号比例缩放，保留自身字体、字号及位置，不带动画。模板的 `spacing` 控制字间距，默认为 `5`。
 它继承 `[assprovider.default]` 的渲染设置，可在 `[assprovider.kara-templater]` 中覆盖；特效参数放在 `[assprovider.kara-templater.template]`。`layctl ass` 和右键菜单修改当前 provider 的设置。
 
 ## 环境变量
@@ -216,11 +227,11 @@ provider = "kara-templater"
 
 ## 歌词渲染
 
-- **卡拉 OK**（`karaoke=true`）：逐字扫色，默认 provider 用 `SecondaryColour` 作为扫色前的填充，用 `PrimaryColour` 作为扫色后的填充
+- **卡拉 OK**（`karaoke=true`）：逐字扫色，普通 ASS provider 用 `SecondaryColour` 作为扫色前的填充，用 `PrimaryColour` 作为扫色后的填充
 - **单行模式**（`line_mode="single"`）：一行居中，可附带翻译/罗马音
 - **双行模式**（`line_mode="double"`）：两行左右交替显示；启用 `advance_ms` 时提前显示为暗色，到播放时间点亮
 
-歌词语言（日语/韩语/中文/英语）自动识别，并从 `[fonts]` 选择对应字体。
+自动识别歌词语言后，优先使用 `[fonts]` 的语言字体，其次是对应轨道显式设置的 `font_name`，最后使用 `fonts.default`。
 
 获取歌词时在所有配置的歌词源中搜索，按标题、时长、歌手相似度选出最佳匹配。
 
@@ -247,7 +258,7 @@ provider = "kara-templater"
 
 ---
 
-layrics is a desktop lyrics overlay: it fetches playback state from MPRIS-compatible players (Spotify, mpd, ...), automatically searches and matches lyrics for the current track, and floats karaoke (word-by-word) or plain-text lyrics on your desktop. Rendering is built on `wlr-layer-shell`, libass (ASS subtitles) and Vulkan GPU compositing, supported on Sway, Hyprland, KDE Plasma, etc.
+layrics is a desktop lyrics overlay: it fetches playback state from MPRIS-compatible players (Spotify, mpd, ...), automatically searches and matches lyrics for the current track, and floats karaoke (word-by-word) or plain-text lyrics on your desktop. The overlay uses `wlr-layer-shell` and Vulkan, with libass for ASS subtitles and libplacebo for word-timed effects on Hook-capable engines. Supported compositors include Sway, Hyprland and KDE Plasma.
 
 https://github.com/user-attachments/assets/6b443cf9-284a-4800-afc5-e7a7fb488092
 
@@ -260,7 +271,7 @@ https://github.com/user-attachments/assets/6b443cf9-284a-4800-afc5-e7a7fb488092
 - **Layer Shell overlay**: auto-floating layer based on `wlr-layer-shell`, no compositor-specific setup required
 - **libass rendering**: supports ASS subtitle features including karaoke (`\k`), styling, fonts, and effects
 - **Vulkan hardware acceleration**: GPU-accelerated rendering
-- **Karaoke templates**: an optional kara-templater provider processes word-timed lyrics for advanced karaoke effects without Aegisub
+- **Karaoke templates**: timed word wipes in the base lyric style by default, with a glow template and plain ASS also available
 - **Song-to-lyrics cache**: local song match cache
 - **Drag support**: click and drag the overlay to reposition subtitles
 - **Right-click menu**: right-click the lyrics to open a menu (search songs / show / lock / ASS config / FPS / player / cache, etc.)
@@ -277,6 +288,7 @@ https://github.com/user-attachments/assets/6b443cf9-284a-4800-afc5-e7a7fb488092
 - `wayland`
 - `vulkan`, `vulkan-headers`
 - `shaderc`
+- `libplacebo >= 6.338` (Vulkan)
 - `libass`
 - `fontconfig`
 - `uv`
@@ -285,7 +297,7 @@ https://github.com/user-attachments/assets/6b443cf9-284a-4800-afc5-e7a7fb488092
 
 ### Install
 
-Layrics uses Python 3.14 or later. A source installation installs kara-templater 1.1.1 or a compatible newer release from PyPI.
+Layrics uses Python 3.14 or later. A source installation installs kara-templater 1.2.2 or a compatible newer release from PyPI.
 
 ```bash
 # uv / pipx
@@ -302,7 +314,7 @@ cd layrics
 uv tool install .
 ```
 
-The overlay engine is provided by the independent dependency `asslayer>=0.1.0,<0.2.0`, fetched automatically from PyPI during installation. No separate engine checkout is needed. The Wayland layer namespace remains `layrics`, so existing compositor rules continue to apply.
+The overlay engine is provided by the independent dependency `asslayer>=0.2.0,<0.3.0`, fetched automatically from PyPI during installation. No separate engine checkout is needed. The Wayland layer namespace remains `layrics`, so existing compositor rules continue to apply.
 
 ## Usage
 
@@ -319,7 +331,7 @@ The daemon:
 4. Shows a system tray icon: left click toggles the overlay, right click opens the menu
 
 Optional arguments:
-- `--socket, -s PATH`  — custom IPC socket path (default: `$XDG_RUNTIME_DIR/layrics.sock`)
+- `--socket, -s PATH`  — custom path for the user-only IPC socket (default: `$XDG_RUNTIME_DIR/layrics.sock`)
 
 ### Control with layctl
 
@@ -416,19 +428,31 @@ hl.bind("SUPER + SHIFT + M", hl.dsp.exec_cmd [[layctl dmenu]])
 
 ## Configuration
 
-Configuration is loaded from `~/.config/layrics/config.toml` (or `$LAYRICS_CONFIG_DIR/config.toml`).
+Configuration is loaded from `~/.config/layrics/config.toml` (respecting `XDG_CONFIG_HOME`, with `LAYRICS_CONFIG_DIR` overriding the layrics directory).
 
-> See [examples/config.toml](https://github.com/sitiyou/layrics/blob/main/examples/config.toml) for the full configuration reference.
+> See [examples/config.toml](examples/config.toml) for the full configuration reference.
 
-The default provider is `default`. To enable the built-in karaoke templates:
+The default `gradient-outline` provider wipes each timed word from the base ASS style’s `SecondaryColour` to its `PrimaryColour`, with a curved leading edge and a brief glint. Each glyph lifts slightly as the front passes, then settles into the base style. Rendering options inherit from `[assprovider.default]`.
+
+For local Hook development, check out asslayer and kara-templater alongside layrics. Building this asslayer checkout also requires libplacebo ≥ 6.338 development files. From the layrics directory run:
+
+```sh
+uv sync --locked
+uv pip install --python .venv/bin/python --reinstall --no-deps ../asslayer ../kara-templater
+.venv/bin/layrics
+```
+
+An engine without Hook input uses native ASS karaoke for word-timed lyrics. After another `uv sync`, repeat the `uv pip install` step. During word-timed playback, the engine logs `Loaded libplacebo Hook` when the Hook loads successfully.
+
+Use `layctl load song.hook` to load an external Hook and `layctl fetch > lyrics.ass` to export native ASS. Line-timed lyrics, the untimed-lyrics hint and playback with karaoke disabled use the base ASS style. ASS exports preserve native karaoke timing for word-timed lyrics. Drag visible Hook lyrics while the overlay is unlocked. Set `provider = "default"` for the original single-layer plain ASS, or select the older glow template explicitly:
 
 ```toml
 [assprovider]
 provider = "kara-templater"
 ```
 
-Restart layrics after changing the provider. `kara-templater` 1.1.1 or a compatible newer version is installed with the application and supports single- and double-line modes. Non-word-timed lyrics, or disabling `karaoke`, use ordinary ASS output.
-Word clocks come directly from the lyric source. The provider uses kara-templater’s structured word and ruby layout and emits four native ASS events per visible word or reading, independent of note duration. The default template combines four glow/outline layers, syllable scale pulses, and a variable-speed highlight sweep. Its main colour follows the primary lyric style's `PrimaryColour`, with glow colours derived automatically. In single-line mode, secondary lyrics use the colours from `[style.secondary]`, with spacing, border widths, and blur scaled to their font size. They retain their own font, size, and position, without animation. The template's `spacing` controls character spacing and defaults to `5`.
+Restart layrics after changing the provider. `kara-templater` 1.2.2 or a compatible newer version is installed with the application and supports single- and double-line modes. Non-word-timed lyrics, or disabling `karaoke`, use ordinary ASS output.
+Word clocks come directly from the lyric source. The provider uses kara-templater’s structured word and ruby layout and emits four native ASS events per visible word or reading, independent of note duration. The glow template combines four glow/outline layers, syllable scale pulses, and a variable-speed highlight sweep. Its main colour follows the primary lyric style's `PrimaryColour`, with glow colours derived automatically. In single-line mode, secondary lyrics use the colours from `[style.secondary]`, with spacing, border widths, and blur scaled to their font size. They retain their own font, size, and position, without animation. The template's `spacing` controls character spacing and defaults to `5`.
 It inherits rendering settings from `[assprovider.default]`; override them in `[assprovider.kara-templater]` and configure effects in `[assprovider.kara-templater.template]`. `layctl ass` and the context menu update the current provider's settings.
 
 ## Environment Variables
@@ -442,11 +466,11 @@ It inherits rendering settings from `[assprovider.default]`; override them in `[
 
 ## Lyrics rendering
 
-- **Karaoke** (`karaoke=true`): syllable-by-syllable colour fill. The default provider uses `SecondaryColour` before the wipe and `PrimaryColour` after it
+- **Karaoke** (`karaoke=true`): syllable-by-syllable colour fill. The plain ASS provider uses `SecondaryColour` before the wipe and `PrimaryColour` after it
 - **Single line** (`line_mode="single"`): one centered line, optionally with a translation/romaji second line
 - **Double line** (`line_mode="double"`): two lines shown side by side; with `advance_ms` they appear dimmed before their play time and light up when it starts
 
-Lyrics language (Japanese/Korean/Chinese/English) is detected automatically and the matching font is picked from `[fonts]`.
+Font selection uses the detected language’s entry in `[fonts]`, then the track’s explicit `font_name`, then `fonts.default`.
 
 When fetching, all configured lyric sources are searched and the best match is chosen by title, duration and artist similarity.
 
